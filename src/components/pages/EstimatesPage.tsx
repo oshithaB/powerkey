@@ -3,7 +3,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import EstimateModal from '../modals/EstimateModal';
+import { useNavigate } from 'react-router-dom';
 
 interface Estimate {
   id: number;
@@ -33,7 +33,7 @@ export default function EstimatesPage() {
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const navigate = useNavigate();
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function EstimatesPage() {
 
   const handleEdit = (estimate: Estimate) => {
     setEditingEstimate(estimate);
-    setShowModal(true);
+    // setShowModal(true);
   };
 
   const handleDelete = async (id: number) => {
@@ -117,8 +117,7 @@ export default function EstimatesPage() {
         <h1 className="text-2xl font-bold text-gray-900">Estimates</h1>
         <button
           onClick={() => {
-            setEditingEstimate(null);
-            setShowModal(true);
+            navigate('/estimates/create')
           }}
           className="btn btn-primary btn-md"
         >
@@ -173,11 +172,6 @@ export default function EstimatesPage() {
                 <tr key={estimate.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <FileCheck className="h-5 w-5 text-blue-600" />
-                        </div>
-                      </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
                           {estimate.estimate_number}
@@ -265,17 +259,7 @@ export default function EstimatesPage() {
         </div>
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <EstimateModal
-          estimate={editingEstimate}
-          onClose={() => setShowModal(false)}
-          onSave={() => {
-            fetchEstimates();
-            setShowModal(false);
-          }}
-        />
-      )}
+      
     </div>
   );
 }

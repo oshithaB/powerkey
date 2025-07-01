@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
-import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,16 +28,57 @@ interface Estimate {
   created_at: string;
 }
 
+interface EstimateItem {
+  id?: number;
+  product_id: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_price: number;
+}
+
 export default function EstimatesPage() {
   const { selectedCompany } = useCompany();
   const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [taxRates, setTaxRates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
+    estimate_number: '',
+    customer_id: '',
+    employee_id: '',
+    estimate_date: new Date().toISOString().split('T')[0],
+    expiry_date: '',
+    discount_type: 'fixed' as 'percentage' | 'fixed',
+    discount_value: 0,
+    notes: '',
+    terms: ''
+  });
+
+  const [items, setItems] = useState<EstimateItem[]>([
+    {
+      product_id: 0,
+      description: '',
+      quantity: 1,
+      unit_price: 0,
+      tax_rate: 0,
+      tax_amount: 0,
+      total_price: 0
+    }
+  ]);
 
   useEffect(() => {
     fetchEstimates();
+    fetchData();
   }, [selectedCompany]);
 
   const fetchEstimates = async () => {
@@ -51,9 +92,72 @@ export default function EstimatesPage() {
     }
   };
 
-  const handleEdit = (estimate: Estimate) => {
+  const fetchData = async () => {
+    try {
+      const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
+        axios.get(`/api/customers/${selectedCompany?.id}`),
+        axios.get(`/api/employees/${selectedCompany?.id}`),
+        axios.get(`/api/products/${selectedCompany?.id}`),
+        axios.get(`/api/tax-rates/${selectedCompany?.id}`)
+      ]);
+
+      setCustomers(customersRes.data);
+      setEmployees(employeesRes.data);
+      setProducts(productsRes.data);
+      setTaxRates(taxRatesRes.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  const fetchEstimateItems = async (estimateId: number) => {
+    try {
+      const response = await axios.get(`/api/estimates/${selectedCompany?.id}/${estimateId}/items`);
+      setItems(response.data.length > 0 ? response.data : [
+        {
+          product_id: 0,
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ]);
+    } catch (error) {
+      console.error('Error fetching estimate items:', error);
+      // Set default item if fetch fails
+      setItems([
+        {
+          product_id: 0,
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ]);
+    }
+  };
+
+  const handleEdit = async (estimate: Estimate) => {
     setEditingEstimate(estimate);
-    // setShowModal(true);
+    setFormData({
+      estimate_number: estimate.estimate_number,
+      customer_id: estimate.customer_id.toString(),
+      employee_id: estimate.employee_id?.toString() || '',
+      estimate_date: estimate.estimate_date,
+      expiry_date: estimate.expiry_date || '',
+      discount_type: estimate.discount_type,
+      discount_value: estimate.discount_value,
+      notes: estimate.notes || '',
+      terms: estimate.terms || ''
+    });
+    
+    // Fetch estimate items
+    await fetchEstimateItems(estimate.id);
+    setShowModal(true);
   };
 
   const handleDelete = async (id: number) => {
@@ -77,6 +181,117 @@ export default function EstimatesPage() {
         alert(error.response?.data?.error || 'Failed to convert estimate');
       }
     }
+  };
+
+  const addItem = () => {
+    setItems([...items, {
+      product_id: 0,
+      description: '',
+      quantity: 1,
+      unit_price: 0,
+      tax_rate: 0,
+      tax_amount: 0,
+      total_price: 0
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+
+    // Auto-calculate when product is selected
+    if (field === 'product_id' && value) {
+      const product = products.find(p => p.id === parseInt(value));
+      if (product) {
+        updatedItems[index].description = product.name;
+        updatedItems[index].unit_price = product.unit_price;
+      }
+    }
+
+    // Calculate tax and total
+    if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
+      const item = updatedItems[index];
+      const subtotal = item.quantity * item.unit_price;
+      item.tax_amount = (subtotal * item.tax_rate) / 100;
+      item.total_price = subtotal + item.tax_amount;
+    }
+
+    setItems(updatedItems);
+  };
+
+  const calculateTotals = () => {
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    const totalTax = items.reduce((sum, item) => sum + item.tax_amount, 0);
+    
+    let discountAmount = 0;
+    if (formData.discount_type === 'percentage') {
+      discountAmount = (subtotal * formData.discount_value) / 100;
+    } else {
+      discountAmount = formData.discount_value;
+    }
+
+    const total = subtotal - discountAmount + totalTax;
+
+    return { subtotal, totalTax, discountAmount, total };
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const submitData = {
+        ...formData,
+        items,
+        customer_id: parseInt(formData.customer_id),
+        employee_id: formData.employee_id ? parseInt(formData.employee_id) : null
+      };
+
+      if (editingEstimate) {
+        await axios.put(`/api/estimates/${selectedCompany?.id}/${editingEstimate.id}`, submitData);
+      } else {
+        await axios.post(`/api/estimates/${selectedCompany?.id}`, submitData);
+      }
+
+      fetchEstimates();
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving estimate:', error);
+      alert('Failed to save estimate');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      estimate_number: '',
+      customer_id: '',
+      employee_id: '',
+      estimate_date: new Date().toISOString().split('T')[0],
+      expiry_date: '',
+      discount_type: 'fixed',
+      discount_value: 0,
+      notes: '',
+      terms: ''
+    });
+    setItems([
+      {
+        product_id: 0,
+        description: '',
+        quantity: 1,
+        unit_price: 0,
+        tax_rate: 0,
+        tax_amount: 0,
+        total_price: 0
+      }
+    ]);
+    setEditingEstimate(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -103,7 +318,9 @@ export default function EstimatesPage() {
     estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
+  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+
+  if (loading && !showModal) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -117,7 +334,8 @@ export default function EstimatesPage() {
         <h1 className="text-2xl font-bold text-gray-900">Estimates</h1>
         <button
           onClick={() => {
-            navigate('/estimates/create')
+            resetForm();
+            setShowModal(true);
           }}
           className="btn btn-primary btn-md"
         >
@@ -194,9 +412,11 @@ export default function EstimatesPage() {
                     <div className="text-sm text-gray-900">
                       {format(new Date(estimate.estimate_date), 'MMM dd, yyyy')}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      Expires: {format(new Date(estimate.expiry_date), 'MMM dd, yyyy')}
-                    </div>
+                    {estimate.expiry_date && (
+                      <div className="text-sm text-gray-500">
+                        Expires: {format(new Date(estimate.expiry_date), 'MMM dd, yyyy')}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -259,7 +479,302 @@ export default function EstimatesPage() {
         </div>
       </div>
 
-      
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                {editingEstimate ? 'Edit Estimate' : 'Create New Estimate'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowModal(false);
+                  resetForm();
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Header Information */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimate Number
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={formData.estimate_number}
+                    onChange={(e) => setFormData({ ...formData, estimate_number: e.target.value })}
+                    placeholder="AUTO"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer *
+                  </label>
+                  <select
+                    required
+                    className="input"
+                    value={formData.customer_id}
+                    onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                  >
+                    <option value="">Select Customer</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Employee
+                  </label>
+                  <select
+                    className="input"
+                    value={formData.employee_id}
+                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.first_name} {employee.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimate Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="input"
+                    value={formData.estimate_date}
+                    onChange={(e) => setFormData({ ...formData, estimate_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-medium text-gray-900">Items</h4>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax %</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="px-4 py-2">
+                            <select
+                              className="input"
+                              value={item.product_id}
+                              onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
+                            >
+                              <option value={0}>Select Product</option>
+                              {products.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="text"
+                              className="input"
+                              value={item.description}
+                              onChange={(e) => updateItem(index, 'description', e.target.value)}
+                              placeholder="Item description"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="input w-20"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="input w-24"
+                              value={item.unit_price}
+                              onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <select
+                              className="input w-20"
+                              value={item.tax_rate}
+                              onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                            >
+                              <option value={0}>0%</option>
+                              {taxRates.map((tax) => (
+                                <option key={tax.id} value={tax.rate}>
+                                  {tax.rate}%
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            ${item.total_price.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Totals Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      className="input min-h-[80px]"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Additional notes..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Terms & Conditions
+                    </label>
+                    <textarea
+                      className="input min-h-[80px]"
+                      value={formData.terms}
+                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+                      placeholder="Terms and conditions..."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span>Discount:</span>
+                        <div className="flex items-center space-x-2">
+                          <select
+                            className="input w-24"
+                            value={formData.discount_type}
+                            onChange={(e) => setFormData({ ...formData, discount_type: e.target.value as 'percentage' | 'fixed' })}
+                          >
+                            <option value="fixed">$</option>
+                            <option value="percentage">%</option>
+                          </select>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="input w-24"
+                            value={formData.discount_value}
+                            onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })}
+                          />
+                          <span className="w-20 text-right">${discountAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span>Tax:</span>
+                        <span>${totalTax.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="flex justify-between font-bold text-lg border-t pt-2">
+                        <span>Total:</span>
+                        <span>${total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="btn btn-secondary btn-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary btn-md"
+                >
+                  {loading ? 'Saving...' : editingEstimate ? 'Update Estimate' : 'Create Estimate'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

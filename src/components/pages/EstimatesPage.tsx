@@ -165,11 +165,19 @@ export default function EstimatesPage() {
       try {
         await axios.delete(`/api/estimates/${selectedCompany?.id}/${id}`);
         fetchEstimates();
-      } catch (error) {
+      } catch (error: any) {
+        // Check if backend sent a meaningful error message
+        const backendMessage = error.response?.data?.error;
+        if (backendMessage) {
+          alert(backendMessage); // or use your custom UI to show errors
+        } else {
+          alert('Failed to delete estimate');
+        }
         console.error('Error deleting estimate:', error);
       }
     }
   };
+  
 
   const handleConvertToInvoice = async (estimateId: number) => {
     if (window.confirm('Convert this estimate to an invoice?')) {
@@ -486,7 +494,7 @@ export default function EstimatesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50" style={{marginTop: "-10px"}}>
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">

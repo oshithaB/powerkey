@@ -798,6 +798,43 @@ app.put('/api/estimates/:companyId/:estimateId', authenticateToken, async (req, 
   }
 });
 
+// Delete estimate
+app.delete('/api/estimates/:companyId/:estimateId', authenticateToken, async (req, res) => {
+  try {
+    const { companyId, estimateId } = req.params;
+    
+    // Check if estimate exists
+    const [estimate] = await db.execute('SELECT id FROM estimates WHERE id = ? AND company_id = ?', [estimateId, companyId]);
+    
+    if (estimate.length === 0) {
+      return res.status(404).json({ error: 'Estimate not found' });
+    }
+
+    // Check if estimate is used in an invoice
+    const [invoiceRefs] = await db.execute(
+      'SELECT id FROM invoices WHERE estimate_id = ?',
+      [estimateId]
+    );
+
+    if (invoiceRefs.length > 0) {
+      return res.status(400).json({ error: 'Cannot delete estimate because it has already been converted to an invoice.' });
+    }
+
+    // Delete estimate items
+    await db.execute('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+    
+    // Delete estimate
+    await db.execute('DELETE FROM estimates WHERE id = ? AND company_id = ?', [estimateId, companyId]);
+    
+    res.json({ message: 'Estimate deleted successfully' });
+  }
+
+  catch (error) {
+    console.error('Error deleting estimate:', error);
+    res.status(500).json({ error: 'Failed to delete estimate' });
+  }
+});
+
 // Get estimate items
 app.get('/api/estimates/:companyId/:estimateId/items', authenticateToken, async (req, res) => {
   try {

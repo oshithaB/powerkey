@@ -12,6 +12,11 @@ import Layout from './components/layout/Layout';
 import CreateEstimate from './components/modals/CreateEstimate'
 import CreateInvoice from './components/modals/CreateInvoice';
 
+// Reports
+import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
+
+import NotFound from './components/NotFound/NotFound';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -78,6 +83,19 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Reports Routes */}
+              <Route
+                path="/reports/profit&loss"
+                element={
+                  <ProtectedRoute>
+                    <ProfitAndLossReport />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Catch-all route for 404 Not Found */}
+              <Route path='*' element={<NotFound />} />
             </Routes>
           </div>
         </Router>

@@ -236,8 +236,23 @@ export default function EstimatesPage() {
     }]);
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const removeItem = async (index: number) => {
+    const item = items[index];
+    
+    // If editing an existing estimate and the item has an ID, delete it from the backend
+    if (editingEstimate && item.id) {
+      try {
+        await axios.delete(`/api/estimate-items/${selectedCompany?.id}/${editingEstimate.id}/${item.id}`);
+        setItems(items.filter((_, i) => i !== index));
+      } catch (error: any) {
+        const backendMessage = error.response?.data?.error;
+        alert(backendMessage || 'Failed to delete estimate item');
+        console.error('Error deleting estimate item:', error);
+      }
+    } else {
+      // For new items or new estimates, remove directly from state
+      setItems(items.filter((_, i) => i !== index));
+    }
   };
 
   const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
@@ -767,7 +782,7 @@ export default function EstimatesPage() {
                     onClick={addItem}
                     className="btn btn-secondary btn-sm"
                   >
-                    <Plus className="h-4 w-4 mr two2" />
+                    <Plus className="h-4 w-4 mr-2" />
                     Add Item
                   </button>
                 </div>

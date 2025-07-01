@@ -726,6 +726,96 @@ app.post('/api/estimates/:companyId', authenticateToken, async (req, res) => {
   }
 });
 
+// Update estimate
+app.put('/api/estimates/:companyId/:estimateId', authenticateToken, async (req, res) => {
+  try {
+    const { companyId, estimateId } = req.params;
+    const {
+      estimate_number,
+      customer_id,
+      employee_id,
+      estimate_date,
+      expiry_date,
+      items,
+      discount_type,
+      discount_value,
+      notes,
+      terms
+    } = req.body;
+    
+    // Calculate totals
+    let subtotal = 0;
+    let totalTax = 0;
+    
+    for (const item of items) {
+      const itemTotal = item.quantity * item.unit_price;
+      subtotal += itemTotal;
+      totalTax += item.tax_amount || 0;
+    }
+    
+    // Calculate discount
+    let discountAmount = 0;
+    if (discount_type === 'percentage') {
+      discountAmount = (subtotal * discount_value) / 100;
+    } else {
+      discountAmount = discount_value || 0;
+    }
+    
+    const totalAmount = subtotal - discountAmount + totalTax;
+    
+    // Update estimate
+    await db.execute(`
+      UPDATE estimates SET
+        estimate_number = ?, customer_id = ?, employee_id = ?, estimate_date = ?, expiry_date = ?,
+        subtotal = ?, discount_type = ?, discount_value = ?, discount_amount = ?, tax_amount = ?, 
+        total_amount = ?, notes = ?, terms = ?
+      WHERE id = ? AND company_id = ?
+    `, [
+      estimate_number, customer_id, employee_id, estimate_date, expiry_date,
+      subtotal, discount_type, discount_value, discountAmount, totalTax, totalAmount,
+      notes, terms, estimateId, companyId
+    ]);
+    
+    // Delete existing items
+    await db.execute('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+    
+    // Add new estimate items
+    for (const item of items) {
+      await db.execute(`
+        INSERT INTO estimate_items (
+          estimate_id, product_id, description, quantity, unit_price, tax_rate, tax_amount, total_price
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        estimateId, item.product_id, item.description, item.quantity, item.unit_price,
+        item.tax_rate, item.tax_amount, item.quantity * item.unit_price
+      ]);
+    }
+    
+    res.json({ message: 'Estimate updated successfully' });
+  } catch (error) {
+    console.error('Error updating estimate:', error);
+    res.status(500).json({ error: 'Failed to update estimate' });
+  }
+});
+
+// Get estimate items
+app.get('/api/estimates/:companyId/:estimateId/items', authenticateToken, async (req, res) => {
+  try {
+    const { companyId, estimateId } = req.params;
+    const [items] = await db.execute(`
+      SELECT ei.*, p.name as product_name
+      FROM estimate_items ei
+      LEFT JOIN products p ON ei.product_id = p.id
+      WHERE ei.estimate_id = ?
+    `, [estimateId]);
+    
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching estimate items:', error);
+    res.status(500).json({ error: 'Failed to fetch estimate items' });
+  }
+});
+
 // Convert estimate to invoice
 app.post('/api/estimates/:companyId/:estimateId/convert', authenticateToken, async (req, res) => {
   try {

@@ -9,6 +9,9 @@ import CreateCompany from './components/company/CreateCompany';
 import Dashboard from './components/dashboard/Dashboard';
 import Layout from './components/layout/Layout';
 
+import CreateEstimate from './components/modals/CreateEstimate'
+import CreateInvoice from './components/modals/CreateInvoice';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -59,6 +62,22 @@ function App() {
                 }
               />
               <Route path="/" element={<Navigate to="/companies" />} />
+              <Route
+                path="/estimates/create"
+                element={
+                  <ProtectedRoute>
+                    <CreateEstimate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/invoices/create"
+                element={
+                  <ProtectedRoute>
+                    <CreateInvoice />
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
           </div>
         </Router>

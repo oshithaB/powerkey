@@ -3,8 +3,8 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, FileText, Eye, Send, DollarSign, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import InvoiceModal from '../modals/InvoiceModal';
 import PaymentModal from '../modals/PaymentModal';
+import { useNavigate } from 'react-router-dom';
 
 interface Invoice {
   id: number;
@@ -33,13 +33,14 @@ interface Invoice {
 }
 
 export default function InvoicesPage() {
+  const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  // const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
@@ -94,7 +95,7 @@ export default function InvoicesPage() {
 
   const handleEdit = (invoice: Invoice) => {
     setEditingInvoice(invoice);
-    setShowModal(true);
+    // setShowModal(true);
   };
 
   const handleDelete = async (id: number) => {
@@ -159,8 +160,7 @@ export default function InvoicesPage() {
           </button>
           <button
             onClick={() => {
-              setEditingInvoice(null);
-              setShowModal(true);
+              navigate('/invoices/create');
             }}
             className="btn btn-primary btn-md"
           >
@@ -339,6 +339,8 @@ export default function InvoicesPage() {
                       {(invoice.computed_status || invoice.status).replace('_', ' ').charAt(0).toUpperCase() + (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
                     </span>
                   </td>
+
+                  {/* Action Buttons  */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
@@ -386,7 +388,7 @@ export default function InvoicesPage() {
       </div>
 
       {/* Modals */}
-      {showModal && (
+      {/* {showModal && (
         <InvoiceModal
           invoice={editingInvoice}
           onClose={() => setShowModal(false)}
@@ -395,7 +397,7 @@ export default function InvoicesPage() {
             setShowModal(false);
           }}
         />
-      )}
+      )} */}
 
       {showPaymentModal && selectedInvoiceForPayment && (
         <PaymentModal

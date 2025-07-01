@@ -396,7 +396,7 @@ export default function EstimatesPage() {
         <button
           onClick={() => {
             resetForm();
-            setShowModal(true);
+            navigate('/estimates/create');
           }}
           className="btn btn-primary btn-md"
         >

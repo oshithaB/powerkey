@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Estimate {
   id: number;
@@ -14,7 +16,7 @@ interface Estimate {
   first_name?: string;
   last_name?: string;
   estimate_date: string;
-  expiry_date: string;
+  expiry_date?: string | null;
   subtotal: number;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
@@ -50,7 +52,11 @@ export default function EstimatesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [printingEstimate, setPrintingEstimate] = useState<Estimate | null>(null);
+  const [printItems, setPrintItems] = useState<EstimateItem[]>([]);
   const navigate = useNavigate();
+  const printRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     estimate_number: '',
@@ -113,7 +119,7 @@ export default function EstimatesPage() {
   const fetchEstimateItems = async (estimateId: number) => {
     try {
       const response = await axios.get(`/api/estimates/${selectedCompany?.id}/${estimateId}/items`);
-      setItems(response.data.length > 0 ? response.data : [
+      return response.data.length > 0 ? response.data : [
         {
           product_id: 0,
           description: '',
@@ -123,11 +129,10 @@ export default function EstimatesPage() {
           tax_amount: 0,
           total_price: 0
         }
-      ]);
+      ];
     } catch (error) {
       console.error('Error fetching estimate items:', error);
-      // Set default item if fetch fails
-      setItems([
+      return [
         {
           product_id: 0,
           description: '',
@@ -137,7 +142,7 @@ export default function EstimatesPage() {
           tax_amount: 0,
           total_price: 0
         }
-      ]);
+      ];
     }
   };
 
@@ -147,7 +152,7 @@ export default function EstimatesPage() {
       estimate_number: estimate.estimate_number,
       customer_id: estimate.customer_id.toString(),
       employee_id: estimate.employee_id?.toString() || '',
-      estimate_date: estimate.estimate_date,
+      estimate_date: estimate.estimate_date || new Date().toISOString().split('T')[0],
       expiry_date: estimate.expiry_date || '',
       discount_type: estimate.discount_type,
       discount_value: estimate.discount_value,
@@ -155,8 +160,8 @@ export default function EstimatesPage() {
       terms: estimate.terms || ''
     });
     
-    // Fetch estimate items
-    await fetchEstimateItems(estimate.id);
+    const fetchedItems = await fetchEstimateItems(estimate.id);
+    setItems(fetchedItems);
     setShowModal(true);
   };
 
@@ -165,7 +170,9 @@ export default function EstimatesPage() {
       try {
         await axios.delete(`/api/estimates/${selectedCompany?.id}/${id}`);
         fetchEstimates();
-      } catch (error) {
+      } catch (error: any) {
+        const backendMessage = error.response?.data?.error;
+        alert(backendMessage || 'Failed to delete estimate');
         console.error('Error deleting estimate:', error);
       }
     }
@@ -183,6 +190,40 @@ export default function EstimatesPage() {
     }
   };
 
+  const handlePrint = async (estimate: Estimate) => {
+    try {
+      setPrintingEstimate(estimate);
+      const fetchedItems = await fetchEstimateItems(estimate.id);
+      setPrintItems(fetchedItems);
+      setShowPrintPreview(true);
+    } catch (error) {
+      console.error('Error preparing print preview:', error);
+      alert('Failed to load print preview');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      if (printRef.current) {
+        const canvas = await html2canvas(printRef.current, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`estimate_${printingEstimate?.estimate_number}.pdf`);
+        setShowPrintPreview(false);
+        setPrintingEstimate(null);
+        setPrintItems([]);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF');
+    }
+  };
+
   const addItem = () => {
     setItems([...items, {
       product_id: 0,
@@ -195,15 +236,29 @@ export default function EstimatesPage() {
     }]);
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const removeItem = async (index: number) => {
+    const item = items[index];
+    
+    // If editing an existing estimate and the item has an ID, delete it from the backend
+    if (editingEstimate && item.id) {
+      try {
+        await axios.delete(`/api/estimate-items/${selectedCompany?.id}/${editingEstimate.id}/${item.id}`);
+        setItems(items.filter((_, i) => i !== index));
+      } catch (error: any) {
+        const backendMessage = error.response?.data?.error;
+        alert(backendMessage || 'Failed to delete estimate item');
+        console.error('Error deleting estimate item:', error);
+      }
+    } else {
+      // For new items or new estimates, remove directly from state
+      setItems(items.filter((_, i) => i !== index));
+    }
   };
 
   const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
-    // Auto-calculate when product is selected
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -212,7 +267,6 @@ export default function EstimatesPage() {
       }
     }
 
-    // Calculate tax and total
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
@@ -223,9 +277,9 @@ export default function EstimatesPage() {
     setItems(updatedItems);
   };
 
-  const calculateTotals = () => {
-    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    const totalTax = items.reduce((sum, item) => sum + item.tax_amount, 0);
+  const calculateTotals = (itemsToCalculate: EstimateItem[] = items) => {
+    const subtotal = itemsToCalculate.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    const totalTax = itemsToCalculate.reduce((sum, item) => sum + item.tax_amount, 0);
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
@@ -294,8 +348,10 @@ export default function EstimatesPage() {
     setEditingEstimate(null);
   };
 
-  const formatDate = (isoDate: string | Date) => {
+  const formatDate = (isoDate: string | Date | null | undefined) => {
+    if (!isoDate) return '';
     const date = new Date(isoDate);
+    if (isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
   };
 
@@ -448,12 +504,14 @@ export default function EstimatesPage() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => handlePrint(estimate)}
                         className="text-blue-600 hover:text-blue-900"
                         title="View"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => handlePrint(estimate)}
                         className="text-gray-600 hover:text-gray-900"
                         title="Print"
                       >
@@ -484,9 +542,147 @@ export default function EstimatesPage() {
         </div>
       </div>
 
+      {/* Print Preview Modal */}
+      {showPrintPreview && printingEstimate && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50" style={{ marginTop: "-10px" }}>
+          <div className="relative top-4 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Print Preview</h3>
+              <button
+                onClick={() => {
+                  setShowPrintPreview(false);
+                  setPrintingEstimate(null);
+                  setPrintItems([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[70vh]">
+              <div ref={printRef} className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900">
+                <div className="border-b pb-4 mb-4">
+                  <h1 className="text-3xl font-bold">Estimate #{printingEstimate.estimate_number}</h1>
+                  <p className="text-sm text-gray-600">ID: {printingEstimate.id}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold">Customer</h3>
+                    <p>{printingEstimate.customer_name || 'Unknown Customer'}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Details</h3>
+                    <p>Estimate Date: {formatDate(printingEstimate.estimate_date) || 'N/A'}</p>
+                    {printingEstimate.expiry_date && (
+                      <p>Expiry Date: {formatDate(printingEstimate.expiry_date)}</p>
+                    )}
+                    <p>Employee: {printingEstimate.first_name && printingEstimate.last_name 
+                      ? `${printingEstimate.first_name} ${printingEstimate.last_name}`
+                      : 'Not assigned'}</p>
+                    <p>Status: {printingEstimate.status.charAt(0).toUpperCase() + printingEstimate.status.slice(1)}</p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Items</h3>
+                  <table className="w-full border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Item #</th>
+                        <th className="px-4 py-2 text-left">Product</th>
+                        <th className="px-4 py-2 text-left">Description</th>
+                        <th className="px-4 py-2 text-right">Qty</th>
+                        <th className="px-4 py-2 text-right">Unit Price</th>
+                        <th className="px-4 py-2 text-right">Tax %</th>
+                        <th className="px-4 py-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {printItems.map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="px-4 py-2">{index + 1}</td>
+                          <td className="px-4 py-2">
+                            {item.product_id ? products.find(p => p.id === item.product_id)?.name || 'N/A' : 'N/A'}
+                          </td>
+                          <td className="px-4 py-2">{item.description || 'N/A'}</td>
+                          <td className="px-4 py-2 text-right">{item.quantity}</td>
+                          <td className="px-4 py-2 text-right">${Number(item.unit_price || 0).toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right">{item.tax_rate}%</td>
+                          <td className="px-4 py-2 text-right">${Number(item.total_price || 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    {printingEstimate.notes && (
+                      <div>
+                        <h3 className="text-lg font-semibold">Notes</h3>
+                        <p className="text-sm">{printingEstimate.notes}</p>
+                      </div>
+                    )}
+                    {printingEstimate.terms && (
+                      <div className="mt-4">
+                        <h3 className="text-lg font-semibold">Terms & Conditions</h3>
+                        <p className="text-sm">{printingEstimate.terms}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>${Number(printingEstimate.subtotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Discount ({printingEstimate.discount_type === 'percentage' ? '%' : '$'}):</span>
+                          <span>${Number(printingEstimate.discount_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tax:</span>
+                          <span>${Number(printingEstimate.tax_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg border-t pt-2">
+                          <span>Total:</span>
+                          <span>${Number(printingEstimate.total_amount || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                onClick={() => {
+                  setShowPrintPreview(false);
+                  setPrintingEstimate(null);
+                  setPrintItems([]);
+                }}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="btn btn-primary btn-md"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50" style={{marginTop: "-10px"}}>
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
@@ -504,7 +700,6 @@ export default function EstimatesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Header Information */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -563,7 +758,6 @@ export default function EstimatesPage() {
                     value={formatDate(formData.estimate_date)}
                     onChange={(e) => setFormData({ ...formData, estimate_date: e.target.value })}
                   />
-
                 </div>
               </div>
 
@@ -578,11 +772,9 @@ export default function EstimatesPage() {
                     value={formatDate(formData.expiry_date)}
                     onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
                   />
-
                 </div>
               </div>
 
-              {/* Items Section */}
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-lg font-medium text-gray-900">Items</h4>
@@ -670,7 +862,6 @@ export default function EstimatesPage() {
                           <td className="px-4 py-2 text-right">
                             ${Number(item.total_price || 0).toFixed(2)}
                           </td>
-
                           <td className="px-4 py-2">
                             <button
                               type="button"
@@ -687,7 +878,6 @@ export default function EstimatesPage() {
                 </div>
               </div>
 
-              {/* Totals Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
@@ -721,7 +911,6 @@ export default function EstimatesPage() {
                         <span>Subtotal:</span>
                         <span>${subtotal.toFixed(2)}</span>
                       </div>
-                      
                       <div className="flex justify-between items-center">
                         <span>Discount:</span>
                         <div className="flex items-center space-x-2">
@@ -740,16 +929,13 @@ export default function EstimatesPage() {
                             value={formData.discount_value}
                             onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })}
                           />
-                          <span className="w-20 text-right">${Number(discountAmount || 0).toFixed(2)}
-                          </span>
+                          <span className="w-20 text-right">${Number(discountAmount || 0).toFixed(2)}</span>
                         </div>
                       </div>
-                      
                       <div className="flex justify-between">
                         <span>Tax:</span>
                         <span>${Number(totalTax || 0).toFixed(2)}</span>
                       </div>
-                      
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total:</span>
                         <span>${Number(total || 0).toFixed(2)}</span>
@@ -759,7 +945,6 @@ export default function EstimatesPage() {
                 </div>
               </div>
 
-              {/* Submit Buttons */}
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"

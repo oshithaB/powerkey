@@ -40,7 +40,10 @@ const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'powerkey'
+  database: process.env.DB_NAME || 'powerkey',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 };
 
 // Configure nodemailer - FIXED: createTransport instead of createTransporter
@@ -68,8 +71,8 @@ async function initDatabase() {
     await tempDb.execute(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
     await tempDb.end();
 
-    // Step 3: Now connect with the database specified
-    db = await mysql.createConnection(dbConfig);
+    // Step 3: Now create connection pool with the database specified
+    db = mysql.createPool(dbConfig);
     console.log(`Connected to MySQL database: ${dbConfig.database}`);
 
     // Step 4: Create tables

@@ -14,6 +14,9 @@ interface AuthContextType {
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  requestPasswordReset: (email: string) => Promise<void>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // You might want to validate the token here
       const userData = localStorage.getItem('user');
       if (userData) {
         setUser(JSON.parse(userData));
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(userData);
     } catch (error) {
-      throw new Error('Login failed');
+      throw new Error(error.response?.data?.message || 'Login failed');
     }
   };
 
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         firstName,
-        lastName
+        lastName,
       });
       const { token, user: userData } = response.data;
       
@@ -74,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(userData);
     } catch (error) {
-      throw new Error('Registration failed');
+      throw new Error(error.response?.data?.message || 'Registration failed');
     }
   };
 
@@ -86,12 +88,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const requestPasswordReset = async (email: string) => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/password-reset/request', { email });
+      return response.data; // Assuming API returns success message or data
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async (email: string, otp: string) => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/password-reset/verify', { email, otp });
+      return response.data; // Assuming API returns verification status
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string, otp: string, newPassword: string) => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/password-reset/reset', { email, otp, newPassword });
+      return response.data; // Assuming API returns success message
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     login,
     register,
     logout,
-    loading
+    loading,
+    requestPasswordReset,
+    verifyOtp,
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

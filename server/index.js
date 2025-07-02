@@ -7,6 +7,8 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -40,6 +42,15 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'powerkey'
 };
+
+// Configure nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 let db;
 
@@ -81,6 +92,15 @@ async function createTables() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`,
+
+    // Password reset tokens table
+    `CREATE TABLE IF NOT EXISTS password_reset_otps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        otp VARCHAR(6) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`,
     
     // Companies table
     `CREATE TABLE IF NOT EXISTS companies (
@@ -462,6 +482,118 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Request OTP for password reset
+app.post('/api/auth/password-reset/request', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    const { email } = req.body;
+    console.log('Received password reset request for:', email);
+
+    // Check if user exists
+    const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      console.log('User not found:', email);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Start transaction
+    await connection.beginTransaction();
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    console.log('Generated OTP:', otp, 'Expires at:', expiresAt);
+
+    // Store OTP in database
+    await connection.execute(
+      'INSERT INTO password_reset_otps (email, otp, expires_at) VALUES (?, ?, ?)',
+      [email, otp, expiresAt]
+    );
+    console.log('OTP stored in database');
+
+    // Send OTP via email
+    await transporter.sendMail({
+      to: email,
+      subject: 'Password Reset OTP',
+      text: `Your OTP for password reset is: ${otp}. It expires in 10 minutes.`,
+    });
+    console.log('OTP email sent to:', email);
+
+    // Commit transaction
+    await connection.commit();
+    res.json({ message: 'OTP sent to email' });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    await connection.rollback();
+    res.status(500).json({ message: 'Failed to send OTP', error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// Verify OTP
+app.post('/api/auth/password-reset/verify', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    console.log('Verifying OTP for:', email, otp);
+
+    const [otps] = await db.execute(
+      'SELECT * FROM password_reset_otps WHERE email = ? AND otp = ? AND expires_at > NOW()',
+      [email, otp]
+    );
+
+    if (otps.length === 0) {
+      console.log('Invalid or expired OTP for:', email);
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    res.json({ message: 'OTP verified' });
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({ message: 'Failed to verify OTP', error: error.message });
+  }
+});
+
+// Reset password
+app.post('/api/auth/password-reset/reset', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    const { email, otp, newPassword } = req.body;
+    console.log('Resetting password for:', email);
+
+    await connection.beginTransaction();
+
+    const [otps] = await connection.execute(
+      'SELECT * FROM password_reset_otps WHERE email = ? AND otp = ? AND expires_at > NOW()',
+      [email, otp]
+    );
+
+    if (otps.length === 0) {
+      console.log('Invalid or expired OTP for:', email);
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    const [users] = await connection.execute('SELECT id FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      console.log('User not found:', email);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await connection.execute('UPDATE users SET password = ? WHERE email = ?', [hashedPassword, email]);
+    await connection.execute('DELETE FROM password_reset_otps WHERE email = ?', [email]);
+
+    await connection.commit();
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    await connection.rollback();
+    res.status(500).json({ message: 'Failed to reset password', error: error.message });
+  } finally {
+    connection.release();
   }
 });
 

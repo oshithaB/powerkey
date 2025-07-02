@@ -43,8 +43,8 @@ const dbConfig = {
   database: process.env.DB_NAME || 'powerkey'
 };
 
-// Configure nodemailer
-const transporter = nodemailer.createTransporter({
+// Configure nodemailer - FIXED: createTransport instead of createTransporter
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,

@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart3, FileText, TrendingUp, Download } from 'lucide-react';
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
+
   const reports = [
     {
       name: 'Sales Report',
@@ -64,7 +67,7 @@ export default function ReportsPage() {
         </div>
         <div className="card-content">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left">
+            <button className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left" onClick={() => navigate('/reports/profit&loss')}>
               <h4 className="font-medium text-gray-900 mb-1">Profit & Loss</h4>
               <p className="text-sm text-gray-600">Current month P&L statement</p>
             </button>

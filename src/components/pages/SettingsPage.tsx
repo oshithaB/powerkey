@@ -47,7 +47,7 @@ export default function SettingsPage() {
           <div className="flex items-center space-x-4">
             {selectedCompany?.logo ? (
               <img
-                src={selectedCompany.logo}
+                src={`http://localhost:3001${selectedCompany.logo}`}
                 alt={selectedCompany.name}
                 className="h-16 w-16 rounded-lg object-cover"
               />

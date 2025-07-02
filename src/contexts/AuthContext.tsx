@@ -55,8 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       setUser(userData);
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Login failed');
     }
   };
 
@@ -75,8 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       setUser(userData);
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Registration failed');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Registration failed');
     }
   };
 
@@ -90,37 +90,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const requestPasswordReset = async (email: string) => {
     try {
-      setLoading(true);
       const response = await axios.post('/api/auth/password-reset/request', { email });
-      return response.data; // Assuming API returns success message or data
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to send verification code');
     }
   };
 
   const verifyOtp = async (email: string, otp: string) => {
     try {
-      setLoading(true);
       const response = await axios.post('/api/auth/password-reset/verify', { email, otp });
-      return response.data; // Assuming API returns verification status
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Invalid OTP');
-    } finally {
-      setLoading(false);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Invalid or expired verification code');
     }
   };
 
   const resetPassword = async (email: string, otp: string, newPassword: string) => {
     try {
-      setLoading(true);
       const response = await axios.post('/api/auth/password-reset/reset', { email, otp, newPassword });
-      return response.data; // Assuming API returns success message
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to reset password');
-    } finally {
-      setLoading(false);
     }
   };
 

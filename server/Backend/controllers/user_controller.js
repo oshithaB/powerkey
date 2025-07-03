@@ -46,16 +46,6 @@ const addUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const [isMatch] = await db.query(
-            'SELECT * FROM user WHERE password_hash = ?',
-            [hashedPassword]
-        );
-        console.log('Checking for existing password:', isMatch);
-
-        if (isMatch.length > 0) {
-            return res.status(400).json({ success: false, message: 'Password already exists' });
-        }
-
         const role_lowercase = role.toLowerCase();
         console.log('Role after conversion to lowercase:', role_lowercase);
 
@@ -86,7 +76,127 @@ const addUser = async (req, res) => {
     }
 }
 
+// This function updates user details based on the userId from the request.
+// It allows updating fields like fullname, username, email, and password.
+// It checks for conflicts with existing usernames and emails.
+// It hashes the new password if provided.
+// It returns success or error messages based on the operation outcome.
+const updateUser = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const updates = req.body;
+        console.log('Update user request received for userId:', userId, 'with updates:', updates);
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ success: false, message: 'No fields to update' });
+        }
+
+        const allowedFields = ['fullname', 'username', 'email', 'password'];
+        const fieldsToUpdate = {};
+        for (const key of allowedFields) {
+            if (updates[key]) {
+                fieldsToUpdate[key] = updates[key];
+            }
+        }
+
+        console.log(fieldsToUpdate);
+
+        const [existingUserData] = await db.query(
+            'SELECT * FROM user WHERE user_id = ?',
+            [userId]
+        );
+
+        if (existingUserData.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found for update' });
+        }
+
+        if (fieldsToUpdate.fullname) {
+            if (fieldsToUpdate.fullname === existingUserData[0].full_name) {
+                delete fieldsToUpdate.fullname;
+            }
+        }
+
+        if (fieldsToUpdate.password) {
+            if (await bcrypt.compare(fieldsToUpdate.password, existingUserData[0].password_hash)) {
+                delete fieldsToUpdate.password;
+            }
+        }
+
+        // Check for username, email conflicts if those fields are being updated
+        if (fieldsToUpdate.username || fieldsToUpdate.email) {
+
+            if (fieldsToUpdate.username === existingUserData[0].username) {
+                delete fieldsToUpdate.username;
+            }
+
+            if (fieldsToUpdate.email === existingUserData[0].email) {
+                delete fieldsToUpdate.email;
+            }
+            
+
+            const [conflict] = await db.query(
+                'SELECT * FROM user WHERE (username = ? OR email = ?) AND user_id != ?',
+                [
+                    fieldsToUpdate.username || '',
+                    fieldsToUpdate.email || '',
+                    userId
+                ]
+            );
+            if (conflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Username, email or password already exists' });
+            }
+        }
+
+        if (Object.keys(fieldsToUpdate).length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid fields to update' });
+        }
+
+        // Prepare update query
+        const setClauses = [];
+        const values = [];
+
+        if (fieldsToUpdate.fullname) {
+            setClauses.push('full_name = ?');
+            values.push(fieldsToUpdate.fullname);
+        }
+        if (fieldsToUpdate.username) {
+            setClauses.push('username = ?');
+            values.push(fieldsToUpdate.username);
+        }
+        if (fieldsToUpdate.email) {
+            setClauses.push('email = ?');
+            values.push(fieldsToUpdate.email);
+        }
+        if (fieldsToUpdate.password) {
+            const hashedPassword = await bcrypt.hash(fieldsToUpdate.password, 10);
+            setClauses.push('password_hash = ?');
+            values.push(hashedPassword);
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid fields to update' });
+        }
+
+        values.push(userId);
+
+        const [result] = await db.query(
+            `UPDATE user SET ${setClauses.join(', ')} WHERE user_id = ?`,
+            values
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'User not found or nothing to update' });
+        }
+
+        return res.status(200).json({ success: true, message: 'User updated successfully' });
+        
+    } catch (error) {
+        console.error('Error updating user:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
 module.exports = {
     getUserDetails,
-    addUser
+    addUser,
+    updateUser
 };

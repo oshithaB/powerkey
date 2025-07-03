@@ -34,6 +34,12 @@ async function createTables(db) {
             UNIQUE KEY username (username),
             KEY role_id (role_id),
             CONSTRAINT user_ibfk_1 FOREIGN KEY (role_id) REFERENCES role (role_id)
+        )`,
+        `CREATE TABLE IF NOT EXISTS tax_rates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            rate DECIMAL(5,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
     ];
 

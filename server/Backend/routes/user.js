@@ -5,10 +5,12 @@ const authorizedRoles = require('../middleware/authorized-roles');
 
 const { 
     getUserDetails,
-    addUser
+    addUser,
+    updateUser
 } = require('../controllers/user_controller');
 
 router.get('/getUserDetails', verifyToken, getUserDetails);
 router.post('/addUser', verifyToken, authorizedRoles('admin'), addUser);
+router.put('/updateUser', verifyToken, updateUser);
 
 module.exports = router;

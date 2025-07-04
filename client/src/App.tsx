@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CompanyProvider } from './contexts/CompanyContext';
+
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import CompanySelection from './components/company/CompanySelection';
@@ -40,9 +42,8 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route
-                path="/companies"
-                element={
+              <Route path="/companies" 
+              element={
                   <ProtectedRoute>
                     <CompanySelection />
                   </ProtectedRoute>

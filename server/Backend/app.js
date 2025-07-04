@@ -16,8 +16,12 @@ const authRoutes = require("./routes/auth");
 const companyRoutes = require("./routes/company");
 const userRoutes = require("./routes/user");
 const roleRoutes = require("./routes/role");
+const tax_ratesRoutes = require("./routes/tax_rates");
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // Allow frontend origin
+  credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static('public/uploads'));
 

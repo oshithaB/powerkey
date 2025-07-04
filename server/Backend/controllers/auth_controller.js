@@ -1,5 +1,6 @@
 const db = require("../DB/db");
 const bcrypt = require('bcrypt');
+const { use } = require("bcrypt/promises");
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
@@ -11,11 +12,11 @@ require('dotenv').config();
 const authenticateUser = async (req, res) => {
     try {
         console.log('Login request received:', req.body);
-        const { username, password } = req.body;
-        console.log('Username:', username);
+        const { email, password } = req.body;
+        console.log('Email:', email);
         console.log('Password:', password);
 
-        const [user] = await db.query('SELECT * FROM user WHERE username = ?', [username]);
+        const [user] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
         console.log('User fetched from database:', user);
 
         if (user.length === 0) {
@@ -36,7 +37,18 @@ const authenticateUser = async (req, res) => {
                     process.env.JWT_SECRET,
                     { expiresIn: '1h' }
                 );
-                return res.status(200).json({ success: true, message: 'Login successful', token });
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'Login successful', 
+                    token , 
+                    user: { 
+                        id: user[0].user_id, 
+                        username: user[0].username, 
+                        email: user[0].email, 
+                        fullname: user[0].fullname, 
+                        role: role[0].name 
+                    } 
+                });
             } else {
                 return res.status(401).json({ success: false, message: 'Invalid credentials' });
             }
@@ -54,17 +66,18 @@ const authenticateUser = async (req, res) => {
 const verifyUser = async (req, res) => {
     try {
 
-        const {identifier} = req.body; 
-        console.log('Reset password request received for identifier:', identifier);
+        const {email} = req.body; 
+        console.log('Reset password request received for email:', email);
 
-        const [user] = await db.query('SELECT * FROM user WHERE username = ? OR email = ?', [identifier, identifier]);
+        const [user] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+
         
         if (user.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         generateOTP_Sendmail(user);
-        return res.status(200).json({ success: true, message: 'User found', userId: user[0].user_id });
+        return res.status(200).json({ success: true, message: 'User found' });
         
     } catch (err) {
         console.error('Error during user verification:', err);
@@ -77,11 +90,11 @@ const verifyUser = async (req, res) => {
 // This function verifies the OTP entered by the user against the one stored in the database.
 const verifyOTP = async (req, res) => {
     try {
-        const { userId, otp } = req.body;
-        console.log('OTP verification request received for user ID:', userId);
+        const { email, otp } = req.body;
+        console.log('OTP verification request received for email:', email);
 
-        const [user] = await db.query('SELECT * FROM user WHERE user_id = ?', [userId]);
-        
+        const [user] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+
         if (user.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
@@ -95,11 +108,11 @@ const verifyOTP = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid OTP' });
         }
 
-        const [result] = await db.query('UPDATE user SET otp_code = NULL, otp_expiry = NULL WHERE user_id = ?', [userId]);
+        const [result] = await db.query('UPDATE user SET otp_code = NULL, otp_expiry = NULL WHERE user_id = ?', [user[0].user_id]);
         if (result.affectedRows === 0) {
             return res.status(500).json({ success: false, message: 'Failed to clear OTP' });
         }
-        console.log('OTP verified and cleared for user ID:', userId);
+        console.log('OTP verified and cleared for email:', email);
 
         return res.json({ success: true, message: 'OTP verified successfully' });
 
@@ -136,12 +149,12 @@ const resendOTP = async (req, res) => {
 // This function take the user ID and new password from the request body, hashes the new password, and updates it in the database.
 const resetPassword = async (req, res) => {
     try {
-        const { userId, newPassword } = req.body;
-        const [result] = await db.query('UPDATE user SET password_hash = ? WHERE user_id = ?', [bcrypt.hashSync(newPassword, 10), userId]);
+        const { email, newPassword } = req.body;
+        const [result] = await db.query('UPDATE user SET password_hash = ? WHERE email = ?', [bcrypt.hashSync(newPassword, 10), email]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Failed to reset password' });
         }
-        console.log('Password reset successfully for user ID:', userId);
+        console.log('Password reset successfully for user email:', email);
         return res.status(200).json({ success: true, message: 'Password reset successfully' });
 
     } catch (err) {

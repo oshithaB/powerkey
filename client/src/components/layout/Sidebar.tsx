@@ -84,7 +84,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           <div className="flex items-center gap-x-3">
             {selectedCompany?.logo ? (
               <img
-                src={`http://localhost:3001${selectedCompany.logo}`}
+                src={`http://localhost:3000${selectedCompany.logo}`}
                 alt={selectedCompany.name}
                 className="h-8 w-8 rounded-lg object-cover"
               />

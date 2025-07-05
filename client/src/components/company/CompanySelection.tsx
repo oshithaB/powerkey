@@ -45,7 +45,7 @@ export default function CompanySelection() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome, {user?.firstName}!
+              Welcome, {user?.fullname}!
             </h1>
             <p className="text-gray-600 mt-2">
               Select a company to access your ERP dashboard
@@ -91,7 +91,7 @@ export default function CompanySelection() {
                   <div className="flex items-center">
                     {company.logo ? (
                       <img
-                        src={`http://localhost:3001${company.logo}`}
+                        src={`http://localhost:3000${company.logo}`}
                         alt={company.name}
                         className="w-12 h-12 rounded-lg object-cover"
                       />

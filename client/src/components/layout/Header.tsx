@@ -30,7 +30,7 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
         <div className="flex items-center gap-x-4 lg:gap-x-6">
           {selectedCompany?.logo ? (
             <img
-              src={`http://localhost:3001${selectedCompany.logo}`}
+              src={`http://localhost:3000${selectedCompany.logo}`}
               alt={selectedCompany.name}
               className="h-8 w-8 rounded-lg object-cover"
             />
@@ -51,7 +51,7 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
           <div className="relative">
             <div className="flex items-center gap-x-4">
               <span className="text-sm font-medium text-gray-700">
-                {user?.firstName} {user?.lastName}
+                {user?.fullname}
               </span>
               <div className="flex items-center gap-x-2">
                 <Link

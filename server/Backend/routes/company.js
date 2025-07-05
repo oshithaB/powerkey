@@ -4,14 +4,18 @@ const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 const upload = require('../middleware/upload');
 
-const { createCompany, selectCompany } = require('../controllers/company_controller');
+const { 
+    createCompany, 
+    selectCompany, 
+    getCompanies, 
+    getDashboardData 
+} = require('../controllers/company_controller');
 
-// Upload single image with field name 'companyLogo'
+// Upload single image with field name 'logo'
 router.post(
   '/createCompany',
   verifyToken,
-  authorizedRoles('admin'),
-  upload.single('companyLogo'),  // 👈 this enables file upload
+  upload.single('logo'),  // Changed from 'companyLogo' to 'logo'
   createCompany
 );
 
@@ -19,6 +23,18 @@ router.get(
   '/selectCompany/:companyId',
   verifyToken,
   selectCompany
+);
+
+router.get(
+  '/companies',
+  verifyToken,
+  getCompanies
+);
+
+router.get(
+  '/dashboard/:companyId',
+  verifyToken,
+  getDashboardData
 );
 
 module.exports = router;

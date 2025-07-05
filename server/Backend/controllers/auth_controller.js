@@ -45,7 +45,7 @@ const authenticateUser = async (req, res) => {
                         id: user[0].user_id, 
                         username: user[0].username, 
                         email: user[0].email, 
-                        fullname: user[0].fullname, 
+                        fullname: user[0].full_name, 
                         role: role[0].name 
                     } 
                 });

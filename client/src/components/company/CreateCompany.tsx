@@ -63,14 +63,17 @@ export default function CreateCompany() {
         }
       });
 
-      // Token received, backend doesn't return company data directly
-      const token = response.data.token;
-
-      // Optionally: store token in localStorage or use it
+      // Update token and set selected company
+      const { token, company } = response.data;
       localStorage.setItem('authToken', token);
+      
+      if (company) {
+        setSelectedCompany(company);
+      }
 
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('Error creating company:', err);
       setError(err.response?.data?.message || 'Failed to create company');
     } finally {
       setLoading(false);

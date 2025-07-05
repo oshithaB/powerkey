@@ -1,13 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
-// interface User {
-//   id: number;
-//   email: string;
-//   firstName: string;
-//   lastName: string;
-// }
-
 interface User {
   id: number;
   username: string;
@@ -43,13 +36,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
+    }
+
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser?.fullname) {
+          setUser(parsedUser);
+        } else {
+          console.warn('Invalid user object in localStorage:', parsedUser);
+        }
+      } catch (err) {
+        console.error('Failed to parse user from localStorage:', err);
       }
     }
+
     setLoading(false);
   }, []);
 
@@ -57,23 +62,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await axios.post('/api/login', { email, password });
       const { token, user: userData } = response.data;
-      
+
+      if (!userData.fullname) {
+        console.warn('Missing fullname in backend response:', userData);
+      }
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Login failed');
+      throw new Error(error.response?.data?.message || 'Login failed');
     }
   };
 
-  const register = async (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string
-  ) => {
+  const register = async (email: string, password: string, firstName: string, lastName: string) => {
     try {
       await axios.post('/api/signup', {
         username: email.split('@')[0],

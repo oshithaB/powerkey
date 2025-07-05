@@ -1,4 +1,3 @@
-
 // This middleware checks if the user has one of the authorized roles
 // It takes an array of roles as an argument and checks if the user's role matches any of them.
 const authorizedRoles = (roles) => {
@@ -7,7 +6,10 @@ const authorizedRoles = (roles) => {
       return res.status(403).json({ success: false, message: 'Access denied. No user role found.' });
     }
 
-    if (roles.includes(req.role)) {
+    // Convert roles to array if it's a string
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+    if (allowedRoles.includes(req.role)) {
       console.log(`User ID: ${req.userId}, Role: ${req.role} - Access granted`);
       return next();
     } else {

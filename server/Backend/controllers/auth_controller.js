@@ -61,6 +61,36 @@ const authenticateUser = async (req, res) => {
     }
 }
 
+// Register user
+const registerUser = async(req, res) => {
+    try {
+        const { username, fullname, email, password, role_id } = req.body;
+
+        // Check if user already exists
+        const [existingUser] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+        if (existingUser.length > 0) {
+            return res.status(400).json({ success: false, message: 'User already exists' });
+        }
+
+        // Hash the password
+        const hashedPassword = bcrypt.hashSync(password, 10);
+
+        // Insert new user into the database
+        const [result] = await db.query('INSERT INTO user (username, full_name, email, password_hash, role_id) VALUES (?, ?, ?, ?, ?)', 
+            [username, fullname, email, hashedPassword, role_id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to register user' });
+        }
+
+        return res.status(201).json({ success: true, message: 'User registered successfully' });
+
+    } catch (err) {
+        console.error('Error during user registration:', err);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
 //Controller functions for user verification in password reset
 // This function verifies the user by checking if the username or email exists in the database. 
 const verifyUser = async (req, res) => {
@@ -215,6 +245,7 @@ const generateOTP_Sendmail = async (user) => {
 
 module.exports = {
     authenticateUser,
+    registerUser,
     verifyUser,
     verifyOTP,
     resendOTP,

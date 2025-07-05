@@ -30,22 +30,26 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+  
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
-
+  
     try {
-      await register(formData.email, formData.password, formData.firstName, formData.lastName);
+      await register(
+        formData.email,
+        formData.password,
+        formData.firstName,
+        formData.lastName
+      );
       navigate('/companies');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
     }
   };
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 py-12 px-4 sm:px-6 lg:px-8">

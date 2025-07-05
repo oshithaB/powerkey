@@ -68,23 +68,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, firstName: string, lastName: string) => {
+  const register = async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
+  ) => {
     try {
-      const response = await axios.post('/api/auth/register', {
+      await axios.post('/api/signup', {
+        username: email.split('@')[0],
+        fullname: `${firstName} ${lastName}`,
         email,
         password,
-        firstName,
-        lastName,
+        role_id: 1,
       });
-      const { token, user: userData } = response.data;
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      throw new Error(error.response?.data?.message || 'Registration failed');
     }
   };
 

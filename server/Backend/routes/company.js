@@ -15,6 +15,7 @@ const {
 router.post(
   '/createCompany',
   verifyToken,
+  authorizedRoles(['admin']), // Ensure only admin can create company
   upload.single('logo'),  // Changed from 'companyLogo' to 'logo'
   createCompany
 );

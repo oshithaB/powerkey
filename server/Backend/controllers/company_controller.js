@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 
 const createCompany = async (req, res) => {
     try {
-        const { companyName, isTaxable, companyAddress, companyPhone, companyRegistrationNumber } = req.body;
+        const { companyName, isTaxable, taxNumber, companyAddress, companyPhone, companyRegistrationNumber, privacyPolicy } = req.body;
         const companyLogo = req.file ? `/uploads/${req.file.filename}` : null; // Store relative path
 
         console.log('Create company request received:', req.body);
@@ -22,17 +22,10 @@ const createCompany = async (req, res) => {
 
         // Insert new company
         const [result] = await db.query(
-            'INSERT INTO company (name, is_taxable, company_logo, address, contact_number, registration_number) VALUES (?, ?, ?, ?, ?, ?)',
-            [companyName, isTaxable === 'Taxable' ? 1 : 0, companyLogo, companyAddress, companyPhone, companyRegistrationNumber]
+            'INSERT INTO company (name, is_taxable, tax_number, company_logo, address, contact_number, registration_number, privacy_policy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [companyName, isTaxable === 'Taxable' ? 1 : 0, taxNumber, companyLogo, companyAddress, companyPhone, companyRegistrationNumber, privacyPolicy]
         );
         console.log('New company created:', result);
-
-        // Create user-company relationship
-        const [userCompanyResult] = await db.query(
-            'INSERT INTO user_company (user_id, company_id, role) VALUES (?, ?, ?)',
-            [req.userId, result.insertId, 'owner']
-        );
-        console.log('User-company relationship created:', userCompanyResult);
 
         // Generate new JWT token with company ID
         const token = jwt.sign(
@@ -68,28 +61,13 @@ const createCompany = async (req, res) => {
 
 const getCompanies = async (req, res) => {
     try {
-        const userId = req.userId;
-        console.log('Get companies request for userId:', userId);
-
-        const [companies] = await db.query(`
-            SELECT 
-                c.company_id as id,
-                c.name,
-                c.address,
-                c.contact_number as phone,
-                c.company_logo as logo,
-                uc.role
-            FROM company c
-            INNER JOIN user_company uc ON c.company_id = uc.company_id
-            WHERE uc.user_id = ?
-        `, [userId]);
-
-        console.log('Companies retrieved:', companies);
-        return res.status(200).json(companies);
-
+        console.log('Get companies request received');
+        const [companies] = await db.query('SELECT * FROM company');
+        console.log('Companies fetched:', companies);
+        return res.status(200).json({ success: true, companies });
     } catch (error) {
         console.error('Error fetching companies:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+        return res.status(500).json({ success: false, message: 'Internal server error' });
     }
 };
 

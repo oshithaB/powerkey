@@ -63,7 +63,7 @@ const getCompanies = async (req, res) => {
     try {
         console.log('Get companies request received');
         const [companies] = await db.query('SELECT * FROM company');
-        console.log('Companies fetched:', companies);
+        console.log('Companies fetched:', companies);        
         return res.status(200).json({ success: true, companies });
     } catch (error) {
         console.error('Error fetching companies:', error);

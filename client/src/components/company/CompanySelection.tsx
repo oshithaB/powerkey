@@ -18,7 +18,7 @@ export default function CompanySelection() {
   const fetchCompanies = async () => {
     try {
       const response = await axios.get('/api/companies');
-      setCompanies(response.data);
+      setCompanies(response.data.companies);
     } catch (error) {
       console.error('Error fetching companies:', error);
     } finally {

@@ -38,11 +38,12 @@ const createCompany = async (req, res) => {
         // Return company data along with token
         const companyData = {
             id: result.insertId,
+            company_id: result.insertId,
             name: companyName,
             address: companyAddress,
-            phone: companyPhone,
+            contact_number: companyPhone,
             email: null,
-            logo: companyLogo,
+            company_logo: companyLogo,
             role: 'owner'
         };
 
@@ -64,7 +65,7 @@ const getCompanies = async (req, res) => {
         console.log('Get companies request received');
         const [companies] = await db.query('SELECT * FROM company');
         console.log('Companies fetched:', companies);        
-        return res.status(200).json({ success: true, companies });
+        return res.status(200).json(companies);
     } catch (error) {
         console.error('Error fetching companies:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });

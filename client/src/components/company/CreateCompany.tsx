@@ -134,7 +134,7 @@ export default function CreateCompany() {
               <h2 className="text-xl font-semibold">Basic Information</h2>
             </div>
             <div className="card-content space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Company Name
@@ -162,19 +162,6 @@ export default function CreateCompany() {
                     value={formData.companyRegistrationNumber}
                     onChange={handleInputChange}
                     placeholder="Enter registration number"
-                  />
-                </div>
-
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>
-                    Tax Number
-                  </label>
-                  <input
-                    type="text"
-                    name="taxNumber"
-                    className="input"
-                    placeholder="Enter tax number"
-                    required
                   />
                 </div>
               </div>
@@ -291,6 +278,7 @@ export default function CreateCompany() {
               <div className="card-header">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Tax Rates</h2>
+                  
                   <button
                     type="button"
                     onClick={addTaxRate}
@@ -300,7 +288,21 @@ export default function CreateCompany() {
                     Add Tax Rate
                   </button>
                 </div>
+
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Tax Number
+                  </label>
+                  <input
+                    type="text"
+                    name="taxNumber"
+                    className="input"
+                    placeholder="Enter tax number"
+                    required
+                  />
+                </div>
               </div>
+              
               <div className="card-content">
                 <div className="space-y-4">
                   {taxRates.map((taxRate, index) => (

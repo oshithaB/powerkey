@@ -265,7 +265,7 @@ export default function VendorsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"  style={{marginTop: "-1px"}}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -287,12 +287,13 @@ export default function VendorsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name *
+                      Name
                     </label>
                     <input
                       type="text"
                       required
                       className="input"
+                      placeholder="Enter Name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
@@ -304,6 +305,7 @@ export default function VendorsPage() {
                     <input
                       type="email"
                       className="input"
+                      placeholder="Enter Email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
@@ -315,22 +317,38 @@ export default function VendorsPage() {
                     <input
                       type="tel"
                       className="input"
+                      placeholder="Enter Phone Number"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  />
+
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      // value={formData.tax_number || ''}
+                      // onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                      placeholder="Enter Tax Number"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
+
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -341,6 +359,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter City'
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     />
@@ -352,6 +371,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter State'
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                     />
@@ -363,6 +383,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter ZIP Code'
                       value={formData.zip_code}
                       onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
                     />
@@ -374,6 +395,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter Country'
                       value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                     />
@@ -388,6 +410,7 @@ export default function VendorsPage() {
                     type="number"
                     step="0.01"
                     className="input"
+                    placeholder="Enter Balance"
                     value={formData.balance}
                     onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
                   />

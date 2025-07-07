@@ -18,7 +18,8 @@ export default function CompanySelection() {
   const fetchCompanies = async () => {
     try {
       const response = await axios.get('/api/companies');
-      setCompanies(response.data.companies);
+      console.log('Companies response:', response.data);
+      setCompanies(response.data);
     } catch (error) {
       console.error('Error fetching companies:', error);
     } finally {
@@ -26,9 +27,37 @@ export default function CompanySelection() {
     }
   };
 
-  const handleCompanySelect = (company: any) => {
-    setSelectedCompany(company);
-    navigate('/dashboard');
+  const handleCompanySelect = async (company: any) => {
+    try {
+      console.log('Selecting company:', company);
+      
+      // Update the token with company information
+      const response = await axios.get(`/api/selectCompany/${company.company_id}`);
+      
+      if (response.data.success) {
+        // Update the token in localStorage
+        localStorage.setItem('authToken', response.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
+        // Set the selected company in context
+        const companyData = {
+          id: company.company_id,
+          company_id: company.company_id,
+          name: company.name,
+          address: company.address,
+          contact_number: company.contact_number,
+          email: company.email,
+          company_logo: company.company_logo,
+          role: 'owner'
+        };
+        
+        setSelectedCompany(companyData);
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Error selecting company:', error);
+      alert('Failed to select company. Please try again.');
+    }
   };
 
   if (loading) {
@@ -63,6 +92,7 @@ export default function CompanySelection() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Create New Company Card */}
           <Link
+            key="create-new-company"
             to="/create-company"
             className="card hover:shadow-lg transition-shadow duration-200 border-2 border-dashed border-gray-300 hover:border-primary-400"
           >
@@ -82,16 +112,16 @@ export default function CompanySelection() {
           {/* Existing Companies */}
           {companies.map((company) => (
             <div
-              key={company.id}
+              key={`company-${company.company_id}`}
               onClick={() => handleCompanySelect(company)}
               className="card hover:shadow-lg transition-shadow duration-200 cursor-pointer hover:border-primary-300"
             >
               <div className="card-content p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center">
-                    {company.logo ? (
+                    {company.company_logo ? (
                       <img
-                        src={`http://localhost:3000${company.logo}`}
+                        src={`http://localhost:3000${company.company_logo}`}
                         alt={company.name}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
@@ -105,7 +135,7 @@ export default function CompanySelection() {
                         {company.name}
                       </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                        {company.role}
+                        Owner
                       </span>
                     </div>
                   </div>
@@ -115,11 +145,11 @@ export default function CompanySelection() {
                   {company.address && (
                     <p className="truncate">{company.address}</p>
                   )}
-                  {company.email && (
-                    <p className="truncate">{company.email}</p>
+                  {company.contact_number && (
+                    <p>{company.contact_number}</p>
                   )}
-                  {company.phone && (
-                    <p>{company.phone}</p>
+                  {company.registration_number && (
+                    <p className="truncate">Reg: {company.registration_number}</p>
                   )}
                 </div>
 

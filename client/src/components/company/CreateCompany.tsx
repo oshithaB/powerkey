@@ -164,19 +164,6 @@ export default function CreateCompany() {
                     placeholder="Enter registration number"
                   />
                 </div>
-
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>
-                    Tax Number
-                  </label>
-                  <input
-                    type="text"
-                    name="taxNumber"
-                    className="input"
-                    placeholder="Enter tax number"
-                    required
-                  />
-                </div>
               </div>
 
               <div>
@@ -291,6 +278,7 @@ export default function CreateCompany() {
               <div className="card-header">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Tax Rates</h2>
+                  
                   <button
                     type="button"
                     onClick={addTaxRate}
@@ -300,7 +288,21 @@ export default function CreateCompany() {
                     Add Tax Rate
                   </button>
                 </div>
+
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Tax Number
+                  </label>
+                  <input
+                    type="text"
+                    name="taxNumber"
+                    className="input"
+                    placeholder="Enter tax number"
+                    required
+                  />
+                </div>
               </div>
+              
               <div className="card-content">
                 <div className="space-y-4">
                   {taxRates.map((taxRate, index) => (

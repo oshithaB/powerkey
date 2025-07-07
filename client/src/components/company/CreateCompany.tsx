@@ -134,7 +134,7 @@ export default function CreateCompany() {
               <h2 className="text-xl font-semibold">Basic Information</h2>
             </div>
             <div className="card-content space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Company Name

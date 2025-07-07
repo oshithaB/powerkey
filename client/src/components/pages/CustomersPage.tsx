@@ -5,7 +5,6 @@ import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
 
 interface Customer {
   id: number;
-  customer_code: string;
   name: string;
   email: string;
   phone: string;
@@ -28,7 +27,6 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
-    customer_code: '',
     name: '',
     email: '',
     phone: '',
@@ -37,6 +35,7 @@ export default function CustomersPage() {
     state: '',
     zip_code: '',
     country: '',
+    is_active: true,
     credit_limit: 0,
     balance: 0
   });
@@ -75,7 +74,6 @@ export default function CustomersPage() {
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
     setFormData({
-      customer_code: customer.customer_code || '',
       name: customer.name,
       email: customer.email || '',
       phone: customer.phone || '',
@@ -84,6 +82,7 @@ export default function CustomersPage() {
       state: customer.state || '',
       zip_code: customer.zip_code || '',
       country: customer.country || '',
+      is_active: customer.is_active,
       credit_limit: customer.credit_limit || 0,
       balance: customer.balance || 0
     });
@@ -103,7 +102,6 @@ export default function CustomersPage() {
 
   const resetForm = () => {
     setFormData({
-      customer_code: '',
       name: '',
       email: '',
       phone: '',
@@ -112,6 +110,7 @@ export default function CustomersPage() {
       state: '',
       zip_code: '',
       country: '',
+      is_active: false,
       credit_limit: 0,
       balance: 0
     });
@@ -120,8 +119,7 @@ export default function CustomersPage() {
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.customer_code?.toLowerCase().includes(searchTerm.toLowerCase())
+    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -195,7 +193,7 @@ export default function CustomersPage() {
                         {customer.name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {customer.customer_code}
+                        {/* {customer.tax_number || '-'} */}
                       </div>
                     </div>
                   </td>
@@ -256,7 +254,7 @@ export default function CustomersPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"  style={{marginTop: "-1px"}}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -266,28 +264,18 @@ export default function CustomersPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Customer Code
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.customer_code}
-                      onChange={(e) => setFormData({ ...formData, customer_code: e.target.value })}
-                      placeholder="AUTO"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name *
+                      Name
                     </label>
                     <input
                       type="text"
                       required
                       className="input"
+                      placeholder='Enter Customer Name'
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Email
@@ -295,23 +283,70 @@ export default function CustomersPage() {
                     <input
                       type="email"
                       className="input"
+                      placeholder="Enter Email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
                   </div>
-                  <div>
+
+                  <div className="col-span-2 md:col-span-1">
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Is Taxable
+                    </label>
+                    <select
+                      className="input"
+                      value={formData.is_active ? 'Yes' : 'No'}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'Yes' })}
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+
+                  <div className="col-span-2 md:col-span-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone
+                      Tax Number
                     </label>
                     <input
-                      type="tel"
+                      type="text"
                       className="input"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      name="taxId"
+                      // value={formData.taxId || ''}
+                      // onChange={handleInputChange}
+                      placeholder="Enter Tax Number"
+                      disabled={!formData.is_active}
                     />
                   </div>
                 </div>
-                
+
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        className="input"
+                        placeholder="Enter Phone Number"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Vehicle Number
+                      </label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Enter Vehicle Number"
+                        // value={formData.vehicleNumber || ''}
+                        // onChange={handleInputChange}
+                      />
+                    </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Address
@@ -319,6 +354,7 @@ export default function CustomersPage() {
                   <input
                     type="text"
                     className="input"
+                    placeholder="Enter Address"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
@@ -332,6 +368,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter City'
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     />
@@ -343,6 +380,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter State'
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                     />
@@ -354,6 +392,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter ZIP Code'
                       value={formData.zip_code}
                       onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
                     />
@@ -365,6 +404,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       className="input"
+                      placeholder='Enter Country'
                       value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                     />

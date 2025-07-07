@@ -18,6 +18,7 @@ export default function CompanySelection() {
   const fetchCompanies = async () => {
     try {
       const response = await axios.get('/api/companies');
+      console.log('Companies response:', response.data);
       setCompanies(response.data);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -26,9 +27,37 @@ export default function CompanySelection() {
     }
   };
 
-  const handleCompanySelect = (company: any) => {
-    setSelectedCompany(company);
-    navigate('/dashboard');
+  const handleCompanySelect = async (company: any) => {
+    try {
+      console.log('Selecting company:', company);
+      
+      // Update the token with company information
+      const response = await axios.get(`/api/selectCompany/${company.company_id}`);
+      
+      if (response.data.success) {
+        // Update the token in localStorage
+        localStorage.setItem('authToken', response.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
+        // Set the selected company in context
+        const companyData = {
+          id: company.company_id,
+          company_id: company.company_id,
+          name: company.name,
+          address: company.address,
+          contact_number: company.contact_number,
+          email: company.email,
+          company_logo: company.company_logo,
+          role: 'owner'
+        };
+        
+        setSelectedCompany(companyData);
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Error selecting company:', error);
+      alert('Failed to select company. Please try again.');
+    }
   };
 
   if (loading) {

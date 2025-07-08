@@ -7,8 +7,8 @@ async function createTables(db) {
             is_taxable tinyint(1) NOT NULL DEFAULT '0',
             tax_number varchar(100) DEFAULT NULL,
             company_logo varchar(255) DEFAULT NULL,
-            address text NOT NULL,
-            contact_number varchar(20) NOT NULL,
+            address text DEFAULT '',
+            contact_number varchar(20) DEFAULT '',
             email_address varchar(255) DEFAULT NULL,
             registration_number varchar(100) NOT NULL,
             terms_and_conditions text,
@@ -58,7 +58,7 @@ async function createTables(db) {
             created_at timestamp DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY company_id (company_id),
-            CONSTRAINT customers_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id)
+            CONSTRAINT customers_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
         )`,
         // `CREATE TABLE IF NOT EXISTS products (
         //     id int NOT NULL AUTO_INCREMENT,
@@ -103,15 +103,16 @@ async function createTables(db) {
         //     KEY customer_id (customer_id),
         //     CONSTRAINT invoices_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id),
         //     CONSTRAINT invoices_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customers (id)
-        // )`,
+        // )`
         `CREATE TABLE IF NOT EXISTS tax_rates (
             id INT AUTO_INCREMENT PRIMARY KEY,
             company_id int NOT NULL,
             name VARCHAR(100) NOT NULL,
             rate DECIMAL(5,2) NOT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             KEY company_id (company_id),
-            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id)
+            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
         )`,
         `CREATE TABLE IF NOT EXISTS employees (
             id int NOT NULL AUTO_INCREMENT,

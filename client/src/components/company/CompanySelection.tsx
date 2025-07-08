@@ -3,12 +3,27 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
-import { Building2, Plus, LogOut, Users, Calendar } from 'lucide-react';
+import { Building2, Plus, LogOut, Users, Calendar, Edit, Trash2, X } from 'lucide-react';
 
 export default function CompanySelection() {
   const { user, logout } = useAuth();
   const { companies, setCompanies, setSelectedCompany } = useCompany();
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    contact_number: '',
+    email_address: '',
+    registration_number: '',
+    is_taxable: 'Not Taxable',
+    tax_number: '',
+    notes: '',
+    terms_and_conditions: ''
+  });
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -58,6 +73,97 @@ export default function CompanySelection() {
       console.error('Error selecting company:', error);
       alert('Failed to select company. Please try again.');
     }
+  };
+
+  const handleEditCompany = (company: any) => {
+    setEditingCompany(company);
+    setFormData({
+      name: company.name || '',
+      address: company.address || '',
+      contact_number: company.contact_number || '',
+      email_address: company.email_address || '',
+      registration_number: company.registration_number || '',
+      is_taxable: company.is_taxable ? 'Taxable' : 'Not Taxable',
+      tax_number: company.tax_number || '',
+      notes: company.notes || '',
+      terms_and_conditions: company.terms_and_conditions || ''
+    });
+    setLogoPreview(company.company_logo ? `http://localhost:3000${company.company_logo}` : '');
+    setShowEditModal(true);
+  };
+
+  const handleDeleteCompany = async (companyId: number) => {
+    if (window.confirm('Are you sure you want to delete this company? This action cannot be undone.')) {
+      try {
+        await axios.delete(`/api/companies/${companyId}`);
+        fetchCompanies(); // Refresh the list
+        alert('Company deleted successfully');
+      } catch (error: any) {
+        console.error('Error deleting company:', error);
+        alert(error.response?.data?.message || 'Failed to delete company');
+      }
+    }
+  };
+
+  const handleUpdateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const submitData = new FormData();
+      
+      Object.entries(formData).forEach(([key, value]) => {
+        submitData.append(key, value);
+      });
+
+      if (logo) {
+        submitData.append('logo', logo);
+      }
+
+      await axios.put(`/api/companies/${editingCompany.company_id}`, submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setShowEditModal(false);
+      setEditingCompany(null);
+      setLogo(null);
+      setLogoPreview('');
+      fetchCompanies(); // Refresh the list
+      alert('Company updated successfully');
+    } catch (error: any) {
+      console.error('Error updating company:', error);
+      alert(error.response?.data?.message || 'Failed to update company');
+    }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogo(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetEditForm = () => {
+    setShowEditModal(false);
+    setEditingCompany(null);
+    setLogo(null);
+    setLogoPreview('');
+    setFormData({
+      name: '',
+      address: '',
+      contact_number: '',
+      email_address: '',
+      registration_number: '',
+      is_taxable: 'Not Taxable',
+      tax_number: '',
+      notes: '',
+      terms_and_conditions: ''
+    });
   };
 
   if (loading) {
@@ -113,10 +219,36 @@ export default function CompanySelection() {
           {companies.map((company) => (
             <div
               key={`company-${company.company_id}`}
-              onClick={() => handleCompanySelect(company)}
-              className="card hover:shadow-lg transition-shadow duration-200 cursor-pointer hover:border-primary-300"
+              className="card hover:shadow-lg transition-shadow duration-200 relative group"
             >
-              <div className="card-content p-6">
+              {/* Action Buttons */}
+              <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditCompany(company);
+                  }}
+                  className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 text-blue-600"
+                  title="Edit Company"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCompany(company.company_id);
+                  }}
+                  className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 text-red-600"
+                  title="Delete Company"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div
+                onClick={() => handleCompanySelect(company)}
+                className="card-content p-6 cursor-pointer"
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center">
                     {company.company_logo ? (
@@ -189,6 +321,191 @@ export default function CompanySelection() {
           </div>
         )}
       </div>
+
+      {/* Edit Company Modal */}
+      {showEditModal && editingCompany && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Edit Company
+              </h3>
+              <button onClick={resetEditForm} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCompany} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Registration Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input"
+                    value={formData.registration_number}
+                    onChange={(e) => setFormData({ ...formData, registration_number: e.target.value })}
+                    placeholder="Enter registration number"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Enter address"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    className="input"
+                    value={formData.contact_number}
+                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                    placeholder="Enter phone"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    className="input"
+                    value={formData.email_address}
+                    onChange={(e) => setFormData({ ...formData, email_address: e.target.value })}
+                    placeholder="Enter email"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Is Taxable?
+                  </label>
+                  <select
+                    className="input"
+                    value={formData.is_taxable}
+                    onChange={(e) => setFormData({ ...formData, is_taxable: e.target.value })}
+                  >
+                    <option value="Not Taxable">Not Taxable</option>
+                    <option value="Taxable">Taxable</option>
+                  </select>
+                </div>
+
+                {formData.is_taxable === 'Taxable' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.tax_number}
+                      onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                      placeholder="Enter tax number"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company Logo
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="input"
+                  />
+                  {logoPreview && (
+                    <img
+                      src={logoPreview}
+                      alt="Logo preview"
+                      className="h-12 w-12 object-cover rounded-lg"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    className="input"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Enter any additional notes"
+                    style={{ height: '80px' }}
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Terms & Conditions
+                  </label>
+                  <textarea
+                    className="input"
+                    value={formData.terms_and_conditions}
+                    onChange={(e) => setFormData({ ...formData, terms_and_conditions: e.target.value })}
+                    placeholder="Enter terms and conditions"
+                    style={{ height: '80px' }}
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={resetEditForm}
+                  className="btn btn-secondary btn-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-md"
+                >
+                  Update Company
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

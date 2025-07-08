@@ -7,6 +7,7 @@ import { Building2, ArrowLeft, Upload, Plus, Trash2 } from 'lucide-react';
 interface TaxRate {
   name: string;
   rate: number;
+  is_default: boolean;
 }
 
 export default function CreateCompany() {
@@ -21,22 +22,26 @@ export default function CreateCompany() {
     companyAddress: '',
     companyPhone: '',
     companyRegistrationNumber: '',
+    companyEmail: '',
     isTaxable: 'Not Taxable',
-    taxType: '',
+    taxNumber: '',
+    notes: '',
+    termsAndConditions: ''
   });
 
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
 
   const [taxRates, setTaxRates] = useState<TaxRate[]>([
-    { name: 'VAT', rate: 10 },
-    { name: 'Sales Tax', rate: 8.5}
+    { name: 'VAT', rate: 10, is_default: true },
+    { name: 'Sales Tax', rate: 8.5, is_default: false }
   ]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
   };
 
@@ -53,12 +58,20 @@ export default function CreateCompany() {
   };
 
   const addTaxRate = () => {
-    setTaxRates([...taxRates, { name: '', rate: 0 }]);
+    setTaxRates([...taxRates, { name: '', rate: 0, is_default: false }]);
   };
 
-  const updateTaxRate = (index: number, field: keyof TaxRate, value: string | number) => {
+  const updateTaxRate = (index: number, field: keyof TaxRate, value: string | number | boolean) => {
     const updated = [...taxRates];
     updated[index] = { ...updated[index], [field]: value };
+    
+    // If setting as default, unset others
+    if (field === 'is_default' && value === true) {
+      updated.forEach((tax, i) => {
+        if (i !== index) tax.is_default = false;
+      });
+    }
+    
     setTaxRates(updated);
   };
 
@@ -74,12 +87,19 @@ export default function CreateCompany() {
     try {
       const submitData = new FormData();
 
+      // Add basic company data
       Object.entries(formData).forEach(([key, value]) => {
         submitData.append(key, value);
       });
 
+      // Add logo if present
       if (logo) {
         submitData.append('logo', logo);
+      }
+
+      // Add tax rates if company is taxable
+      if (formData.isTaxable === 'Taxable') {
+        submitData.append('taxRates', JSON.stringify(taxRates.filter(tax => tax.name && tax.rate > 0)));
       }
 
       const response = await axios.post('/api/createCompany', submitData, {
@@ -96,7 +116,7 @@ export default function CreateCompany() {
         setSelectedCompany(company);
       }
 
-      navigate('/dashboard');
+      navigate('/companies');
     } catch (err: any) {
       console.error('Error creating company:', err);
       setError(err.response?.data?.message || 'Failed to create company');
@@ -137,7 +157,7 @@ export default function CreateCompany() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Name
+                    Company Name *
                   </label>
                   <input
                     type="text"
@@ -152,7 +172,7 @@ export default function CreateCompany() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Register Number
+                    Registration Number *
                   </label>
                   <input
                     type="text"
@@ -197,7 +217,23 @@ export default function CreateCompany() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Is Taxable?
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="companyEmail"
+                    className="input"
+                    value={formData.companyEmail}
+                    onChange={handleInputChange}
+                    placeholder="Enter email"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Is Taxable? *
                   </label>
                   <select
                     name="isTaxable"
@@ -209,6 +245,23 @@ export default function CreateCompany() {
                     <option value="Taxable">Taxable</option>
                   </select>
                 </div>
+
+                {formData.isTaxable === 'Taxable' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tax Number *
+                    </label>
+                    <input
+                      type="text"
+                      name="taxNumber"
+                      required
+                      className="input"
+                      value={formData.taxNumber}
+                      onChange={handleInputChange}
+                      placeholder="Enter tax number"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -248,8 +301,8 @@ export default function CreateCompany() {
                   <textarea
                     name="notes"
                     className="input"
-                    // value={formData.notes || ''}
-                    // onChange={handleInputChange}
+                    value={formData.notes}
+                    onChange={handleInputChange}
                     placeholder="Enter any additional notes"
                     style={{ height: '100px' }}
                   ></textarea>
@@ -260,10 +313,10 @@ export default function CreateCompany() {
                     Terms & Conditions
                   </label>
                   <textarea
-                    name="terms"
+                    name="termsAndConditions"
                     className="input"
-                    // value={formData.terms || ''}
-                    // onChange={handleInputChange}
+                    value={formData.termsAndConditions}
+                    onChange={handleInputChange}
                     placeholder="Enter terms and conditions"
                     style={{ height: '100px' }}
                   ></textarea>
@@ -272,13 +325,12 @@ export default function CreateCompany() {
             </div>
           </div>
 
-          {/* Tax adding section  */}
+          {/* Tax Rates Section */}
           {formData.isTaxable === 'Taxable' && (
             <div className="card">
               <div className="card-header">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Tax Rates</h2>
-                  
                   <button
                     type="button"
                     onClick={addTaxRate}
@@ -288,19 +340,6 @@ export default function CreateCompany() {
                     Add Tax Rate
                   </button>
                 </div>
-
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>
-                    Tax Number
-                  </label>
-                  <input
-                    type="text"
-                    name="taxNumber"
-                    className="input"
-                    placeholder="Enter tax number"
-                    required
-                  />
-                </div>
               </div>
               
               <div className="card-content">
@@ -309,7 +348,7 @@ export default function CreateCompany() {
                     <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-gray-200 rounded-lg">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tax Name
+                          Tax Name *
                         </label>
                         <input
                           type="text"
@@ -317,32 +356,40 @@ export default function CreateCompany() {
                           value={taxRate.name}
                           onChange={(e) => updateTaxRate(index, 'name', e.target.value)}
                           placeholder="e.g., Sales Tax"
+                          required
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Rate (%)
+                          Rate (%) *
                         </label>
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="100"
                           className="input"
                           value={taxRate.rate}
                           onChange={(e) =>
                             updateTaxRate(index, 'rate', parseFloat(e.target.value) || 0)
                           }
                           placeholder="0.00"
+                          required
                         />
                       </div>
                       <div>
                         <label className='block text-sm font-medium text-gray-700 mb-1'>
-                          Is default?
+                          Is Default?
                         </label>
-                        <input 
-                          type="checkbox"
-                          className="checkbox"
-                          
-                        />
+                        <div className="flex items-center mt-2">
+                          <input 
+                            type="checkbox"
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                            checked={taxRate.is_default}
+                            onChange={(e) => updateTaxRate(index, 'is_default', e.target.checked)}
+                          />
+                          <span className="ml-2 text-sm text-gray-600">Default tax</span>
+                        </div>
                       </div>
                       <div className="flex items-end">
                         <button
@@ -359,7 +406,6 @@ export default function CreateCompany() {
               </div>
             </div>
           )}
-
 
           <div className="flex justify-end space-x-4">
             <Link to="/companies" className="btn btn-secondary btn-lg">

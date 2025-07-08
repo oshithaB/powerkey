@@ -9,7 +9,8 @@ const {
     selectCompany, 
     getCompanies, 
     getDashboardData,
-    updateCompany
+    updateCompany,
+    deleteCompany
 } = require('../controllers/company_controller');
 
 // Upload single image with field name 'logo'
@@ -40,11 +41,18 @@ router.get(
 );
 
 router.put(
-  '/updateCompany',
+  '/companies/:companyId',
   verifyToken,
   authorizedRoles(['admin']),
   upload.single('logo'),
   updateCompany
+);
+
+router.delete(
+  '/companies/:companyId',
+  verifyToken,
+  authorizedRoles(['admin']),
+  deleteCompany
 );
 
 module.exports = router;

@@ -1,52 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, User, Mail, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Employee {
   id: number;
-  employee_id: string;
-  first_name: string;
-  last_name: string;
+  name: string;
   email: string;
   phone: string;
   address: string;
-  position: string;
-  department: string;
-  salary: number;
   hire_date: string;
   is_active: boolean;
   created_at: string;
 }
 
 export default function EmployeesPage() {
-  const { selectedCompany } = useCompany();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({
-    employee_id: '',
-    first_name: '',
-    last_name: '',
+    name: '',
     email: '',
     phone: '',
     address: '',
-    position: '',
-    department: '',
-    salary: 0,
-    hire_date: new Date().toISOString().split('T')[0]
+    hire_date: ''
   });
 
   useEffect(() => {
     fetchEmployees();
-  }, [selectedCompany]);
+  }, []);
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees/${selectedCompany?.id}`);
+      const response = await axios.get('/api/employees');
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -57,11 +45,15 @@ export default function EmployeesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.hire_date && isNaN(new Date(formData.hire_date).getTime())) {
+      console.error('Invalid hire date');
+      return; // Or show an error to the user
+    }
     try {
       if (editingEmployee) {
-        await axios.put(`/api/employees/${selectedCompany?.id}/${editingEmployee.id}`, formData);
+        await axios.put(`/api/employees/${editingEmployee.id}`, formData);
       } else {
-        await axios.post(`/api/employees/${selectedCompany?.id}`, formData);
+        await axios.post('/api/employees', formData);
       }
       fetchEmployees();
       setShowModal(false);
@@ -72,18 +64,14 @@ export default function EmployeesPage() {
   };
 
   const handleEdit = (employee: Employee) => {
+    console.log('Editing employee:', employee);
     setEditingEmployee(employee);
     setFormData({
-      employee_id: employee.employee_id || '',
-      first_name: employee.first_name,
-      last_name: employee.last_name,
+      name: employee.name || '',
       email: employee.email || '',
       phone: employee.phone || '',
       address: employee.address || '',
-      position: employee.position || '',
-      department: employee.department || '',
-      salary: employee.salary || 0,
-      hire_date: employee.hire_date || new Date().toISOString().split('T')[0]
+      hire_date: employee.hire_date || ''
     });
     setShowModal(true);
   };
@@ -91,7 +79,7 @@ export default function EmployeesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
       try {
-        await axios.delete(`/api/employees/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/employees/${id}`);
         fetchEmployees();
       } catch (error) {
         console.error('Error deleting employee:', error);
@@ -101,26 +89,20 @@ export default function EmployeesPage() {
 
   const resetForm = () => {
     setFormData({
-      employee_id: '',
-      first_name: '',
-      last_name: '',
+      name: '',
       email: '',
       phone: '',
       address: '',
-      position: '',
-      department: '',
-      salary: 0,
-      hire_date: new Date().toISOString().split('T')[0]
+      hire_date: ''
     });
     setEditingEmployee(null);
   };
 
   const filteredEmployees = employees.filter(employee =>
-    `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    employee.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -172,15 +154,6 @@ export default function EmployeesPage() {
                   Contact
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Position
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Department
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Salary
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Hire Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -203,10 +176,10 @@ export default function EmployeesPage() {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {employee.first_name} {employee.last_name}
+                          {employee.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          ID: {employee.employee_id}
+                          ID: {employee.id}
                         </div>
                       </div>
                     </div>
@@ -226,15 +199,6 @@ export default function EmployeesPage() {
                         </div>
                       )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {employee.position || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {employee.department || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${employee.salary?.toLocaleString() || '0'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {employee.hire_date ? format(new Date(employee.hire_date), 'MMM dd, yyyy') : '-'}
@@ -273,48 +237,37 @@ export default function EmployeesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px'}}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employee ID
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.employee_id}
-                      onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                      placeholder="EMP001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      First Name *
+                      Name *
                     </label>
                     <input
                       type="text"
                       required
                       className="input"
-                      value={formData.first_name}
-                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      placeholder='Enter Employee Name'
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Last Name *
+                      Hire Date
                     </label>
                     <input
-                      type="text"
-                      required
+                      type="date"
                       className="input"
-                      value={formData.last_name}
-                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      value={formData.hire_date}
+                      onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                     />
                   </div>
                 </div>
@@ -327,6 +280,7 @@ export default function EmployeesPage() {
                     <input
                       type="email"
                       className="input"
+                      placeholder='Enter Employee Email'
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
@@ -338,6 +292,7 @@ export default function EmployeesPage() {
                     <input
                       type="tel"
                       className="input"
+                      placeholder='Enter Employee Phone'
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
@@ -351,62 +306,10 @@ export default function EmployeesPage() {
                   <input
                     type="text"
                     className="input"
+                    placeholder='Enter Employee Address'
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Position
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      placeholder="Job title"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Department
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      placeholder="Department name"
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Annual Salary
-                    </label>
-                    <input
-                      type="number"
-                      className="input"
-                      value={formData.salary}
-                      onChange={(e) => setFormData({ ...formData, salary: parseFloat(e.target.value) || 0 })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Hire Date
-                    </label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={formData.hire_date}
-                      onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                    />
-                  </div>
                 </div>
                 
                 <div className="flex justify-end space-x-3 pt-4">

@@ -112,7 +112,19 @@ async function createTables(db) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             KEY company_id (company_id),
             CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id)
-        )`
+        )`,
+        `CREATE TABLE IF NOT EXISTS employees (
+            id int NOT NULL AUTO_INCREMENT,
+            name varchar(200) NOT NULL,
+            email varchar(255),
+            phone varchar(20),
+            address text,
+            hire_date date,
+            is_active tinyint(1) DEFAULT 1,
+            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY email (email)
+        )`,
     ];
 
     for (const table of tables) {

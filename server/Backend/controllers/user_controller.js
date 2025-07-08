@@ -195,6 +195,8 @@ const updateUser = async (req, res) => {
     }
 }
 
+
+
 module.exports = {
     getUserDetails,
     addUser,

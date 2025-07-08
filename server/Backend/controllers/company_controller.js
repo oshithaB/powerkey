@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 
 const createCompany = async (req, res) => {
     try {
-        const { companyName, isTaxable, taxNumber, companyAddress, companyPhone, companyRegistrationNumber, privacyPolicy } = req.body;
+        const { companyName, isTaxable, taxNumber, companyAddress, companyPhone, companyRegistrationNumber, email, notes, termsAndConditions } = req.body;
         const companyLogo = req.file ? `/uploads/${req.file.filename}` : null; // Store relative path
 
         console.log('Create company request received:', req.body);
@@ -22,9 +22,14 @@ const createCompany = async (req, res) => {
 
         // Insert new company
         const [result] = await db.query(
-            'INSERT INTO company (name, is_taxable, tax_number, company_logo, address, contact_number, registration_number, privacy_policy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [companyName, isTaxable === 'Taxable' ? 1 : 0, taxNumber, companyLogo, companyAddress, companyPhone, companyRegistrationNumber, privacyPolicy]
+            'INSERT INTO company (name, is_taxable, tax_number, company_logo, address, contact_number, email_address, registration_number, terms_and_conditions, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [companyName, isTaxable === 'Taxable' ? 1 : 0, taxNumber, companyLogo, companyAddress, companyPhone, email, companyRegistrationNumber, termsAndConditions, notes]
         );
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to create company' });
+        }
+        
         console.log('New company created:', result);
 
         // Generate new JWT token with company ID
@@ -38,13 +43,16 @@ const createCompany = async (req, res) => {
         // Return company data along with token
         const companyData = {
             id: result.insertId,
-            company_id: result.insertId,
             name: companyName,
+            is_taxable: isTaxable === 'Taxable' ? 1 : 0,
+            tax_number: taxNumber,
+            logo: companyLogo,
             address: companyAddress,
-            contact_number: companyPhone,
-            email: null,
-            company_logo: companyLogo,
-            role: 'owner'
+            phone: companyPhone,
+            email: email,
+            registration_number: companyRegistrationNumber,
+            terms_and_conditions: termsAndConditions,
+            notes: notes
         };
 
         return res.status(201).json({ 
@@ -154,9 +162,140 @@ const selectCompany = async (req, res) => {
     }
 };
 
+const updateCompany = async (req, res) => {
+    try {
+        const companyId = req.companyId;
+        const updates = req.body;
+        const companyLogo = req.file ? `/uploads/${req.file.filename}` : null;
+        console.log('Update company request received for companyId:', companyId, 'with updates:', updates);
+
+        if (Object.keys(updates).length === 0 && !companyLogo) {
+            return res.status(400).json({ success: false, message: 'No fields to update' });
+        }
+
+        const allowedFields = [
+            'name', 'is_taxable', 'tax_number', 'company_logo', 
+            'address', 'contact_number', 'email_address', 
+            'registration_number', 'terms_and_conditions', 'notes'
+        ];
+
+        const fieldsToUpdate = {};
+        for (const key of allowedFields) {
+            if (updates[key]) {
+                fieldsToUpdate[key] = updates[key];
+            }
+        }
+
+        if (companyLogo) {
+            fieldsToUpdate.company_logo = companyLogo;
+        }
+
+        console.log(fieldsToUpdate);
+
+        const [existingCompanyData] = await db.query(
+            'SELECT * FROM company WHERE company_id = ?',
+            [companyId]
+        );
+
+        if (existingCompanyData.length === 0) {
+            return res.status(404).json({ success: false, message: 'Company not found for update' });
+        }
+
+        if (fieldsToUpdate.name) {
+            if (fieldsToUpdate.name === existingCompanyData[0].name) {
+                delete fieldsToUpdate.name;
+            }
+        }
+
+        if (fieldsToUpdate.is_taxable) {
+            if (fieldsToUpdate.is_taxable === existingCompanyData[0].is_taxable) {
+                delete fieldsToUpdate.is_taxable;
+            } else {
+                fieldsToUpdate.is_taxable = fieldsToUpdate.is_taxable === 'Taxable' ? 1 : 0;
+            }
+        }
+
+        if (fieldsToUpdate.tax_number && fieldsToUpdate.is_taxable === 1 || fieldsToUpdate.tax_number && existingCompanyData[0].is_taxable === 1) {
+            if (fieldsToUpdate.tax_number === existingCompanyData[0].tax_number) {
+                delete fieldsToUpdate.tax_number;
+            }
+        } else {
+            if (fieldsToUpdate.tax_number) {
+                fieldsToUpdate.tax_number = null; // Set to null if not taxable
+            }
+        }
+
+        if (fieldsToUpdate.address) {
+            if (fieldsToUpdate.address === existingCompanyData[0].address) {
+                delete fieldsToUpdate.address;
+            }
+        }
+
+        if (fieldsToUpdate.contact_number) {
+            if (fieldsToUpdate.contact_number === existingCompanyData[0].contact_number) {
+                delete fieldsToUpdate.contact_number;
+            }
+        }
+
+        if (fieldsToUpdate.email_address) {
+            if (fieldsToUpdate.email_address === existingCompanyData[0].email_address) {
+                delete fieldsToUpdate.email_address;
+            }
+        }
+
+        if (fieldsToUpdate.registration_number) {
+            if (fieldsToUpdate.registration_number === existingCompanyData[0].registration_number) {
+                delete fieldsToUpdate.registration_number;
+            }
+
+            const [conflict] = await db.query(
+                'SELECT * FROM company WHERE registration_number = ? AND company_id != ?',
+                [fieldsToUpdate.registration_number, companyId]
+            );
+
+            if (conflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Company with this registration number already exists' });
+            }
+        }
+
+        const setClauses = [];
+        const values = [];
+
+        for (const key in fieldsToUpdate) {
+            setClauses.push(`${key} = ?`);
+            values.push(fieldsToUpdate[key]);
+        }
+
+        if (setClauses.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid fields to update' });
+        }
+
+        values.push(companyId);
+
+        const updateQuery = `UPDATE company SET ${setClauses.join(', ')} WHERE company_id = ?`;
+        const [result] = await db.query(updateQuery, values);
+
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ success: false, message: 'No changes made to the company' });
+        }
+
+        const updatedCompanyData = {
+            id: companyId,
+            ...fieldsToUpdate
+        };
+
+        return res.status(200).json({ success: true, message: 'Company updated successfully', updateCompany: updatedCompanyData });
+
+    } catch (error) {
+        console.error('Error updating company:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 module.exports = { 
     createCompany, 
     selectCompany, 
     getCompanies, 
-    getDashboardData 
+    getDashboardData,
+    updateCompany
 };

@@ -7,7 +7,7 @@ async function createTables(db) {
             is_taxable tinyint(1) NOT NULL DEFAULT '0',
             tax_number varchar(100) DEFAULT NULL,
             company_logo varchar(255) DEFAULT NULL,
-            address text DEFAULT '',
+            address text,
             contact_number varchar(20) DEFAULT '',
             email_address varchar(255) DEFAULT NULL,
             registration_number varchar(100) NOT NULL,
@@ -33,14 +33,15 @@ async function createTables(db) {
             created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             otp_code varchar(10) DEFAULT NULL,
             otp_expiry datetime DEFAULT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
             PRIMARY KEY (user_id),
             UNIQUE KEY email (email),
             UNIQUE KEY username (username),
             KEY role_id (role_id),
-            CONSTRAINT user_ibfk_1 FOREIGN KEY (role_id) REFERENCES role (role_id)
+            CONSTRAINT user_ibfk_1 FOREIGN KEY (role_id) REFERENCES role (role_id) ON DELETE CASCADE
         )`,
-        `CREATE TABLE IF NOT EXISTS customers (
-            id int NOT NULL AUTO_INCREMENT,
+        `CREATE TABLE IF NOT EXISTS customer (
+            customer_id int NOT NULL AUTO_INCREMENT,
             company_id int NOT NULL,
             customer_code varchar(50),
             name varchar(200) NOT NULL,
@@ -55,10 +56,59 @@ async function createTables(db) {
             credit_limit decimal(15,2) DEFAULT 0,
             is_taxable tinyint(1) NOT NULL DEFAULT 0,
             customer_tax_number varchar(100) DEFAULT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (customer_id),
+            KEY company_id (company_id),
+            CONSTRAINT customer_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
+        )`,
+        `CREATE TABLE IF NOT EXISTS vendor (
+            vendor_id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT,
+            name VARCHAR(255) NOT NULL,
+            vendor_company_name VARCHAR(255) NULL,
+            email VARCHAR(255),
+            phone VARCHAR(50),
+            address TEXT,
+            city VARCHAR(100),
+            state VARCHAR(100),
+            zip_code VARCHAR(20),
+            country VARCHAR(100),
+            tax_number VARCHAR(100),
+            fax_number VARCHAR(50),
+            website VARCHAR(255),
+            terms VARCHAR(255),
+            account_number VARCHAR(100),
+            balance DECIMAL(15, 2) DEFAULT 0,
+            as_of_date DATE,
+            vehicle_number varchar(50),
+            billing_rate DECIMAL(10, 2) DEFAULT 0.00,
+            default_expense_category VARCHAR(255),
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY company_id (company_id),
+            CONSTRAINT vendor_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+        `CREATE TABLE IF NOT EXISTS tax_rate (
+            tax_rate_id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id int NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            rate DECIMAL(5,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY company_id (company_id),
+            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
+        )`,
+        `CREATE TABLE IF NOT EXISTS employees (
+            id int NOT NULL AUTO_INCREMENT,
+            name varchar(200) NOT NULL,
+            email varchar(255),
+            phone varchar(20),
+            address text,
+            hire_date date,
+            is_active tinyint(1) DEFAULT 1,
             created_at timestamp DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY company_id (company_id),
-            CONSTRAINT customers_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
+            UNIQUE KEY email (email)
         )`,
         // `CREATE TABLE IF NOT EXISTS products (
         //     id int NOT NULL AUTO_INCREMENT,
@@ -104,28 +154,6 @@ async function createTables(db) {
         //     CONSTRAINT invoices_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id),
         //     CONSTRAINT invoices_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customers (id)
         // )`
-        `CREATE TABLE IF NOT EXISTS tax_rates (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            company_id int NOT NULL,
-            name VARCHAR(100) NOT NULL,
-            rate DECIMAL(5,2) NOT NULL,
-            is_default BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            KEY company_id (company_id),
-            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
-        )`,
-        `CREATE TABLE IF NOT EXISTS employees (
-            id int NOT NULL AUTO_INCREMENT,
-            name varchar(200) NOT NULL,
-            email varchar(255),
-            phone varchar(20),
-            address text,
-            hire_date date,
-            is_active tinyint(1) DEFAULT 1,
-            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY email (email)
-        )`,
     ];
 
     for (const table of tables) {

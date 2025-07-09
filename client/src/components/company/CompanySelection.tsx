@@ -54,19 +54,7 @@ export default function CompanySelection() {
         localStorage.setItem('authToken', response.data.token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         
-        // Set the selected company in context
-        const companyData = {
-          id: company.company_id,
-          company_id: company.company_id,
-          name: company.name,
-          address: company.address,
-          contact_number: company.contact_number,
-          email: company.email,
-          company_logo: company.company_logo,
-          role: 'owner'
-        };
-        
-        setSelectedCompany(companyData);
+        setSelectedCompany(company);
         navigate('/dashboard');
       }
     } catch (error) {

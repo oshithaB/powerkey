@@ -23,6 +23,10 @@ const authenticateUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        if (!user[0].is_active) {
+            return res.status(403).json({ success: false, message: 'User account is inactive' });
+        }
+
         if (user) {
             console.log('User found:', user[0]);
             const isMatch = await bcrypt.compare(password, user[0].password_hash);
@@ -106,6 +110,11 @@ const verifyUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        if (!user[0].is_active) {
+            return res.status(403).json({ success: false, message: 'User account is inactive' });
+        }
+
+
         generateOTP_Sendmail(user);
         return res.status(200).json({ success: true, message: 'User found' });
         
@@ -127,6 +136,10 @@ const verifyOTP = async (req, res) => {
 
         if (user.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (!user[0].is_active) {
+            return res.status(403).json({ success: false, message: 'User account is inactive' });
         }
 
         const currentTime = new Date();
@@ -164,6 +177,10 @@ const resendOTP = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        if (!user[0].is_active) {
+            return res.status(403).json({ success: false, message: 'User account is inactive' });
+        }
+
         // Generate and send OTP
         await generateOTP_Sendmail(user);
         return res.status(200).json({ success: true, message: 'OTP resent successfully', email: user[0].email });
@@ -180,6 +197,16 @@ const resendOTP = async (req, res) => {
 const resetPassword = async (req, res) => {
     try {
         const { email, newPassword } = req.body;
+
+        const [user] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+        if (user.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (!user[0].is_active) {
+            return res.status(403).json({ success: false, message: 'User account is inactive' });
+        }
+
         const [result] = await db.query('UPDATE user SET password_hash = ? WHERE email = ?', [bcrypt.hashSync(newPassword, 10), email]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Failed to reset password' });

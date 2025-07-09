@@ -52,7 +52,60 @@ const addRole = async (req, res) => {
     }
 }
 
+
+const updateRole = async (req, res) => {
+    try {
+        const {roleId} = req.params;
+        if (!roleId) {
+            return res.status(400).json({ success: false, message: 'Role ID is required' });
+        }
+        const {name} = req.body;
+        console.log('Update role request received:', roleId, '  Name to be updated: ', name);
+
+        const name_lowercase = name.toLowerCase();
+        console.log('Role name after conversion to lowercase:', name_lowercase);
+
+        const [existingRole] = await db.query(
+            'SELECT * FROM role WHERE role_id = ?',
+            [roleId]
+        );
+
+        if (existingRole.length === 0) {
+            return res.status(404).json({ success: false, message: 'Role not found' });
+        }
+
+        if (existingRole[0].name === name_lowercase) {
+            return res.status(400).json({ success: false, message: 'Role name is the same as existing role' });
+        }
+
+        const [checkRoleName] = await db.query(
+            'SELECT * FROM role WHERE name = ? AND role_id != ?',
+            [name_lowercase, roleId]
+        );
+
+        if (checkRoleName.length > 0) {
+            return res.status(400).json({ success: false, message: 'Role name already exists' });
+        }
+
+        const [updateResult] = await db.query(
+            'UPDATE role SET name = ? WHERE role_id = ?',
+            [name_lowercase, roleId]
+        );
+
+        if (updateResult.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to update role' });
+        }
+
+        console.log('Role updated successfully:', updateResult);
+        return res.status(200).json({ success: true, message: 'Role updated successfully' });
+    } catch (error) {
+        console.error('Error updating role:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
 module.exports = {
     getAllRoles,
-    addRole
+    addRole,
+    updateRole
 };

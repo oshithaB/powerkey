@@ -195,10 +195,75 @@ const updateUser = async (req, res) => {
     }
 }
 
+const softDeleteUser = async (req, res) => {
+    try {
+        const {userId} = req.params;
+        console.log('Soft delete user request received for userId:', userId);
+
+        const [result] = await db.query(
+            'SELECT * FROM user WHERE user_id = ?', 
+            [ userId ]);
+
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (result[0].is_active === 0) {
+            return res.status(400).json({ success: false, message: 'User already inactive' });
+        }
+
+        const [deleteResult] = await db.query(
+            'UPDATE user SET is_active = 0 WHERE user_id = ?',
+            [userId]
+        );
+
+        if (deleteResult.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to soft delete user' });
+        }
+
+        return res.status(200).json({ success: true, message: 'User soft deleted successfully' });
+    } catch (error) {
+        console.error('Error soft deleting user:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+const permanentlyDeleteUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        console.log('Permanently delete user request received for userId:', userId);
+
+        const [result] = await db.query(
+            'SELECT * FROM user WHERE user_id = ?',
+            [userId]
+        );
+
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const [deleteResult] = await db.query(
+            'DELETE FROM user WHERE user_id = ?',
+            [userId]
+        );
+
+        if (deleteResult.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to permanently delete user' });
+        }
+
+        return res.status(200).json({ success: true, message: 'User permanently deleted successfully' });
+    } catch (error) {
+        console.error('Error permanently deleting user:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 
 
 module.exports = {
     getUserDetails,
     addUser,
-    updateUser
+    updateUser,
+    softDeleteUser,
+    permanentlyDeleteUser
 };

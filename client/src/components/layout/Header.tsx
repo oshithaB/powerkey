@@ -2,15 +2,23 @@ import React from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Menu, Building2, LogOut, Settings } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   setSidebarOpen: (open: boolean) => void;
 }
 
 export default function Header({ setSidebarOpen }: HeaderProps) {
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, setSelectedCompany } = useCompany();
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleCompanySwitch = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    selectedCompany && setSelectedCompany(null);
+    navigate('/companies'); // Redirect to company selection page
+    // Logic to handle company switch can be added here
+  };
 
   return (
     <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
@@ -57,12 +65,16 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
                 <Link
                   to="/companies"
                   className="btn btn-secondary btn-sm"
+                  onClick={(e) => {handleCompanySwitch(e)}}
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Switch Company
                 </Link>
                 <button
-                  onClick={logout}
+                  onClick={() => {
+                    logout();
+                    setSelectedCompany(null);
+                  }}
                   className="btn btn-secondary btn-sm text-red-600 hover:text-red-700"
                 >
                   <LogOut className="h-4 w-4" />

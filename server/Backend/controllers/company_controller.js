@@ -343,10 +343,10 @@ const deleteCompany = async (req, res) => {
 
         try {
             // Delete related tax rates first
-            await db.query('DELETE FROM tax_rates WHERE company_id = ?', [companyId]);
+            await db.query('DELETE FROM tax_rate WHERE company_id = ?', [companyId]);
             
             // Delete related customers
-            await db.query('DELETE FROM customers WHERE company_id = ?', [companyId]);
+            await db.query('DELETE FROM customer WHERE company_id = ?', [companyId]);
             
             // Delete the company
             const [result] = await db.query('DELETE FROM company WHERE company_id = ?', [companyId]);

@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface Company {
-  id: number; // maps to company_id
+  company_id: number; // maps to company_id
   name: string;
   is_taxable: boolean; // maps from tinyint(1) → boolean
   tax_number?: string | null;
-  logo?: string | null; // maps to company_logo
+  company_logo?: string | null; // maps to company_logo
   address: string;
-  phone: string; // maps to contact_number
-  email?: string | null; // maps to email_address
+  contact_number: string; // maps to contact_number
+  email_address?: string | null; // maps to email_address
   registration_number: string;
   terms_and_conditions?: string | null;
   notes?: string | null;

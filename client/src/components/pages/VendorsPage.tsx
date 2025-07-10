@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building } from 'lucide-react';
-
-interface Company {
-  company_id: number;
-}
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Truck } from 'lucide-react';
 
 interface Vendor {
-  id: number;
-  company_name: string;
+  vendor_id: number;
+  vendor_company_name: string; // Updated to match backend database field
   name: string;
   email: string;
   phone: string;
@@ -24,13 +20,12 @@ interface Vendor {
   vehicle_number: string;
   fax_number: string;
   website: string;
-  taxes: string;
-  expense_rates: string;
+  default_expense_category: string;
+  billing_rate: number;
   terms: string;
   account_number: string;
-  balance?: number;
-  asOfDate?: string;
-
+  balance: number;
+  as_of_date: string;
 }
 
 export default function VendorsPage() {
@@ -54,22 +49,23 @@ export default function VendorsPage() {
     fax_number: '',
     vehicle_number: '',
     website: '',
-    taxes: '',
-    expense_rates: '',
+    default_expense_category: '',
+    billing_rate: 0,
     terms: '',
     account_number: '',
     balance: 0,
-    asOfDate: ''
+    as_of_date: ''
   });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVendors();
   }, [selectedCompany]);
 
   useEffect(() => {
-    if (!formData.asOfDate) {
+    if (!formData.as_of_date) {
       const today = new Date().toISOString().split('T')[0];
-      setFormData((prev) => ({ ...prev, asOfDate: today }));
+      setFormData((prev) => ({ ...prev, as_of_date: today }));
     }
   }, []);
 
@@ -79,6 +75,7 @@ export default function VendorsPage() {
       setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
+      setError('Failed to fetch vendors');
     } finally {
       setLoading(false);
     }
@@ -86,25 +83,41 @@ export default function VendorsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isNaN(formData.balance) || isNaN(formData.billing_rate)) {
+      setError('Please enter valid numbers for balance and billing rate.');
+      return;
+    }
+
     try {
+      const payload = {
+        ...formData,
+        vendor_company_name: formData.company_name, // Map to backend field
+        taxes: formData.default_expense_category,
+        expense_rates: formData.billing_rate,
+        asOfDate: formData.as_of_date
+      };
+
       if (editingVendor) {
-        await axios.put(`/api/vendors/${selectedCompany?.company_id}/${editingVendor.id}`, formData);
+        await axios.put(`/api/vendors/${selectedCompany?.company_id}/${editingVendor.vendor_id}`, payload);
       } else {
-        await axios.post(`/api/vendors/${selectedCompany?.company_id}`, formData);
+        await axios.post(`/api/vendors/${selectedCompany?.company_id}`, payload);
       }
-      fetchVendors();
       setShowModal(false);
       resetForm();
-    } catch (error) {
+      fetchVendors();
+      setError(null);
+    } catch (error: any) {
       console.error('Error saving vendor:', error);
+      setError(error.response?.data?.message || 'Failed to save vendor');
     }
   };
 
   const handleEdit = (vendor: Vendor) => {
     setEditingVendor(vendor);
     setFormData({
-      company_name: vendor.company_name || '',
       name: vendor.name,
+      company_name: vendor.vendor_company_name || '', // Map from backend field
       email: vendor.email || '',
       phone: vendor.phone || '',
       address: vendor.address || '',
@@ -116,14 +129,15 @@ export default function VendorsPage() {
       vehicle_number: vendor.vehicle_number || '',
       fax_number: vendor.fax_number || '',
       website: vendor.website || '',
-      taxes: vendor.taxes || '',
-      expense_rates: vendor.expense_rates || '',
+      default_expense_category: vendor.default_expense_category || '',
+      billing_rate: vendor.billing_rate || 0,
       terms: vendor.terms || '',
       account_number: vendor.account_number || '',
       balance: vendor.balance || 0,
-      asOfDate: vendor.asOfDate || ''
+      as_of_date: vendor.as_of_date || ''
     });
     setShowModal(true);
+    setError(null);
   };
 
   const handleDelete = async (id: number) => {
@@ -131,8 +145,10 @@ export default function VendorsPage() {
       try {
         await axios.delete(`/api/vendors/${selectedCompany?.company_id}/${id}`);
         fetchVendors();
-      } catch (error) {
+        setError(null);
+      } catch (error: any) {
         console.error('Error deleting vendor:', error);
+        setError(error.response?.data?.message || 'Failed to delete vendor');
       }
     }
   };
@@ -153,14 +169,15 @@ export default function VendorsPage() {
       fax_number: '',
       vehicle_number: '',
       website: '',
-      taxes: '',
-      expense_rates: '',
+      default_expense_category: '',
+      billing_rate: 0,
       terms: '',
       account_number: '',
       balance: 0,
-      asOfDate: today
+      as_of_date: today
     });
     setEditingVendor(null);
+    setError(null);
   };
 
   const filteredVendors = vendors.filter(vendor =>
@@ -178,6 +195,11 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          {error}
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Vendors</h1>
         <button
@@ -232,12 +254,12 @@ export default function VendorsPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredVendors.map((vendor) => (
-                <tr key={vendor.id} className="hover:bg-gray-50">
+                <tr key={vendor.vendor_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
                         <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <Building className="h-5 w-5 text-gray-600" />
+                          <Truck className="h-5 w-5 text-gray-600" />
                         </div>
                       </div>
                       <div className="ml-4">
@@ -294,7 +316,7 @@ export default function VendorsPage() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(vendor.id)}
+                        onClick={() => handleDelete(vendor.vendor_id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -310,12 +332,17 @@ export default function VendorsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"  style={{marginTop: "-1px"}}>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
               </h3>
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                  {error}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -367,9 +394,8 @@ export default function VendorsPage() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Tax Number
                     </label>
                     <input
@@ -380,7 +406,6 @@ export default function VendorsPage() {
                       placeholder="Enter Tax Number"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Address
@@ -396,46 +421,44 @@ export default function VendorsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Fax Number
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        value={formData.fax_number || ''}
-                        onChange={(e) => setFormData({ ...formData, fax_number: e.target.value })}
-                        placeholder="Enter Fax Number"
-                      />
-                    </div>
-
-                    <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Website
-                      </label>
-                      <input
-                        type="url"
-                        className="input"
-                        value={formData.website || ''}
-                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                        placeholder="Enter Website URL"
-                      />
-                    </div>
-
-                    <div>
-                      <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Vehicle Number
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        value={formData.vehicle_number || ''}
-                        onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
-                        placeholder="Enter Vehicle Number"
-                      />
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Fax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.fax_number || ''}
+                      onChange={(e) => setFormData({ ...formData, fax_number: e.target.value })}
+                      placeholder="Enter Fax Number"
+                    />
                   </div>
-                
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      className="input"
+                      value={formData.website || ''}
+                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                      placeholder="Enter Website URL"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vehicle Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formData.vehicle_number || ''}
+                      onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
+                      placeholder="Enter Vehicle Number"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -444,7 +467,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
-                      placeholder='Enter City'
+                      placeholder="Enter City"
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     />
@@ -456,7 +479,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
-                      placeholder='Enter State'
+                      placeholder="Enter State"
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                     />
@@ -468,7 +491,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
-                      placeholder='Enter ZIP Code'
+                      placeholder="Enter ZIP Code"
                       value={formData.zip_code}
                       onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
                     />
@@ -480,7 +503,7 @@ export default function VendorsPage() {
                     <input
                       type="text"
                       className="input"
-                      placeholder='Enter Country'
+                      placeholder="Enter Country"
                       value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                     />
@@ -490,17 +513,17 @@ export default function VendorsPage() {
                 <hr />
 
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Aditional Information
+                  Additional Information
                 </h3>
 
                 <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Default expense category
                   </label>
                   <select
                     className="input"
-                    value={formData.expense_rates || ''}
-                    onChange={(e) => setFormData({ ...formData, expense_rates: e.target.value })}
+                    value={formData.default_expense_category}
+                    onChange={(e) => setFormData({ ...formData, default_expense_category: e.target.value })}
                   >
                     <option value="">Select Category</option>
                     <option value="amorization expense">Amortization Expense</option>
@@ -524,12 +547,12 @@ export default function VendorsPage() {
                     <option value="purchases">Purchases</option>
                     <option value="rent or lease payments">Rent or Lease Payments</option>
                     <option value="repairs and maintenance">Repairs and Maintenance</option>
-                    <option value="salary" >Salary</option>
+                    <option value="salary">Salary</option>
                     <option value="shipping and delivery">Shipping and Delivery</option>
                     <option value="stationery and printing">Stationery and Printing</option>
                     <option value="supplies">Supplies</option>
-                    <option value="travel expenses - general and admin" >Travel Expenses - General and Admin Expenses</option>
-                    <option value="travel expenses - selling" >Travel Expenses - Selling Expenses</option>
+                    <option value="travel expenses - general and admin">Travel Expenses - General and Admin Expenses</option>
+                    <option value="travel expenses - selling">Travel Expenses - Selling Expenses</option>
                     <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
                     <option value="uncategorized expense">Uncategorized Expense</option>
                     <option value="utilities">Utilities</option>
@@ -540,32 +563,21 @@ export default function VendorsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Taxes
+                      Billing Rate
                     </label>
                     <input
-                      type="text"
-                      className="input"
-                      placeholder="Business ID No. / Social Insuarance No."
-                      value={formData.taxes || ''}
-                      onChange={(e) => setFormData({ ...formData, taxes: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Expense Rates
-                    </label>
-                    <input
-                      type="text"
+                      type="number"
                       className="input"
                       placeholder="Billing Rate (/hr)"
-                      value={formData.expense_rates || ''}
-                      onChange={(e) => setFormData({ ...formData, expense_rates: e.target.value })}
+                      value={formData.billing_rate}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setFormData({ ...formData, billing_rate: isNaN(val) ? 0 : val });
+                      }}
                     />
                   </div>
-
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Terms
                     </label>
                     <select
@@ -580,9 +592,8 @@ export default function VendorsPage() {
                       <option value="net_60">Net 60</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Account Number
                     </label>
                     <input
@@ -593,7 +604,6 @@ export default function VendorsPage() {
                       onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Opening Balance
@@ -602,11 +612,13 @@ export default function VendorsPage() {
                       type="number"
                       className="input"
                       placeholder="Balance"
-                      value={formData.balance || ''}
-                      onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) })}
+                      value={formData.balance}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setFormData({ ...formData, balance: isNaN(val) ? 0 : val });
+                      }}
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       As of Date
@@ -614,12 +626,12 @@ export default function VendorsPage() {
                     <input
                       type="date"
                       className="input"
-                      value={formData.asOfDate || ''}
-                      onChange={(e) => setFormData({ ...formData, asOfDate: e.target.value })}
+                      value={formData.as_of_date || ''}
+                      onChange={(e) => setFormData({ ...formData, as_of_date: e.target.value })}
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"

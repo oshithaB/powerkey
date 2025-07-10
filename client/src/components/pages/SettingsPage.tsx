@@ -45,9 +45,9 @@ export default function SettingsPage() {
         </div>
         <div className="card-content">
           <div className="flex items-center space-x-4">
-            {selectedCompany?.logo ? (
+            {selectedCompany?.company_logo ? (
               <img
-                src={`http://localhost:3001${selectedCompany.logo}`}
+                src={`http://localhost:3000${selectedCompany.company_logo}`}
                 alt={selectedCompany.name}
                 className="h-16 w-16 rounded-lg object-cover"
               />
@@ -64,7 +64,7 @@ export default function SettingsPage() {
                 {selectedCompany?.address || 'No address provided'}
               </p>
               <p className="text-sm text-gray-500">
-                Role: {selectedCompany?.role}
+                Contact Number: {selectedCompany?.contact_number}
               </p>
             </div>
           </div>

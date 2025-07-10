@@ -3,6 +3,10 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, Mail, Phone, Building } from 'lucide-react';
 
+interface Company {
+  company_id: number;
+}
+
 interface Vendor {
   id: number;
   company_name: string;
@@ -17,6 +21,7 @@ interface Vendor {
   is_active: boolean;
   created_at: string;
   tax_number: string;
+  vehicle_number: string;
   fax_number: string;
   website: string;
   taxes: string;
@@ -47,6 +52,7 @@ export default function VendorsPage() {
     country: '',
     tax_number: '',
     fax_number: '',
+    vehicle_number: '',
     website: '',
     taxes: '',
     expense_rates: '',
@@ -69,7 +75,7 @@ export default function VendorsPage() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get(`/api/vendors/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/vendors/${selectedCompany?.company_id}`);
       setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -82,9 +88,9 @@ export default function VendorsPage() {
     e.preventDefault();
     try {
       if (editingVendor) {
-        await axios.put(`/api/vendors/${selectedCompany?.id}/${editingVendor.id}`, formData);
+        await axios.put(`/api/vendors/${selectedCompany?.company_id}/${editingVendor.id}`, formData);
       } else {
-        await axios.post(`/api/vendors/${selectedCompany?.id}`, formData);
+        await axios.post(`/api/vendors/${selectedCompany?.company_id}`, formData);
       }
       fetchVendors();
       setShowModal(false);
@@ -107,6 +113,7 @@ export default function VendorsPage() {
       zip_code: vendor.zip_code || '',
       country: vendor.country || '',
       tax_number: vendor.tax_number || '',
+      vehicle_number: vendor.vehicle_number || '',
       fax_number: vendor.fax_number || '',
       website: vendor.website || '',
       taxes: vendor.taxes || '',
@@ -122,7 +129,7 @@ export default function VendorsPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this vendor?')) {
       try {
-        await axios.delete(`/api/vendors/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/vendors/${selectedCompany?.company_id}/${id}`);
         fetchVendors();
       } catch (error) {
         console.error('Error deleting vendor:', error);
@@ -144,6 +151,7 @@ export default function VendorsPage() {
       country: '',
       tax_number: '',
       fax_number: '',
+      vehicle_number: '',
       website: '',
       taxes: '',
       expense_rates: '',
@@ -385,34 +393,48 @@ export default function VendorsPage() {
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     />
                   </div>
-
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Fax Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.fax_number || ''}
-                      onChange={(e) => setFormData({ ...formData, fax_number: e.target.value })}
-                      placeholder="Enter Fax Number"
-                    />
-                  </div>
-
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Website
-                    </label>
-                    <input
-                      type="url"
-                      className="input"
-                      value={formData.website || ''}
-                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                      placeholder="Enter Website URL"
-                    />
-                  </div>
-
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Fax Number
+                      </label>
+                      <input
+                        type="text"
+                        className="input"
+                        value={formData.fax_number || ''}
+                        onChange={(e) => setFormData({ ...formData, fax_number: e.target.value })}
+                        placeholder="Enter Fax Number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        className="input"
+                        value={formData.website || ''}
+                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                        placeholder="Enter Website URL"
+                      />
+                    </div>
+
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>
+                        Vehicle Number
+                      </label>
+                      <input
+                        type="text"
+                        className="input"
+                        value={formData.vehicle_number || ''}
+                        onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
+                        placeholder="Enter Vehicle Number"
+                      />
+                      </div>
+                  </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
@@ -470,6 +492,50 @@ export default function VendorsPage() {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   Aditional Information
                 </h3>
+
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    Default expense category
+                  </label>
+                  <select
+                    className="input"
+                    value={formData.expense_rates || ''}
+                    onChange={(e) => setFormData({ ...formData, expense_rates: e.target.value })}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="amorization expense">Amortization Expense</option>
+                    <option value="bad debts">Bad Debts</option>
+                    <option value="bank charges">Bank Charges</option>
+                    <option value="commissions and fees">Commissions and Fees</option>
+                    <option value="dues and subscriptions">Dues and Subscriptions</option>
+                    <option value="equipment rental">Equipment Rental</option>
+                    <option value="income tax expense">Income Tax Expense</option>
+                    <option value="insurance-disability">Insurance - Disability</option>
+                    <option value="insurance-general">Insurance - General</option>
+                    <option value="insurance-liability">Insurance - Liability</option>
+                    <option value="interest expense">Interest Expense</option>
+                    <option value="legal and professional fees">Legal and Professional Fees</option>
+                    <option value="loss on discontinued operations">Loss on Discontinued Operations</option>
+                    <option value="management compensation">Management Compensation</option>
+                    <option value="meals and entertainment">Meals and Entertainment</option>
+                    <option value="office expenses">Office Expenses</option>
+                    <option value="other expenses">Other Expenses</option>
+                    <option value="payroll expenses">Payroll Expenses</option>
+                    <option value="purchases">Purchases</option>
+                    <option value="rent or lease payments">Rent or Lease Payments</option>
+                    <option value="repairs and maintenance">Repairs and Maintenance</option>
+                    <option value="salary" >Salary</option>
+                    <option value="shipping and delivery">Shipping and Delivery</option>
+                    <option value="stationery and printing">Stationery and Printing</option>
+                    <option value="supplies">Supplies</option>
+                    <option value="travel expenses - general and admin" >Travel Expenses - General and Admin Expenses</option>
+                    <option value="travel expenses - selling" >Travel Expenses - Selling Expenses</option>
+                    <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
+                    <option value="uncategorized expense">Uncategorized Expense</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="wage expense">Wage Expense</option>
+                  </select>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>

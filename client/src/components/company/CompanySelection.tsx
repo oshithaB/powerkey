@@ -54,7 +54,22 @@ export default function CompanySelection() {
         localStorage.setItem('authToken', response.data.token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         
-        setSelectedCompany(company);
+        // Map the company data to match the expected interface
+        const mappedCompany = {
+          id: company.company_id,
+          name: company.name,
+          is_taxable: company.is_taxable,
+          tax_number: company.tax_number,
+          logo: company.company_logo,
+          address: company.address,
+          phone: company.contact_number,
+          email: company.email_address,
+          registration_number: company.registration_number,
+          terms_and_conditions: company.terms_and_conditions,
+          notes: company.notes
+        };
+        
+        setSelectedCompany(mappedCompany);
         navigate('/dashboard');
       }
     } catch (error) {

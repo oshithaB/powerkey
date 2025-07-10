@@ -36,9 +36,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function ProtectedRouteWithCompany({ children }: { children: React.ReactNode }) {
   const {selectedCompany} = useCompany();
 
-  if (selectedCompany) {
-    return <Navigate to="/dashboard" />;
-  }
+  // Don't automatically redirect if company is selected
+  // Let the user stay on the company selection page
 
   return <>{children}</>;
 }

@@ -342,11 +342,19 @@ const deleteCompany = async (req, res) => {
         await db.query('START TRANSACTION');
 
         try {
-            // Delete related tax rates first
-            await db.query('DELETE FROM tax_rate WHERE company_id = ?', [companyId]);
+            // Delete related records in the correct order to avoid foreign key constraint errors
             
-            // Delete related customers
+            // Delete tax rates first
+            await db.query('DELETE FROM tax_rates WHERE company_id = ?', [companyId]);
+            console.log('Deleted tax rates for company:', companyId);
+            
+            // Delete customers (note: table name is 'customer' not 'customers')
             await db.query('DELETE FROM customer WHERE company_id = ?', [companyId]);
+            console.log('Deleted customers for company:', companyId);
+            
+            // Delete vendors
+            await db.query('DELETE FROM vendor WHERE company_id = ?', [companyId]);
+            console.log('Deleted vendors for company:', companyId);
             
             // Delete the company
             const [result] = await db.query('DELETE FROM company WHERE company_id = ?', [companyId]);
@@ -367,12 +375,17 @@ const deleteCompany = async (req, res) => {
         } catch (error) {
             // Rollback transaction on error
             await db.query('ROLLBACK');
+            console.error('Transaction error during company deletion:', error);
             throw error;
         }
 
     } catch (error) {
         console.error('Error deleting company:', error);
-        return res.status(500).json({ success: false, message: 'Internal server error' });
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 

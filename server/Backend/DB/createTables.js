@@ -89,11 +89,12 @@ async function createTables(db) {
             KEY company_id (company_id),
             CONSTRAINT vendor_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
-        `CREATE TABLE IF NOT EXISTS tax_rate (
+        `CREATE TABLE IF NOT EXISTS tax_rates (
             tax_rate_id INT AUTO_INCREMENT PRIMARY KEY,
             company_id int NOT NULL,
             name VARCHAR(100) NOT NULL,
             rate DECIMAL(5,2) NOT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             KEY company_id (company_id),
             CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE

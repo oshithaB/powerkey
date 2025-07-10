@@ -40,13 +40,38 @@ export default function CustomersPage() {
     balance: 0
   });
 
+  const [billingAddress, setBillingAddress] = useState({
+    address: '',
+    city: '',
+    province: '',
+    postalCode: '',
+    country: ''
+  });
+
+  const [showShipping, setShowShipping] = useState(false);
+    const [shippingAddress, setShippingAddress] = useState({ ...billingAddress });
+
+    const handleBillingChange = (e) => {
+        const { name, value } = e.target;
+        setBillingAddress(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleShippingChange = (e) => {
+        const { name, value } = e.target;
+        setShippingAddress(prev => ({ ...prev, [name]: value }));
+    };
+
+    const renderAddress = (address) => {
+        return Object.values(address).filter(Boolean).join(', ');
+    };
+
   useEffect(() => {
     fetchCustomers();
   }, [selectedCompany]);
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -59,9 +84,9 @@ export default function CustomersPage() {
     e.preventDefault();
     try {
       if (editingCustomer) {
-        await axios.put(`/api/customers/${selectedCompany?.id}/${editingCustomer.id}`, formData);
+        await axios.put(`/api/customers/${selectedCompany?.company_id}/${editingCustomer.id}`, formData);
       } else {
-        await axios.post(`/api/customers/${selectedCompany?.id}`, formData);
+        await axios.post(`/api/customers/${selectedCompany?.company_id}`, formData);
       }
       fetchCustomers();
       setShowModal(false);
@@ -92,7 +117,7 @@ export default function CustomersPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this customer?')) {
       try {
-        await axios.delete(`/api/customers/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/customers/${selectedCompany?.company_id}/${id}`);
         fetchCustomers();
       } catch (error) {
         console.error('Error deleting customer:', error);
@@ -346,70 +371,6 @@ export default function CustomersPage() {
                       />
                     </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Enter Address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder='Enter City'
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder='Enter State'
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ZIP Code
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder='Enter ZIP Code'
-                      value={formData.zip_code}
-                      onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder='Enter Country'
-                      value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    />
-                  </div>
-                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -435,6 +396,185 @@ export default function CustomersPage() {
                       value={formData.balance}
                       onChange={(e) => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
                     />
+                  </div>
+                </div>
+
+                <hr />
+
+                <h3 className='text-lg font-medium text-gray-900 mb-4'>Addresses - Billing</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                      <input type="text" id="address" className="input" name="address" value={billingAddress.address} onChange={handleBillingChange} required />
+                  </div>
+
+                  <div className="col-md-6">
+                      <label htmlFor="city" className="form-label">City</label>
+                      <input type="text" id="city" className="input" name="city" value={billingAddress.city} onChange={handleBillingChange} required />
+                  </div>
+
+                  <div className="col-md-6">
+                      <label htmlFor="province" className="form-label">Province</label>
+                      <select id="province" className="input" name="province" value={billingAddress.province} onChange={handleBillingChange} required>
+                          <option value="">Select Province</option>
+                          <option value="Central">Central Province</option>
+                          <option value="Eastern">Eastern Province</option>
+                          <option value="Northern">Northern Province</option>
+                          <option value="Southern">Southern Province</option>
+                          <option value="Western">Western Province</option>
+                          <option value="North Western">North Western Province</option>
+                          <option value="North Central">North Central Province</option>
+                          <option value="Uva">Uva Province</option>
+                          <option value="Sabaragamuwa">Sabaragamuwa Province</option>
+                      </select>
+                  </div>
+
+                  <div className="col-md-6">
+                      <label htmlFor="postalCode" className="form-label">Postal Code</label>
+                      <input type="text" id="postalCode" className="input" name="postalCode" value={billingAddress.postalCode} onChange={handleBillingChange} required />
+                  </div>
+
+                  <div className="col-md-6">
+                      <label htmlFor="country" className="form-label">Country</label>
+                      <input type="text" id="country" className="input" name="country" value={billingAddress.country} onChange={handleBillingChange} required />
+                  </div>
+                </div>
+
+                <div className="col-12">
+                    <p className="mt-3"><strong>Entered Billing Address:</strong> {renderAddress(billingAddress)}</p>
+                </div>
+
+                <h3 className='text-lg font-medium text-gray-900 mb-4'>Addresses - Shipping</h3>
+                <div className="col-12 mb-4">
+                    <div className="form-check">
+                        <input className="form-check-input" type="checkbox" id="sameAsBilling" checked={!showShipping} onChange={() => setShowShipping(!showShipping)} />
+                        <label className="form-check-label" htmlFor="sameAsBilling">
+                            Shipping address same as billing address
+                        </label>
+                    </div>
+                </div>
+
+                {showShipping && (
+                    <div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {['Address', 'City', 'Province', 'PostalCode', 'Country'].map((field, idx) => (
+                            <div className="col-md-6" key={idx}>
+                                <label htmlFor={`shipping-${field}`} className="form-label">{field.replace(/([A-Z])/g, ' $1')}</label>
+                                <input
+                                    type="text"
+                                    id={`shipping-${field}`}
+                                    className="input"
+                                    name={field}
+                                    value={shippingAddress[field]}
+                                    onChange={handleShippingChange}
+                                />
+                            </div>
+                        ))}
+                      </div>
+                      <div className="col-12">
+                          <p className="mt-3"><strong>Entered Shipping Address:</strong> {renderAddress(shippingAddress)}</p>
+                      </div>
+                    </div>
+                
+                )}
+
+                <hr />
+
+                <h3 className='text-lg font-medium text-gray-900 mb-4'>Payments</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label htmlFor="primaryPaymentMethod" className="form-label">Primary Payment Method</label>
+                      <select id="primaryPaymentMethod" className="input" name="primaryPaymentMethod" required>
+                          <option value={""}>Select Payment Method</option>
+                          <option value="cash">Cash</option>
+                          <option value="cashdeposit">Cash Deposit</option>
+                          <option value="cheque">Cheque</option>
+                          <option value="creditcard">Credit Card</option>
+                          <option value="creditnote">Credit Note</option>
+                          <option value="debitcard">Debit Card</option>
+                          <option value="directdebit">Direct Debit</option>
+                          <option value="other">Other</option>
+                          <option value="salesreturn">Sales Return</option>
+                      </select>
+                  </div>
+
+                  <div>
+                      <label htmlFor='terms' className='form-label'>Terms</label>
+                      <select id="terms" className="input" name="terms" required>
+                          <option value={""}>Select Terms</option>
+                          <option value="dueonreceipt">Due on Receipt</option>
+                          <option value="net30">Net 15</option>
+                          <option value="net60">Net 30</option>
+                          <option value="net90">Net 60</option>
+                      </select>
+                  </div>
+
+                  <div>
+                      <label htmlFor='salesFromDeliveryOptions' className='form-label'>Sales From Delivery Options</label>
+                      <select id="salesFromDeliveryOptions" className="input" name="salesFromDeliveryOptions" required>
+                          <option value={""}>Select Delivery Option</option>
+                          <option value="printLater">Print Later</option>
+                          <option value="sendLater">Send Later</option>
+                          <option value="none">None</option>
+                          <option value="useCompanyDefault">Use Company Default</option>
+                      </select>
+                  </div>
+
+                  <div>
+                      <label htmlFor='language' className='form-label'>Language to use when you send invoices</label>
+                      <select id="language" className="input" name="language" required>
+                          <option value={""}>Select Language</option>
+                          <option value="english">English</option>
+                          <option value="spanish">Spanish</option>
+                          <option value="french">French</option>
+                          <option value="italian">Italian</option>
+                          <option value="chinese">Chinese (taditional)</option>
+                          <option value="portuguese">Portuguese (Brazil)</option>
+                      </select>
+                  </div>
+                </div>
+
+                <hr />
+
+                <h3 className='text-lg font-medium text-gray-900 mb-4'>Aditional Info</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label htmlFor='salesTaxRegistration' className='form-label'>Sales Tax Registration</label>
+                      <input
+                          type="text"
+                          id="salesTaxRegistration"
+                          className="input"
+                          name="salesTaxRegistration"
+                          placeholder="Enter Sales Tax Registration"
+                          required
+                      />
+                  </div>
+
+                  <div>
+                  
+                  </div>
+
+                  <div>
+                      <label htmlFor='openingBalance' className='form-label'>Opening Balance</label>
+                      <input
+                          type="number"
+                          id="openingBalance"
+                          className="input"
+                          name="openingBalance"
+                          placeholder="Enter Opening Balance"
+                          required
+                      />
+                  </div>
+
+                  <div>
+                      <label htmlFor='asOfDate' className='form-label'>As of Date</label>
+                      <input
+                          type="date"
+                          id="asOfDate"
+                          className="input"
+                          name="asOfDate"
+                          required
+                      />
                   </div>
                 </div>
                 

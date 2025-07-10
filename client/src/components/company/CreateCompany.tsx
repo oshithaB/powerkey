@@ -108,13 +108,12 @@ export default function CreateCompany() {
         }
       });
 
-      // Update token and set selected company
-      const { token, company } = response.data;
+      // Update token but don't set selected company
+      const { token } = response.data;
       localStorage.setItem('authToken', token);
       
-      if (company) {
-        setSelectedCompany(company);
-      }
+      // Clear any previously selected company to ensure user goes to company selection
+      setSelectedCompany(null);
 
       navigate('/companies');
     } catch (err: any) {

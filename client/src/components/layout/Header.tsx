@@ -36,9 +36,9 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
 
       <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
         <div className="flex items-center gap-x-4 lg:gap-x-6">
-          {selectedCompany?.logo ? (
+          {selectedCompany?.company_logo ? (
             <img
-              src={`http://localhost:3000${selectedCompany.logo}`}
+              src={`http://localhost:3000${selectedCompany.company_logo}`}
               alt={selectedCompany.name}
               className="h-8 w-8 rounded-lg object-cover"
             />

@@ -5,6 +5,21 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Building2, Plus, LogOut, Users, Calendar, Edit, Trash2, X } from 'lucide-react';
 
+// Define the Company type
+interface Company {
+  company_id: number;
+  name: string;
+  is_taxable: boolean;
+  tax_number: string;
+  company_logo: string;
+  address: string;
+  contact_number: string;
+  email_address: string;
+  registration_number: string;
+  terms_and_conditions: string;
+  notes: string;
+}
+
 export default function CompanySelection() {
   const { user, logout } = useAuth();
   const { companies, setCompanies, setSelectedCompany } = useCompany();
@@ -54,19 +69,19 @@ export default function CompanySelection() {
         localStorage.setItem('authToken', response.data.token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         
-        // Map the company data to match the expected interface
-        const mappedCompany = {
-          id: company.company_id,
+        // Map the company data to match the Company interface
+        const mappedCompany: Company = {
+          company_id: company.company_id,
           name: company.name,
           is_taxable: company.is_taxable,
           tax_number: company.tax_number,
-          logo: company.company_logo,
+          company_logo: company.company_logo,
           address: company.address,
-          phone: company.contact_number,
-          email: company.email_address,
+          contact_number: company.contact_number,
+          email_address: company.email_address,
           registration_number: company.registration_number,
           terms_and_conditions: company.terms_and_conditions,
-          notes: company.notes
+          notes: company.notes,
         };
         
         setSelectedCompany(mappedCompany);

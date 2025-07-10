@@ -82,9 +82,9 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-6 pb-4">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center gap-x-3">
-            {selectedCompany?.logo ? (
+            {selectedCompany?.company_logo ? (
               <img
-                src={`http://localhost:3000${selectedCompany.logo}`}
+                src={`http://localhost:3000${selectedCompany.company_logo}`}
                 alt={selectedCompany.name}
                 className="h-8 w-8 rounded-lg object-cover"
               />

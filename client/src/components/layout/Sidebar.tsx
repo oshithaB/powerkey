@@ -16,7 +16,8 @@ import {
   CreditCard,
   PieChart,
   Receipt,
-  FileCheck
+  FileCheck,
+  Folder
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Estimates', href: '/dashboard/estimates', icon: FileCheck },
   { name: 'Invoices', href: '/dashboard/invoices', icon: FileText },
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
+  { name: 'Categories', href: '/dashboard/categories', icon: Folder },
   { name: 'Vendors', href: '/dashboard/vendors', icon: Truck },
   { name: 'Products', href: '/dashboard/products', icon: Package },
   { name: 'Expenses', href: '/dashboard/expenses', icon: Receipt },

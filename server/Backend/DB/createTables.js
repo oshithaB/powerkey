@@ -122,6 +122,19 @@ async function createTables(db) {
             PRIMARY KEY (id),
             UNIQUE KEY email (email)
         )`,
+        `CREATE TABLE IF NOT EXISTS categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE,
+            description TEXT,
+            amount DECIMAL(15,2) DEFAULT 0.00,
+            tax_rate_id INT DEFAULT NULL,
+            employee_id INT DEFAULT NULL,
+            company_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tax_rate_id) REFERENCES tax_rates(tax_rate_id) ON DELETE SET NULL,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
         // `CREATE TABLE IF NOT EXISTS products (
         //     id int NOT NULL AUTO_INCREMENT,
         //     company_id int NOT NULL,

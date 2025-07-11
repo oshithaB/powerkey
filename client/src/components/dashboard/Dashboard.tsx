@@ -16,6 +16,7 @@ import AccountingPage from '../pages/AccountingPage';
 import ReportsPage from '../pages/ReportsPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import SettingsPage from '../pages/SettingsPage';
+import CategoryPage from '../pages/CategoryPage';
 
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
@@ -53,6 +54,7 @@ export default function Dashboard() {
       <Route path="/estimates" element={<EstimatesPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/customers" element={<CustomersPage />} />
+      <Route path="/categories" element={<CategoryPage />} />
       <Route path="/vendors" element={<VendorsPage />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/expenses" element={<ExpensesPage />} />

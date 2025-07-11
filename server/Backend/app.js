@@ -19,6 +19,7 @@ const roleRoutes = require("./routes/role");
 const employeeRoutes = require("./routes/employee");
 const tax_ratesRoutes = require("./routes/tax_rates");
 const vendorRoutes = require("./routes/vendor");
+const customerRoutes = require("./routes/customer");
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow frontend origin
@@ -33,6 +34,7 @@ app.use("/api", userRoutes);
 app.use("/api", roleRoutes);
 app.use("/api", employeeRoutes);
 app.use("/api", vendorRoutes);
+app.use("/api", customerRoutes);
 
 app.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");

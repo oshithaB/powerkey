@@ -41,7 +41,7 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`/api/products/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/products/${selectedCompany?.company_id}`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -54,9 +54,9 @@ export default function ProductsPage() {
     e.preventDefault();
     try {
       if (editingProduct) {
-        await axios.put(`/api/products/${selectedCompany?.id}/${editingProduct.id}`, formData);
+        await axios.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, formData);
       } else {
-        await axios.post(`/api/products/${selectedCompany?.id}`, formData);
+        await axios.post(`/api/products/${selectedCompany?.company_id}`, formData);
       }
       fetchProducts();
       setShowModal(false);
@@ -84,7 +84,7 @@ export default function ProductsPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`/api/products/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/products/${selectedCompany?.company_id}/${id}`);
         fetchProducts();
       } catch (error) {
         console.error('Error deleting product:', error);

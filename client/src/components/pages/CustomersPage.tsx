@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
-import { Plus, Search, Edit, Trash2, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Mail, Phone, Truck } from 'lucide-react';
 
 interface Customer {
   id: number;
@@ -390,6 +390,7 @@ export default function CustomersPage() {
                       placeholder="Enter Tax Number"
                       value={formData.tax_number}
                       onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                      disabled={!formData.is_taxable}
                     />
                   </div>
                 </div>

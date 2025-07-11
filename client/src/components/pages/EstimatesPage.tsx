@@ -89,7 +89,7 @@ export default function EstimatesPage() {
 
   const fetchEstimates = async () => {
     try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
     } catch (error) {
       console.error('Error fetching estimates:', error);
@@ -101,10 +101,10 @@ export default function EstimatesPage() {
   const fetchData = async () => {
     try {
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.id}`),
-        axios.get(`/api/employees/${selectedCompany?.id}`),
-        axios.get(`/api/products/${selectedCompany?.id}`),
-        axios.get(`/api/tax-rates/${selectedCompany?.id}`)
+        axios.get(`/api/customers/${selectedCompany?.company_id}`),
+        axios.get(`/api/employees/${selectedCompany?.company_id}`),
+        axios.get(`/api/products/${selectedCompany?.company_id}`),
+        axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
       setCustomers(customersRes.data);
@@ -118,7 +118,7 @@ export default function EstimatesPage() {
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.id}/${estimateId}/items`);
+      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`);
       return response.data.length > 0 ? response.data : [
         {
           product_id: 0,
@@ -168,7 +168,7 @@ export default function EstimatesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this estimate?')) {
       try {
-        await axios.delete(`/api/estimates/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/estimates/${selectedCompany?.company_id}/${id}`);
         fetchEstimates();
       } catch (error: any) {
         const backendMessage = error.response?.data?.error;
@@ -181,7 +181,7 @@ export default function EstimatesPage() {
   const handleConvertToInvoice = async (estimateId: number) => {
     if (window.confirm('Convert this estimate to an invoice?')) {
       try {
-        const response = await axios.post(`/api/estimates/${selectedCompany?.id}/${estimateId}/convert`);
+        const response = await axios.post(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/convert`);
         alert('Estimate converted to invoice successfully!');
         fetchEstimates();
       } catch (error: any) {
@@ -242,7 +242,7 @@ export default function EstimatesPage() {
     // If editing an existing estimate and the item has an ID, delete it from the backend
     if (editingEstimate && item.id) {
       try {
-        await axios.delete(`/api/estimate-items/${selectedCompany?.id}/${editingEstimate.id}/${item.id}`);
+        await axios.delete(`/api/estimate-items/${selectedCompany?.company_id}/${editingEstimate.id}/${item.id}`);
         setItems(items.filter((_, i) => i !== index));
       } catch (error: any) {
         const backendMessage = error.response?.data?.error;
@@ -306,9 +306,9 @@ export default function EstimatesPage() {
       };
 
       if (editingEstimate) {
-        await axios.put(`/api/estimates/${selectedCompany?.id}/${editingEstimate.id}`, submitData);
+        await axios.put(`/api/estimates/${selectedCompany?.company_id}/${editingEstimate.id}`, submitData);
       } else {
-        await axios.post(`/api/estimates/${selectedCompany?.id}`, submitData);
+        await axios.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
       }
 
       fetchEstimates();

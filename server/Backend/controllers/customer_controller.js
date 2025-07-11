@@ -71,17 +71,17 @@ const createCustomer = async (req, res) => {
             }
         }
 
-        const [lastCustomer] = await db.query(
-            'SELECT id FROM customer WHERE company_id = ? ORDER BY id DESC LIMIT 1',
-            [company_id]
-        );
+        // const [lastCustomer] = await db.query(
+        //     'SELECT id FROM customer WHERE company_id = ? ORDER BY id DESC LIMIT 1',
+        //     [company_id]
+        // );
 
-        let customerCode = 'CUST001';
-        if (lastCustomer.length > 0 && lastCustomer[0].id) {
-            const lastCode = lastCustomer[0].id;
-            const lastNumber = parseInt(lastCode.replace('CUST', ''));
-            customerCode = `CUST${String(lastNumber + 1).padStart(3, '0')}`;
-        }
+        // let customerCode = 'CUST001';
+        // if (lastCustomer.length > 0 && lastCustomer[0].id) {
+        //     const lastCode = lastCustomer[0].id;
+        //     const lastNumber = parseInt(lastCode.replace('CUST', ''));
+        //     customerCode = `CUST${String(lastNumber + 1).padStart(3, '0')}`;
+        // }
 
         const [result] = await db.query(
             `INSERT INTO customer (

@@ -135,23 +135,32 @@ async function createTables(db) {
             FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
-        // `CREATE TABLE IF NOT EXISTS products (
-        //     id int NOT NULL AUTO_INCREMENT,
-        //     company_id int NOT NULL,
-        //     sku varchar(100),
-        //     name varchar(200) NOT NULL,
-        //     description text,
-        //     category varchar(100),
-        //     unit_price decimal(15,2) DEFAULT 0,
-        //     cost_price decimal(15,2) DEFAULT 0,
-        //     quantity_on_hand int DEFAULT 0,
-        //     reorder_level int DEFAULT 0,
-        //     is_active tinyint(1) DEFAULT 1,
-        //     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        //     PRIMARY KEY (id),
-        //     KEY company_id (company_id),
-        //     CONSTRAINT products_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id)
-        // )`,
+        `CREATE TABLE IF NOT EXISTS products (
+            id int NOT NULL AUTO_INCREMENT,
+            company_id int NOT NULL,
+            sku varchar(100),
+            name varchar(200) NOT NULL,
+            image varchar(255), -- Added for storing image path or URL
+            description text,
+            category_id int, -- Changed to reference categories table
+            preferred_vendor_id int, -- Added to reference vendor table
+            added_employee_id int, -- Added to reference employees table
+            unit_price decimal(15,2) DEFAULT 0,
+            cost_price decimal(15,2) DEFAULT 0,
+            quantity_on_hand int DEFAULT 0,
+            reorder_level int DEFAULT 0,
+            is_active tinyint(1) DEFAULT 1,
+            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY company_id (company_id),
+            KEY category_id (category_id),
+            KEY preferred_vendor_id (preferred_vendor_id),
+            KEY added_employee_id (added_employee_id),
+            CONSTRAINT products_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE,
+            CONSTRAINT products_ibfk_2 FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL,
+            CONSTRAINT products_ibfk_3 FOREIGN KEY (preferred_vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
+            CONSTRAINT products_ibfk_4 FOREIGN KEY (added_employee_id) REFERENCES employees (id) ON DELETE SET NULL
+        )`,
         // `CREATE TABLE IF NOT EXISTS invoices (
         //     id int NOT NULL AUTO_INCREMENT,
         //     company_id int NOT NULL,

@@ -7,8 +7,14 @@ interface Product {
   id: number;
   sku: string;
   name: string;
+  image?: string;
   description: string;
-  category: string;
+  category_id?: number;
+  category_name?: string;
+  preferred_vendor_id?: number;
+  vendor_name?: string;
+  added_employee_id?: number;
+  employee_name?: string;
   unit_price: number;
   cost_price: number;
   quantity_on_hand: number;
@@ -17,9 +23,27 @@ interface Product {
   created_at: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+}
+
+interface Vendor {
+  vendor_id: number;
+  name: string;
+}
+
+interface Employee {
+  id: number;
+  name: string;
+}
+
 export default function ProductsPage() {
   const { selectedCompany } = useCompany();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -27,16 +51,25 @@ export default function ProductsPage() {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
+    image: '',
     description: '',
-    category: '',
+    category_id: '',
+    preferred_vendor_id: '',
+    added_employee_id: '',
     unit_price: 0,
     cost_price: 0,
     quantity_on_hand: 0,
-    reorder_level: 0
+    reorder_level: 0,
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
-    fetchProducts();
+    if (selectedCompany?.company_id) {
+      fetchProducts();
+      fetchCategories();
+      fetchVendors();
+      fetchEmployees();
+    }
   }, [selectedCompany]);
 
   const fetchProducts = async () => {
@@ -50,13 +83,65 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`/api/products/${selectedCompany?.company_id}/categories`);
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchVendors = async () => {
+    try {
+      const response = await axios.get(`/api/products/${selectedCompany?.company_id}/vendors`);
+      setVendors(response.data);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get(`/api/employees`);
+      setEmployees(response.data);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const data = new FormData();
+      data.append('sku', formData.sku);
+      data.append('name', formData.name);
+      if (imageFile) {
+        data.append('image', imageFile);
+      }
+      data.append('description', formData.description);
+      if (formData.category_id) {
+        data.append('category_id', formData.category_id);
+      }
+      if (formData.preferred_vendor_id) {
+        data.append('preferred_vendor_id', formData.preferred_vendor_id);
+      }
+      if (formData.added_employee_id) {
+        data.append('added_employee_id', formData.added_employee_id);
+      }
+      data.append('unit_price', formData.unit_price.toString());
+      data.append('cost_price', formData.cost_price.toString());
+      data.append('quantity_on_hand', formData.quantity_on_hand.toString());
+      data.append('reorder_level', formData.reorder_level.toString());
+
       if (editingProduct) {
-        await axios.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, formData);
+        await axios.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       } else {
-        await axios.post(`/api/products/${selectedCompany?.company_id}`, formData);
+        await axios.post(`/api/products/${selectedCompany?.company_id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       }
       fetchProducts();
       setShowModal(false);
@@ -71,13 +156,17 @@ export default function ProductsPage() {
     setFormData({
       sku: product.sku || '',
       name: product.name,
+      image: product.image || '',
       description: product.description || '',
-      category: product.category || '',
+      category_id: product.category_id ? product.category_id.toString() : '',
+      preferred_vendor_id: product.preferred_vendor_id ? product.preferred_vendor_id.toString() : '',
+      added_employee_id: product.added_employee_id ? product.added_employee_id.toString() : '',
       unit_price: product.unit_price || 0,
       cost_price: product.cost_price || 0,
       quantity_on_hand: product.quantity_on_hand || 0,
-      reorder_level: product.reorder_level || 0
+      reorder_level: product.reorder_level || 0,
     });
+    setImageFile(null);
     setShowModal(true);
   };
 
@@ -96,24 +185,29 @@ export default function ProductsPage() {
     setFormData({
       sku: '',
       name: '',
+      image: '',
       description: '',
-      category: '',
+      category_id: '',
+      preferred_vendor_id: '',
+      added_employee_id: '',
       unit_price: 0,
       cost_price: 0,
       quantity_on_hand: 0,
-      reorder_level: 0
+      reorder_level: 0,
     });
+    setImageFile(null);
     setEditingProduct(null);
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const lowStockProducts = products.filter(product => 
-    product.quantity_on_hand <= product.reorder_level
+  const lowStockProducts = products.filter(
+    (product) => product.quantity_on_hand <= product.reorder_level
   );
 
   if (loading) {
@@ -180,6 +274,9 @@ export default function ProductsPage() {
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Vendor
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Pricing
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -199,22 +296,29 @@ export default function ProductsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Package className="h-5 w-5 text-gray-600" />
-                        </div>
+                        {product.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <Package className="h-5 w-5 text-gray-600" />
+                          </div>
+                        )}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {product.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          SKU: {product.sku || 'N/A'}
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm text-gray-500">SKU: {product.sku || 'N/A'}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.category || '-'}
+                    {product.category_name || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {product.vendor_name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -239,11 +343,11 @@ export default function ProductsPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      product.is_active 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {product.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
@@ -272,7 +376,7 @@ export default function ProductsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"   style={{marginTop: "-1px"}}>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -281,9 +385,7 @@ export default function ProductsPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      SKU
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
                     <input
                       type="text"
                       className="input"
@@ -293,24 +395,40 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
                       type="text"
                       required
                       className="input"
-                      placeholder=''
+                      placeholder="Product name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="input"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setImageFile(file);
+                      }
+                    }}
+                  />
+                  {formData.image && (
+                    <div className="mt-2">
+                      <img src={formData.image} alt="Product preview" className="h-20 w-20 object-cover rounded" />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     className="input min-h-[80px]"
                     value={formData.description}
@@ -318,85 +436,109 @@ export default function ProductsPage() {
                     placeholder="Product description"
                   />
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category
-                    </label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
                       className="input"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="Product category"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Prefered Vendor
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.category} // Assuming category is used for vendor
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="Preferred vendor"
-                    />
+                      value={formData.category_id}
+                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit Price
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Vendor</label>
+                    <select
+                      className="input"
+                      value={formData.preferred_vendor_id}
+                      onChange={(e) => setFormData({ ...formData, preferred_vendor_id: e.target.value })}
+                    >
+                      <option value="">Select Vendor</option>
+                      {vendors.map((vendor) => (
+                        <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                          {vendor.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Added Employee</label>
+                    <select
+                      className="input"
+                      value={formData.added_employee_id}
+                      onChange={(e) => setFormData({ ...formData, added_employee_id: e.target.value })}
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
                     <input
                       type="number"
                       step="0.01"
                       className="input"
                       value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cost Price
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
                     <input
                       type="number"
                       step="0.01"
                       className="input"
                       value={formData.cost_price}
-                      onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
+                      }
                     />
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity on Hand
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity on Hand</label>
                     <input
                       type="number"
                       className="input"
                       value={formData.quantity_on_hand}
-                      onChange={(e) => setFormData({ ...formData, quantity_on_hand: parseInt(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, quantity_on_hand: parseInt(e.target.value) || 0 })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Reorder Level
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
                     <input
                       type="number"
                       className="input"
                       value={formData.reorder_level}
-                      onChange={(e) => setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })
+                      }
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
@@ -405,10 +547,7 @@ export default function ProductsPage() {
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-md"
-                  >
+                  <button type="submit" className="btn btn-primary btn-md">
                     {editingProduct ? 'Update' : 'Create'} Product
                   </button>
                 </div>

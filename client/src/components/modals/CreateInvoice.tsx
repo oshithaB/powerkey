@@ -78,10 +78,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const fetchData = async () => {
     try {
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.id}`),
-        axios.get(`/api/employees/${selectedCompany?.id}`),
-        axios.get(`/api/products/${selectedCompany?.id}`),
-        axios.get(`/api/tax-rates/${selectedCompany?.id}`)
+        axios.get(`/api/customers/${selectedCompany?.company_id}`),
+        axios.get(`/api/employees/${selectedCompany?.company_id}`),
+        axios.get(`/api/products/${selectedCompany?.company_id}`),
+        axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
       setCustomers(customersRes.data);
@@ -96,7 +96,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const fetchInvoiceItems = async () => {
     if (!invoice) return;
     try {
-      const response = await axios.get(`/api/invoices/${selectedCompany?.id}/${invoice.id}/items`);
+      const response = await axios.get(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}/items`);
       setItems(response.data);
     } catch (error) {
       console.error('Error fetching invoice items:', error);
@@ -106,7 +106,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const fetchCustomerEstimates = async (customerId: string) => {
     if (!customerId) return;
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.id}/${customerId}/estimates`);
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}/${customerId}/estimates`);
       setCustomerEstimates(response.data);
       if (response.data.length > 0) {
         setShowEstimateSelection(true);
@@ -125,7 +125,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
 
   const convertEstimateToInvoice = async (estimateId: number) => {
     try {
-      const response = await axios.post(`/api/estimates/${selectedCompany?.id}/${estimateId}/convert`);
+      const response = await axios.post(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/convert`);
       alert('Estimate converted to invoice successfully!');
       onSave();
     } catch (error: any) {
@@ -137,8 +137,8 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (!estimateId) return;
     try {
       const [estimateRes, itemsRes] = await Promise.all([
-        axios.get(`/api/estimates/${selectedCompany?.id}/${estimateId}`),
-        axios.get(`/api/estimates/${selectedCompany?.id}/${estimateId}/items`)
+        axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}`),
+        axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`)
       ]);
 
       const estimate = estimateRes.data;
@@ -226,9 +226,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       };
 
       if (invoice) {
-        await axios.put(`/api/invoices/${selectedCompany?.id}/${invoice.id}`, submitData);
+        await axios.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
-        await axios.post(`/api/invoices/${selectedCompany?.id}`, submitData);
+        await axios.post(`/api/invoices/${selectedCompany?.company_id}`, submitData);
       }
 
       onSave();

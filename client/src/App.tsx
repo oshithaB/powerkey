@@ -13,6 +13,7 @@ import Layout from './components/layout/Layout';
 
 import CreateEstimate from './components/modals/CreateEstimate'
 import CreateInvoice from './components/modals/CreateInvoice';
+import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 
 // Reports
 import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
@@ -36,8 +37,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function ProtectedRouteWithCompany({ children }: { children: React.ReactNode }) {
   const {selectedCompany} = useCompany();
 
-  // Don't automatically redirect if company is selected
-  // Let the user stay on the company selection page
 
   return <>{children}</>;
 }
@@ -94,6 +93,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CreateInvoice />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purchase-orders"
+                element={
+                  <ProtectedRoute>
+                    <PurchaseOrdersPage />
                   </ProtectedRoute>
                 }
               />

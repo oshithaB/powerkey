@@ -17,7 +17,8 @@ import {
   PieChart,
   Receipt,
   FileCheck,
-  Folder
+  Folder,
+  SendToBack
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Estimates', href: '/dashboard/estimates', icon: FileCheck },
   { name: 'Invoices', href: '/dashboard/invoices', icon: FileText },
+  { name: 'Orders', href: '/dashboard/orders', icon: SendToBack },
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
   { name: 'Categories', href: '/dashboard/categories', icon: Folder },
   { name: 'Vendors', href: '/dashboard/vendors', icon: Truck },

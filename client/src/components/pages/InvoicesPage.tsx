@@ -66,7 +66,7 @@ export default function InvoicesPage() {
         if (value) params.append(key, value);
       });
       
-      const response = await axios.get(`/api/invoices/${selectedCompany?.id}?${params}`);
+      const response = await axios.get(`/api/invoices/${selectedCompany?.company_id}?${params}`);
       setInvoices(response.data);
     } catch (error) {
       console.error('Error fetching invoices:', error);
@@ -77,7 +77,7 @@ export default function InvoicesPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -86,7 +86,7 @@ export default function InvoicesPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/employees/${selectedCompany?.company_id}`);
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -101,7 +101,7 @@ export default function InvoicesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        await axios.delete(`/api/invoices/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/invoices/${selectedCompany?.company_id}/${id}`);
         fetchInvoices();
       } catch (error) {
         console.error('Error deleting invoice:', error);

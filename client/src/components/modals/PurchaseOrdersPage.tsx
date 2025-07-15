@@ -9,6 +9,8 @@ interface Order {
   id: number;
   company_id: number;
   vendor_id: number | null;
+  mailling_address?: string;
+  email?: string;
   order_no: string;
   order_date: string;
   category_id: number | null;
@@ -16,6 +18,7 @@ interface Order {
   customer_id: number | null;
   shipping_address?: string;
   location: string;
+  ship_via?: string;
   total_amount: number | null | string;
   status: string;
   created_at: string;
@@ -53,9 +56,9 @@ interface Employee {
 }
 
 interface Customer {
-    id: number;
-    name: string;
-    shipping_address: string;
+  id: number;
+  name: string;
+  shipping_address: string;
 }
 
 export default function PurchaseOrdersPage() {
@@ -65,6 +68,8 @@ export default function PurchaseOrdersPage() {
     id: 0,
     company_id: selectedCompany?.company_id || 0,
     vendor_id: null,
+    mailling_address: '',
+    email: '',
     customer_id: null,
     shipping_address: '',
     order_no: '',
@@ -72,6 +77,7 @@ export default function PurchaseOrdersPage() {
     category_id: null,
     class: null,
     location: '',
+    ship_via: '',
     total_amount: null,
     status: 'draft',
     created_at: new Date().toISOString(),
@@ -80,7 +86,7 @@ export default function PurchaseOrdersPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [showItemForm, setShowItemForm] = useState(false);
   const [newItem, setNewItem] = useState<Omit<OrderItem, 'id' | 'order_id'>>({
     product_id: null,
@@ -94,6 +100,7 @@ export default function PurchaseOrdersPage() {
     received: false,
     closed: false,
   });
+  const [orderCount, setOrderCount] = useState(0);
 
   useEffect(() => {
     if (selectedCompany) {
@@ -101,6 +108,7 @@ export default function PurchaseOrdersPage() {
       fetchCategories();
       fetchEmployees();
       fetchCustomers();
+      fetchOrderCount();
     }
   }, [selectedCompany]);
 
@@ -122,31 +130,69 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-    const fetchEmployees = async () => {
-        try {
-        const response = await axios.get(`/api/employees`);
-        setEmployees(response.data);
-        } catch (error) {
-        console.error('Error fetching employees:', error);
-        }
-    };
-
-    const fetchCustomers = async () => {
-        try {
-            const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
-            setCustomers(response.data);
-        } catch (error) {
-            console.error('Error fetching customers:', error);
-        }
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get(`/api/employees`);
+      setEmployees(response.data);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
     }
+  };
 
+  const fetchCustomers = async () => {
+    try {
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      setCustomers(response.data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  };
+
+  const fetchOrderCount = async () => {
+    try {
+      const response = await axios.get(`/api/orders/count/${selectedCompany?.company_id}`);
+      const count = response.data.count + 1; // Increment for new order
+      setOrderCount(count);
+      setOrder((prev) => ({
+        ...prev,
+        order_no: `ORD-${count}`,
+      }));
+    } catch (error) {
+      console.error('Error fetching order count:', error);
+      setOrder((prev) => ({
+        ...prev,
+        order_no: `ORD-${orderCount + 1}`,
+      }));
+    }
+  };
 
   const handleOrderChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setOrder((prev) => ({
-      ...prev,
-      [name]: value === '' ? null : value,
-    }));
+    
+    // Handle vendor selection and auto-populate mailing address
+    if (name === 'vendor_id') {
+      const selectedVendor = vendors.find(vendor => vendor.vendor_id === Number(value));
+      setOrder((prev) => ({
+        ...prev,
+        vendor_id: value === '' ? null : Number(value),
+        mailling_address: selectedVendor ? selectedVendor.address : '',
+      }));
+    } 
+    // Handle customer selection and auto-populate shipping address
+    else if (name === 'customer_id') {
+      const selectedCustomer = customers.find(customer => customer.id === Number(value));
+      setOrder((prev) => ({
+        ...prev,
+        customer_id: value === '' ? null : Number(value),
+        shipping_address: selectedCustomer ? selectedCustomer.shipping_address : '',
+      }));
+    } 
+    else {
+      setOrder((prev) => ({
+        ...prev,
+        [name]: value === '' ? null : value,
+      }));
+    }
   };
 
   const handleItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -230,131 +276,169 @@ export default function PurchaseOrdersPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Vendor</label>
-                    <select
-                    name="vendor_id"
-                    value={order.vendor_id || ''}
-                    onChange={handleOrderChange}
-                    className="input"
-                    >
-                    <option value="">Select Vendor</option>
-                    {vendors.map((vendor) => (
-                        <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                        {vendor.name}
-                        </option>
-                    ))}
-                    </select>
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Order Number</label>
-                    <input
-                    type="text"
-                    name="order_no"
-                    value={order.order_no}
-                    onChange={handleOrderChange}
-                    className="input"
-                    required
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Order Date</label>
-                    <input
-                    type="date"
-                    name="order_date"
-                    value={order.order_date}
-                    onChange={handleOrderChange}
-                    className="input"
-                    required
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Category</label>
-                    <select
-                    name="category_id"
-                    value={order.category_id || ''}
-                    onChange={handleOrderChange}
-                    className="input"
-                    >
-                    <option value="">Select Category</option>
-                    {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                        {category.name}
-                        </option>
-                    ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Class</label>
-                    <select
-                    name='employee_id'
-                    value={order.class || ''}
-                    onChange={handleOrderChange}
-                    className="input"
-                    >
-                        <option value="">Select Employee</option>
-                        {employees.map((employee) => (
-                            <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Location</label>
-                    <input
-                    type="text"
-                    name="location"
-                    value={order.location}
-                    onChange={handleOrderChange}
-                    className="input"
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Status</label>
-                    <select
-                    name="status"
-                    value={order.status}
-                    onChange={handleOrderChange}
-                    className="input"
-                    >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                    </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Order Number</label>
+                <input
+                  type="text"
+                  name="order_no"
+                  value={order.order_no}
+                  className="input"
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Order Date</label>
+                <input
+                  type="date"
+                  name="order_date"
+                  value={order.order_date}
+                  onChange={handleOrderChange}
+                  className="input"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Vendor</label>
+                <select
+                  name="vendor_id"
+                  value={order.vendor_id || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                >
+                  <option value="">Select Vendor</option>
+                  {vendors.map((vendor) => (
+                    <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                      {vendor.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <div>
-                    <label className='block text-sm font-medium text-gray-700'>Customer</label>
-                    <select
-                      name="customer_id"
-                      value={order.customer_id || ''}
-                      onChange={handleOrderChange}
-                      className="input"
-                    >
-                        <option value="">Select Customer</option>
-                        {customers.map((customer) => (
-                            <option key={customer.id} value={customer.id}>
-                            {customer.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+              <div>
+                <label className='block text-sm font-medium text-gray-700'>Mailing Address</label>
+                <input
+                  type="text"
+                  name="mailling_address"
+                  value={order.mailling_address || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                  placeholder="Enter mailing address"
+                />
+              </div>
 
-                <div>
-                    <label className='block text-sm font-medium text-gray-700'>Customer Shipping Address</label>
-                    <input
-                      type="text"
-                      name="shipping_address"
-                      value={order.shipping_address || ''}
-                      onChange={handleOrderChange}
-                      className="input"
-                    />
-                </div>
+              <div>
+                <label className='block text-sm font-medium text-gray-700'>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={order.email || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                  placeholder="Enter email"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className='block text-sm font-medium text-gray-700'>Customer</label>
+                <select
+                  name="customer_id"
+                  value={order.customer_id || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                >
+                  <option value="">Select Customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700'>Customer Shipping Address</label>
+                <input
+                  type="text"
+                  name="shipping_address"
+                  value={order.shipping_address || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                  placeholder="Enter shipping address"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <select
+                  name="category_id"
+                  value={order.category_id || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Class</label>
+                <select
+                  name="class"
+                  value={order.class || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                >
+                  <option value="">Select Employee</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={order.location}
+                  onChange={handleOrderChange}
+                  className="input"
+                  placeholder="Enter location"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Purchase Order Status</label>
+                <select
+                  name="status"
+                  value={order.status}
+                  onChange={handleOrderChange}
+                  className="input"
+                >
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+              <div>
+                <label className='block text-sm font-medium text-gray-700'>Ship Via</label>
+                <input
+                  type="text"
+                  name="ship_via"
+                  value={order.ship_via || ''}
+                  onChange={handleOrderChange}
+                  className="input"
+                  placeholder="Enter shipping method"
+                />
+              </div>
             </div>
 
             <div className="mt-6">

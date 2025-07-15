@@ -7,10 +7,9 @@ const {
     createCategory,
     getCategories,
     updateCategory,
-    deleteCategory,
-    getTaxRates,
-    getEmployees
-} = require('../controllers/category_controller');
+    permanentDeleteCategory,
+    softDeleteCategory
+} = require('../controllers/product_category_controller');
 
 // Category routes
 router.post(
@@ -33,24 +32,18 @@ router.put(
     updateCategory
 );
 
+router.put(
+    '/categories/softDelete/:company_id/:id',
+    verifyToken,
+    authorizedRoles(['admin']),
+    softDeleteCategory
+);
+
 router.delete(
     '/categories/:company_id/:id',
     verifyToken,
     authorizedRoles(['admin']),
-    deleteCategory
-);
-
-// Helper routes for form data
-router.get(
-    '/tax-rates/:company_id',
-    verifyToken,
-    getTaxRates
-);
-
-router.get(
-    '/employees',
-    verifyToken,
-    getEmployees
+    permanentDeleteCategory
 );
 
 module.exports = router;

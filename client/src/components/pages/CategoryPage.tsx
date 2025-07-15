@@ -3,87 +3,43 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 
+
+
 interface Category {
   id: number;
-  name: string;
-  description: string;
-  amount: number | null | string; // Allow string to handle potential API response
-  tax_rate_id: number | null;
-  employee_id: number | null;
   company_id: number;
-  tax_name?: string;
-  tax_rate?: number;
-  employee_name?: string;
+  name: string;
+  is_active: boolean;
   created_at: string;
 }
 
-interface TaxRate {
-  tax_rate_id: number;
-  name: string;
-  rate: number;
-}
-
-interface Employee {
-  id: number;
-  name: string;
-}
 
 export default function CategoryPage() {
   const { selectedCompany } = useCompany();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
-    amount: '',
-    tax_rate_id: '',
-    employee_id: '',
   });
 
   useEffect(() => {
     if (selectedCompany) {
       fetchCategories();
-      fetchTaxRates();
-      fetchEmployees();
     }
   }, [selectedCompany]);
 
   const fetchCategories = async () => {
     try {
       const response = await axios.get(`/api/categories/${selectedCompany?.company_id}`);
-      // Ensure amount is a number or null
-      const parsedCategories = response.data.map((category: Category) => ({
-        ...category,
-        amount: category.amount != null ? parseFloat(category.amount.toString()) : null,
-      }));
-      setCategories(parsedCategories);
+
+      setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTaxRates = async () => {
-    try {
-      const response = await axios.get(`/api/tax-rates/${selectedCompany?.company_id}`);
-      setTaxRates(response.data);
-    } catch (error) {
-      console.error('Error fetching tax rates:', error);
-    }
-  };
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await axios.get('/api/employees');
-      setEmployees(response.data);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
     }
   };
 
@@ -92,9 +48,6 @@ export default function CategoryPage() {
     try {
       const submitData = {
         ...formData,
-        amount: formData.amount ? parseFloat(formData.amount) : null,
-        tax_rate_id: formData.tax_rate_id ? parseInt(formData.tax_rate_id) : null,
-        employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
       };
 
       if (editingCategory) {
@@ -114,11 +67,7 @@ export default function CategoryPage() {
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
     setFormData({
-      name: category.name || '',
-      description: category.description || '',
-      amount: category.amount != null ? category.amount.toString() : '',
-      tax_rate_id: category.tax_rate_id?.toString() || '',
-      employee_id: category.employee_id?.toString() || '',
+      name: category.name.toUpperCase() || '',
     });
     setShowModal(true);
   };
@@ -126,7 +75,7 @@ export default function CategoryPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
-        await axios.delete(`/api/categories/${selectedCompany?.company_id}/${id}`);
+        await axios.put(`/api/categories/softDelete/${selectedCompany?.company_id}/${id}`);
         fetchCategories();
       } catch (error: any) {
         console.error('Error deleting category:', error);
@@ -138,18 +87,12 @@ export default function CategoryPage() {
   const resetForm = () => {
     setFormData({
       name: '',
-      description: '',
-      amount: '',
-      tax_rate_id: '',
-      employee_id: '',
     });
     setEditingCategory(null);
   };
 
   const filteredCategories = categories.filter(category =>
-    category.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.employee_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    category.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -197,19 +140,7 @@ export default function CategoryPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Description
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tax
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Actions
                 </th>
               </tr>
@@ -219,20 +150,8 @@ export default function CategoryPage() {
                 <tr key={category.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {category.name}
+                        {category.name.toUpperCase()}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {category.description || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {category.amount != null && !isNaN(Number(category.amount)) ? `$${Number(category.amount).toFixed(2)}` : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {category.tax_name ? `${category.tax_name} (${category.tax_rate}%)` : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {category.employee_name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
@@ -260,13 +179,13 @@ export default function CategoryPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-full md:w-1/2 max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingCategory ? 'Edit Category' : 'Add New Category'}
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Name *
@@ -279,68 +198,6 @@ export default function CategoryPage() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input"
-                      placeholder="Enter Amount"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    className="input min-h-[80px]"
-                    placeholder="Enter Category Description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tax Rate
-                    </label>
-                    <select
-                      className="input"
-                      value={formData.tax_rate_id}
-                      onChange={(e) => setFormData({ ...formData, tax_rate_id: e.target.value })}
-                    >
-                      <option value="">Select Tax Rate</option>
-                      {taxRates.map((taxRate) => (
-                        <option key={taxRate.tax_rate_id} value={taxRate.tax_rate_id}>
-                          {taxRate.name} ({taxRate.rate}%)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employee
-                    </label>
-                    <select
-                      className="input"
-                      value={formData.employee_id}
-                      onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 

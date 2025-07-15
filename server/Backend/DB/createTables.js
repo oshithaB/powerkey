@@ -135,6 +135,14 @@ async function createTables(db) {
             FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
+        `CREATE TABLE IF NOT EXISTS product_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
         `CREATE TABLE IF NOT EXISTS products (
             id int NOT NULL AUTO_INCREMENT,
             company_id int NOT NULL,

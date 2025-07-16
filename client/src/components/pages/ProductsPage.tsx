@@ -25,7 +25,10 @@ interface Product {
 
 interface Category {
   id: number;
+  company_id: number;
   name: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 interface Vendor {
@@ -103,8 +106,9 @@ export default function ProductsPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees`);
+      const response = await axios.get(`/api/products/employees`);
       setEmployees(response.data);
+      console.log('Employees fetched successfully:', response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
@@ -388,6 +392,7 @@ export default function ProductsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
                     <input
                       type="text"
+                      required
                       className="input"
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}

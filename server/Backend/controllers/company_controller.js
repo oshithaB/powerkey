@@ -154,25 +154,25 @@ const getDashboardData = async (req, res) => {
         console.log('Get dashboard data for companyId:', companyId);
 
         // Get basic metrics
-        const [customers] = await db.query('SELECT COUNT(*) as count FROM customer WHERE company_id = ?', [companyId]);
-        const [products] = await db.query('SELECT COUNT(*) as count FROM product WHERE company_id = ?', [companyId]);
-        const [invoices] = await db.query('SELECT COUNT(*) as count FROM invoices WHERE company_id = ?', [companyId]);
-        const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);
+        const [customers] = await db.query('SELECT COUNT(*) as count FROM customer WHERE company_id = ? AND is_active = 1', [companyId]);
+        const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ? AND is_active = 1', [companyId]);
+        // const [invoices] = await db.query('SELECT COUNT(*) as count FROM invoices WHERE company_id = ?', [companyId]);
+        // const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);
 
         // Get recent invoices
-        const [recentInvoices] = await db.query(`
-            SELECT 
-                i.id,
-                i.invoice_number,
-                i.total_amount,
-                i.created_at,
-                c.name as customer_name
-            FROM invoices i
-            LEFT JOIN customer c ON i.customer_id = c.id
-            WHERE i.company_id = ?
-            ORDER BY i.created_at DESC
-            LIMIT 5
-        `, [companyId]);
+        // const [recentInvoices] = await db.query(`
+        //     SELECT 
+        //         i.id,
+        //         i.invoice_number,
+        //         i.total_amount,
+        //         i.created_at,
+        //         c.name as customer_name
+        //     FROM invoices i
+        //     LEFT JOIN customer c ON i.customer_id = c.id
+        //     WHERE i.company_id = ?
+        //     ORDER BY i.created_at DESC
+        //     LIMIT 5
+        // `, [companyId]);
 
         const dashboardData = {
             metrics: {

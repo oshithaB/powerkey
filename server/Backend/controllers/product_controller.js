@@ -13,6 +13,12 @@ const getProducts = async (req, res) => {
             [company_id]
         );
 
+        if (products.length === 0) {
+            return res.status(404).json({ success: false, message: 'No active products found for this company' });
+        }
+
+        console.log('Fetched products:', products);
+
         return res.status(200).json(products);
     } catch (error) {
         console.error('Error fetching products:', error);
@@ -45,10 +51,14 @@ const createProduct = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Product name is required' });
         }
 
+        if (!sku) {
+            return res.status(400).json({ success: false, message: 'SKU is required' });
+        }
+
         // Check if product with same SKU exists for this company
         if (sku) {
             const [existingProduct] = await db.query(
-                'SELECT * FROM products WHERE company_id = ? AND sku = ?',
+                'SELECT * FROM products WHERE company_id = ? AND sku = ? AND is_active = 1',
                 [company_id, sku]
             );
 
@@ -59,43 +69,24 @@ const createProduct = async (req, res) => {
 
         // Validate category_id, preferred_vendor_id, and added_employee_id if provided
         if (category_id) {
-            const [category] = await db.query('SELECT id FROM categories WHERE id = ? AND company_id = ?', [category_id, company_id]);
+            const [category] = await db.query('SELECT id FROM product_categories WHERE id = ? AND company_id = ? AND is_active = 1', [category_id, company_id]);
             if (category.length === 0) {
                 return res.status(400).json({ success: false, message: 'Invalid category ID' });
             }
         }
 
         if (preferred_vendor_id) {
-            const [vendor] = await db.query('SELECT vendor_id FROM vendor WHERE vendor_id = ? AND company_id = ?', [preferred_vendor_id, company_id]);
+            const [vendor] = await db.query('SELECT vendor_id FROM vendor WHERE vendor_id = ? AND company_id = ? AND is_active = 1', [preferred_vendor_id, company_id]);
             if (vendor.length === 0) {
                 return res.status(400).json({ success: false, message: 'Invalid vendor ID' });
             }
         }
 
         if (added_employee_id) {
-            const [employee] = await db.query('SELECT id FROM employees WHERE id = ?', [added_employee_id]);
+            const [employee] = await db.query('SELECT id FROM employees WHERE id = ? AND is_active = 1', [added_employee_id]);
             if (employee.length === 0) {
                 return res.status(400).json({ success: false, message: 'Invalid employee ID' });
             }
-        }
-
-        // Generate SKU if not provided
-        let productSku = sku;
-        if (!productSku) {
-            const [lastProduct] = await db.query(
-                'SELECT sku FROM products WHERE company_id = ? AND sku IS NOT NULL ORDER BY id DESC LIMIT 1',
-                [company_id]
-            );
-
-            let skuNumber = 1;
-            if (lastProduct.length > 0 && lastProduct[0].sku) {
-                const lastSku = lastProduct[0].sku;
-                const lastNumber = parseInt(lastSku.replace('PRD', ''));
-                if (!isNaN(lastNumber)) {
-                    skuNumber = lastNumber + 1;
-                }
-            }
-            productSku = `PRD${String(skuNumber).padStart(3, '0')}`;
         }
 
         const [result] = await db.query(
@@ -105,34 +96,15 @@ const createProduct = async (req, res) => {
                 quantity_on_hand, reorder_level, is_active
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                company_id, productSku, name, image || null, description || null, category_id || null,
+                company_id, sku, name, image || null, description || null, category_id || null,
                 preferred_vendor_id || null, added_employee_id || null, unit_price || 0, cost_price || 0,
                 quantity_on_hand || 0, reorder_level || 0, true
             ]
         );
 
-        const productData = {
-            id: result.insertId,
-            company_id: parseInt(company_id),
-            sku: productSku,
-            name,
-            image: image || null,
-            description: description || null,
-            category_id: category_id || null,
-            preferred_vendor_id: preferred_vendor_id || null,
-            added_employee_id: added_employee_id || null,
-            unit_price: unit_price || 0,
-            cost_price: cost_price || 0,
-            quantity_on_hand: quantity_on_hand || 0,
-            reorder_level: reorder_level || 0,
-            is_active: true,
-            created_at: new Date()
-        };
-
         return res.status(201).json({
             success: true,
-            message: 'Product created successfully',
-            product: productData
+            message: 'Product created successfully'
         });
 
     } catch (error) {
@@ -316,7 +288,7 @@ const getCategories = async (req, res) => {
         }
 
         const [categories] = await db.query(
-            'SELECT id, name FROM categories WHERE company_id = ? ORDER BY name ASC',
+            'SELECT id, name FROM product_categories WHERE company_id = ? AND is_active = 1 ORDER BY name ASC',
             [company_id]
         );
 
@@ -348,10 +320,11 @@ const getVendors = async (req, res) => {
 
 const getEmployees = async (req, res) => {
     try {
+        console.log('Fetching active employees');
         const [employees] = await db.query(
             'SELECT id, name FROM employees WHERE is_active = 1 ORDER BY name ASC'
         );
-
+        console.log('Fetched employees:', employees);
         return res.status(200).json(employees);
     } catch (error) {
         console.error('Error fetching employees:', error);

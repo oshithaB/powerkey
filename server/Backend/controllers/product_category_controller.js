@@ -182,7 +182,7 @@ const permanentDeleteCategory = async(req, res) => {
         }
 
         const [existingCategory] = await db.query(
-            'SELECT * FROM categories WHERE id = ? AND company_id = ?', 
+            'SELECT * FROM product_categories WHERE id = ? AND company_id = ?', 
             [id, company_id]
         );
 
@@ -190,7 +190,7 @@ const permanentDeleteCategory = async(req, res) => {
             return res.status(404).json({ success: false, message: 'Category not found' });
         }
 
-        await db.query('DELETE FROM categories WHERE id = ? AND company_id = ?', [id, company_id]);
+        await db.query('DELETE FROM product_categories WHERE id = ? AND company_id = ?', [id, company_id]);
         console.log('Category deleted successfully');
 
         return res.status(200).json({ success: true, message: 'Category deleted successfully' });

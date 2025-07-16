@@ -14,7 +14,7 @@ const getCategories = async (req, res) => {
         `, [company_id]);
 
         if (categories.length === 0) {
-            return res.status(404).json({ success: false, message: 'No categories found for this company' });
+            return res.status(200).json(categories);
         }
 
         console.log('Categories fetched:', categories);
@@ -189,7 +189,7 @@ const permanentDeleteCategory = async(req, res) => {
         if (existingCategory.length === 0) {
             return res.status(404).json({ success: false, message: 'Category not found' });
         }
-
+        
         await db.query('DELETE FROM product_categories WHERE id = ? AND company_id = ?', [id, company_id]);
         console.log('Category deleted successfully');
 

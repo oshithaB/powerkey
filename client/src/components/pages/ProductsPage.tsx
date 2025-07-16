@@ -25,7 +25,6 @@ interface Product {
 
 interface Category {
   id: number;
-  company_id: number;
   name: string;
   is_active: boolean;
   created_at: string;
@@ -49,9 +48,11 @@ export default function ProductsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [productFormData, setProductFormData] = useState({
     sku: '',
     name: '',
     image: '',
@@ -63,6 +64,9 @@ export default function ProductsPage() {
     cost_price: 0,
     quantity_on_hand: 0,
     reorder_level: 0,
+  });
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -88,7 +92,7 @@ export default function ProductsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`/api/products/${selectedCompany?.company_id}/categories`);
+      const response = await axios.get(`/api/categories/${selectedCompany?.company_id}`);
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -106,37 +110,36 @@ export default function ProductsPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/products/employees`);
+      const response = await axios.get(`/api/employees`);
       setEmployees(response.data);
-      console.log('Employees fetched successfully:', response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const data = new FormData();
-      data.append('sku', formData.sku);
-      data.append('name', formData.name);
+      data.append('sku', productFormData.sku);
+      data.append('name', productFormData.name);
       if (imageFile) {
         data.append('image', imageFile);
       }
-      data.append('description', formData.description);
-      if (formData.category_id) {
-        data.append('category_id', formData.category_id);
+      data.append('description', productFormData.description);
+      if (productFormData.category_id) {
+        data.append('category_id', productFormData.category_id);
       }
-      if (formData.preferred_vendor_id) {
-        data.append('preferred_vendor_id', formData.preferred_vendor_id);
+      if (productFormData.preferred_vendor_id) {
+        data.append('preferred_vendor_id', productFormData.preferred_vendor_id);
       }
-      if (formData.added_employee_id) {
-        data.append('added_employee_id', formData.added_employee_id);
+      if (productFormData.added_employee_id) {
+        data.append('added_employee_id', productFormData.added_employee_id);
       }
-      data.append('unit_price', formData.unit_price.toString());
-      data.append('cost_price', formData.cost_price.toString());
-      data.append('quantity_on_hand', formData.quantity_on_hand.toString());
-      data.append('reorder_level', formData.reorder_level.toString());
+      data.append('unit_price', productFormData.unit_price.toString());
+      data.append('cost_price', productFormData.cost_price.toString());
+      data.append('quantity_on_hand', productFormData.quantity_on_hand.toString());
+      data.append('reorder_level', productFormData.reorder_level.toString());
 
       if (editingProduct) {
         await axios.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
@@ -148,16 +151,36 @@ export default function ProductsPage() {
         });
       }
       fetchProducts();
-      setShowModal(false);
-      resetForm();
+      setShowProductModal(false);
+      resetProductForm();
     } catch (error) {
       console.error('Error saving product:', error);
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCategory) {
+        await axios.put(`/api/categories/${selectedCompany?.company_id}/${editingCategory.id}`, {
+          name: categoryFormData.name,
+        });
+      } else {
+        await axios.post(`/api/categories/${selectedCompany?.company_id}`, {
+          name: categoryFormData.name,
+        });
+      }
+      fetchCategories();
+      setShowCategoryModal(false);
+      resetCategoryForm();
+    } catch (error) {
+      console.error('Error saving category:', error);
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setFormData({
+    setProductFormData({
       sku: product.sku || '',
       name: product.name,
       image: product.image || '',
@@ -171,10 +194,18 @@ export default function ProductsPage() {
       reorder_level: product.reorder_level || 0,
     });
     setImageFile(null);
-    setShowModal(true);
+    setShowProductModal(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryFormData({
+      name: category.name,
+    });
+    setShowCategoryModal(true);
+  };
+
+  const handleDeleteProduct = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await axios.delete(`/api/products/${selectedCompany?.company_id}/${id}`);
@@ -185,8 +216,19 @@ export default function ProductsPage() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
+  const handleDeleteCategory = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this category?')) {
+      try {
+        await axios.delete(`/api/categories/${selectedCompany?.company_id}/${id}`);
+        fetchCategories();
+      } catch (error) {
+        console.error('Error deleting category:', error);
+      }
+    }
+  };
+
+  const resetProductForm = () => {
+    setProductFormData({
       sku: '',
       name: '',
       image: '',
@@ -201,6 +243,13 @@ export default function ProductsPage() {
     });
     setImageFile(null);
     setEditingProduct(null);
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      name: '',
+    });
+    setEditingCategory(null);
   };
 
   const filteredProducts = products.filter(
@@ -226,19 +275,30 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="btn btn-primary btn-md"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </button>
+        <div className="space-x-2">
+          <button
+            onClick={() => {
+              resetCategoryForm();
+              setShowCategoryModal(true);
+            }}
+            className="btn btn-secondary btn-md"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </button>
+          <button
+            onClick={() => {
+              resetProductForm();
+              setShowProductModal(true);
+            }}
+            className="btn btn-primary btn-md"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </button>
+        </div>
       </div>
 
-      {/* Low Stock Alert */}
       {lowStockProducts.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-center">
@@ -253,7 +313,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
         <input
@@ -265,8 +324,8 @@ export default function ProductsPage() {
         />
       </div>
 
-      {/* Products Table */}
       <div className="card">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Products</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -302,7 +361,7 @@ export default function ProductsPage() {
                       <div className="flex-shrink-0 h-10 w-10">
                         {product.image ? (
                           <img
-                            src={product.image}
+                            src={`http://localhost:3000${product.image}`}
                             alt={product.name}
                             className="h-10 w-10 rounded-lg object-cover"
                           />
@@ -358,13 +417,13 @@ export default function ProductsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEdit(product)}
+                        onClick={() => handleEditProduct(product)}
                         className="text-primary-600 hover:text-primary-900"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => handleDeleteProduct(product.id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -378,24 +437,22 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Modal */}
-      {showModal && (
+      {showProductModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleProductSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
                     <input
                       type="text"
-                      required
                       className="input"
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      value={productFormData.sku}
+                      onChange={(e) => setProductFormData({ ...productFormData, sku: e.target.value })}
                       placeholder="Product SKU"
                     />
                   </div>
@@ -406,8 +463,8 @@ export default function ProductsPage() {
                       required
                       className="input"
                       placeholder="Product name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      value={productFormData.name}
+                      onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
                     />
                   </div>
                 </div>
@@ -425,9 +482,9 @@ export default function ProductsPage() {
                       }
                     }}
                   />
-                  {formData.image && (
+                  {productFormData.image && (
                     <div className="mt-2">
-                      <img src={formData.image} alt="Product preview" className="h-20 w-20 object-cover rounded" />
+                      <img src={`http://localhost:3000${productFormData.image}`} alt="Product preview" className="h-20 w-20 object-cover rounded" />
                     </div>
                   )}
                 </div>
@@ -436,8 +493,8 @@ export default function ProductsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     className="input min-h-[80px]"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    value={productFormData.description}
+                    onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                     placeholder="Product description"
                   />
                 </div>
@@ -447,8 +504,8 @@ export default function ProductsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                     <select
                       className="input"
-                      value={formData.category_id}
-                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                      value={productFormData.category_id}
+                      onChange={(e) => setProductFormData({ ...productFormData, category_id: e.target.value })}
                     >
                       <option value="">Select Category</option>
                       {categories.map((category) => (
@@ -463,8 +520,8 @@ export default function ProductsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Vendor</label>
                     <select
                       className="input"
-                      value={formData.preferred_vendor_id}
-                      onChange={(e) => setFormData({ ...formData, preferred_vendor_id: e.target.value })}
+                      value={productFormData.preferred_vendor_id}
+                      onChange={(e) => setProductFormData({ ...productFormData, preferred_vendor_id: e.target.value })}
                     >
                       <option value="">Select Vendor</option>
                       {vendors.map((vendor) => (
@@ -479,8 +536,8 @@ export default function ProductsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Added Employee</label>
                     <select
                       className="input"
-                      value={formData.added_employee_id}
-                      onChange={(e) => setFormData({ ...formData, added_employee_id: e.target.value })}
+                      value={productFormData.added_employee_id}
+                      onChange={(e) => setProductFormData({ ...productFormData, added_employee_id: e.target.value })}
                     >
                       <option value="">Select Employee</option>
                       {employees.map((employee) => (
@@ -499,9 +556,9 @@ export default function ProductsPage() {
                       type="number"
                       step="0.01"
                       className="input"
-                      value={formData.unit_price}
+                      value={productFormData.unit_price}
                       onChange={(e) =>
-                        setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })
+                        setProductFormData({ ...productFormData, unit_price: parseFloat(e.target.value) || 0 })
                       }
                     />
                   </div>
@@ -511,9 +568,9 @@ export default function ProductsPage() {
                       type="number"
                       step="0.01"
                       className="input"
-                      value={formData.cost_price}
+                      value={productFormData.cost_price}
                       onChange={(e) =>
-                        setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })
+                        setProductFormData({ ...productFormData, cost_price: parseFloat(e.target.value) || 0 })
                       }
                     />
                   </div>
@@ -525,9 +582,9 @@ export default function ProductsPage() {
                     <input
                       type="number"
                       className="input"
-                      value={formData.quantity_on_hand}
+                      value={productFormData.quantity_on_hand}
                       onChange={(e) =>
-                        setFormData({ ...formData, quantity_on_hand: parseInt(e.target.value) || 0 })
+                        setProductFormData({ ...productFormData, quantity_on_hand: parseInt(e.target.value) || 0 })
                       }
                     />
                   </div>
@@ -536,9 +593,9 @@ export default function ProductsPage() {
                     <input
                       type="number"
                       className="input"
-                      value={formData.reorder_level}
+                      value={productFormData.reorder_level}
                       onChange={(e) =>
-                        setFormData({ ...formData, reorder_level: parseInt(e.target.value) || 0 })
+                        setProductFormData({ ...productFormData, reorder_level: parseInt(e.target.value) || 0 })
                       }
                     />
                   </div>
@@ -547,13 +604,104 @@ export default function ProductsPage() {
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => setShowProductModal(false)}
                     className="btn btn-secondary btn-md"
                   >
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary btn-md">
                     {editingProduct ? 'Update' : 'Create'} Product
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {editingCategory ? 'Edit Category' : 'Add New Category'}
+              </h3>
+              <form onSubmit={handleCategorySubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="input"
+                    placeholder="Category name"
+                    value={categoryFormData.name}
+                    onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                  />
+                </div>
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Existing Categories</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Category Name
+                          </th>
+                          {/* <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th> */}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {categories.map((category) => (
+                          <tr key={category.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                              {category.name}
+                            </td>
+                            {/* <td className="px-4 py-2 whitespace-nowrap">
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  category.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {category.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditCategory(category)}
+                                  className="text-primary-600 hover:text-primary-900"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(category.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td> */}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryModal(false)}
+                    className="btn btn-secondary btn-md"
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-md">
+                    {editingCategory ? 'Update' : 'Create'} Category
                   </button>
                 </div>
               </form>

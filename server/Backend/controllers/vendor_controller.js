@@ -9,7 +9,7 @@ const getVendors = async (req, res) => {
     }
 
     const [vendors] = await db.query(
-      "SELECT * FROM vendor WHERE company_id = ? AND is_active = 1 ORDER BY created_at DESC",
+      "SELECT * FROM vendor WHERE company_id = ? ORDER BY created_at DESC",
       [company_id]
     );
 

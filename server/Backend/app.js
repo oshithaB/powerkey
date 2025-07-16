@@ -20,7 +20,7 @@ const employeeRoutes = require("./routes/employee");
 const tax_ratesRoutes = require("./routes/tax_rates");
 const vendorRoutes = require("./routes/vendor");
 const customerRoutes = require("./routes/customer");
-const productCategoryRoutes = require("./routes/product_category");
+const productcategoryRoutes = require("./routes/product_category");
 const productRoutes = require("./routes/product");
 
 app.use(cors({
@@ -29,6 +29,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use('/uploads', express.static('public/uploads'));
+app.use('/Product_Uploads', express.static('Product_Uploads'));
 
 app.use("/api", authRoutes);
 app.use("/api", companyRoutes);
@@ -37,7 +38,7 @@ app.use("/api", roleRoutes);
 app.use("/api", employeeRoutes);
 app.use("/api", vendorRoutes);
 app.use("/api", customerRoutes);
-app.use("/api", productCategoryRoutes);
+app.use("/api", productcategoryRoutes);
 app.use("/api", productRoutes);
 
 app.listen(3000, () => {

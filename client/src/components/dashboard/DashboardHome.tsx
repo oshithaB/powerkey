@@ -18,6 +18,7 @@ interface DashboardHomeProps {
 }
 
 export default function DashboardHome({ data }: DashboardHomeProps) {
+  // Default values for metrics and recentInvoices
   const metrics = data?.metrics || {};
   const recentInvoices = data?.recentInvoices || [];
 

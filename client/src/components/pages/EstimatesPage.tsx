@@ -115,7 +115,7 @@ export default function EstimatesPage() {
     try {
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
         axios.get(`/api/customers/${selectedCompany?.company_id}`),
-        axios.get(`/api/employees/${selectedCompany?.company_id}`),
+        axios.get(`/api/employees/`),
         axios.get(`/api/products/${selectedCompany?.company_id}`),
         axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);

@@ -20,9 +20,16 @@ interface EstimateItem {
   total_price: number;
 }
 
+interface Customer {
+  id: number;
+  name: string;
+  shipping_address?: string;
+  billing_address?: string;
+}
+
 export default function EstimateModal({ estimate, onSave }: EstimateModalProps) {
   const { selectedCompany } = useCompany();
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
@@ -38,7 +45,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
     notes: '',
-    terms: ''
+    terms: '',
+    shipping_address: '',
+    billing_address: '',
+    ship_via: '',
+    shipping_date: '',
+    tracking_number: ''
   });
 
   const [items, setItems] = useState<EstimateItem[]>([
@@ -55,48 +67,74 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   useEffect(() => {
     fetchData();
-    if (estimate) {
-      setFormData({
-        estimate_number: estimate.estimate_number,
-        customer_id: estimate.customer_id.toString(),
-        employee_id: estimate.employee_id?.toString() || '',
-        estimate_date: estimate.estimate_date,
-        expiry_date: estimate.expiry_date,
-        discount_type: estimate.discount_type,
-        discount_value: estimate.discount_value,
-        notes: estimate.notes || '',
-        terms: estimate.terms || ''
-      });
-      // Load estimate items if editing
-      fetchEstimateItems();
+    fetchCustomers();
+  }, [selectedCompany]);
+
+  useEffect(() => {
+    const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
+    if (selectedCustomer) {
+      setFormData(prev => ({
+        ...prev,
+        shipping_address: selectedCustomer.shipping_address || '',
+        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || ''
+      }));
     }
-  }, [estimate]);
+  }, [formData.customer_id, customers]);
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      setCustomers(response.data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
-      const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.id}`),
-        axios.get(`/api/employees/${selectedCompany?.id}`),
-        axios.get(`/api/products/${selectedCompany?.id}`),
-        axios.get(`/api/tax-rates/${selectedCompany?.id}`)
+      const [customersRes, employeesRes, productsRes] = await Promise.all([
+        axios.get(`/api/customers/${selectedCompany?.company_id}`),
+        axios.get(`/api/employees/`),
+        axios.get(`/api/products/${selectedCompany?.company_id}`),
+        // axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
       setCustomers(customersRes.data);
       setEmployees(employeesRes.data);
       setProducts(productsRes.data);
-      setTaxRates(taxRatesRes.data);
+      // setTaxRates(taxRatesRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
   };
 
-  const fetchEstimateItems = async () => {
-    if (!estimate) return;
+  const fetchEstimateItems = async (estimateId: number) => {
     try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.id}/${estimate.id}/items`);
-      setItems(response.data);
+      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`);
+      return response.data.length > 0 ? response.data : [
+        {
+          product_id: 0,
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ];
     } catch (error) {
       console.error('Error fetching estimate items:', error);
+      return [
+        {
+          product_id: 0,
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ];
     }
   };
 
@@ -169,9 +207,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       };
 
       if (estimate) {
-        await axios.put(`/api/estimates/${selectedCompany?.id}/${estimate.id}`, submitData);
+        await axios.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
       } else {
-        await axios.post(`/api/estimates/${selectedCompany?.id}`, submitData);
+        await axios.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
       }
 
       onSave();
@@ -205,25 +243,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Header Information */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estimate Number
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  value={formData.estimate_number}
-                  onChange={(e) => setFormData({ ...formData, estimate_number: e.target.value })}
-                  placeholder="AUTO"
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer *
                 </label>
                 <select
-                  required
                   className="input"
                   value={formData.customer_id}
                   onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
@@ -236,6 +261,33 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Customer Shipping Address
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.shipping_address || ''}
+                  onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })}
+                  placeholder="Shipping Address"
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Billing Address
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.billing_address || ''}
+                  onChange={(e) => setFormData({ ...formData, billing_address: e.target.value })}
+                  placeholder="Billing Address"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Employee
@@ -248,11 +300,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   <option value="">Select Employee</option>
                   {employees.map((employee) => (
                     <option key={employee.id} value={employee.id}>
-                      {employee.first_name} {employee.last_name}
+                      {employee.name}
                     </option>
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Estimate Date *
@@ -265,9 +318,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   onChange={(e) => setFormData({ ...formData, estimate_date: e.target.value })}
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Expiry Date
@@ -277,6 +328,45 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   className="input"
                   value={formData.expiry_date}
                   onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Ship Via
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.ship_via || ''}
+                  onChange={(e) => setFormData({ ...formData, ship_via: e.target.value })}
+                  placeholder="Shipping Method"
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  Shipping Date
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  value={formData.shipping_date || ''}
+                  onChange={(e) => setFormData({ ...formData, shipping_date: e.target.value })}
+                  placeholder="Shipping Date"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Trach Number
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.tracking_number || ''}
+                  onChange={(e) => setFormData({ ...formData, tracking_number: e.target.value })}
+                  placeholder="Tracking Number"
                 />
               </div>
             </div>

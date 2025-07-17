@@ -56,6 +56,9 @@ export default function EstimatesPage() {
   const [printingEstimate, setPrintingEstimate] = useState<Estimate | null>(null);
   const [printItems, setPrintItems] = useState<EstimateItem[]>([]);
   const navigate = useNavigate();
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
@@ -85,7 +88,17 @@ export default function EstimatesPage() {
   useEffect(() => {
     fetchEstimates();
     fetchData();
+    fetchCustomers();
   }, [selectedCompany]);
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      setCustomers(response.data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  };
 
   const fetchEstimates = async () => {
     try {
@@ -392,7 +405,7 @@ export default function EstimatesPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Estimates</h1>
+        <h1 className="text-2xl font-bold text-gray-900"></h1>
         <button
           onClick={() => {
             resetForm();
@@ -405,17 +418,55 @@ export default function EstimatesPage() {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      {/* Status Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+        <select
+          className="input pr-3 w-full"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">All Estimates</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="declined">Declined</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+
+      {/* Date Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
         <input
-          type="text"
-          placeholder="Search estimates..."
-          className="input pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          type="date"
+          className="input pr-3 w-full"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
         />
       </div>
+
+      {/* Customer Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+        <select
+          className="input pr-3 w-full"
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+        >
+          <option value="">All Customers</option>
+          {customers.map(customer => (
+            <option key={customer.id} value={customer.name}>
+              {customer.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      </div>
+
 
       {/* Estimates Table */}
       <div className="card">

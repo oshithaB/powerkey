@@ -27,12 +27,22 @@ interface Customer {
   billing_address?: string;
 }
 
+interface TaxRate {
+  tax_rate_id: number;
+  company_id: number;
+  name: string;
+  rate: string;
+  is_default: number;
+  created_at: string;
+}
+
 export default function EstimateModal({ estimate, onSave }: EstimateModalProps) {
   const { selectedCompany } = useCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [company, setCompany] = useState<any>();
   const [employees, setEmployees] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [taxRates, setTaxRates] = useState<any[]>([]);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -66,8 +76,47 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   ]);
 
   useEffect(() => {
-    fetchData();
-    fetchCustomers();
+    const fetchData = async () => {
+      try {
+        const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
+          axios.get(`/api/customers/${selectedCompany?.company_id}`),
+          axios.get(`/api/employees/`),
+          axios.get(`/api/products/${selectedCompany?.company_id}`),
+          axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+        ]);
+
+        setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
+        setEmployees(Array.isArray(employeesRes.data) ? employeesRes.data : []);
+        setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
+        const taxRatesData = Array.isArray(taxRatesRes.data) && Array.isArray(taxRatesRes.data[0]) 
+          ? taxRatesRes.data[0] 
+          : Array.isArray(taxRatesRes.data) 
+            ? taxRatesRes.data 
+            : [];
+        setTaxRates(taxRatesData);
+
+        const defaultTaxRate = taxRatesData.find((tax: TaxRate) => tax.is_default === 1);
+        if (defaultTaxRate) {
+          setItems(prevItems => prevItems.map(item => ({
+            ...item,
+            tax_rate: item.tax_rate === 0 ? parseFloat(defaultTaxRate.rate) : item.tax_rate
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setTaxRates([]);
+      }
+    };
+
+    if (selectedCompany) {
+      setCompany(selectedCompany);
+      setFormData(prev => ({
+        ...prev,
+        notes: selectedCompany.notes || '',
+        terms: selectedCompany.terms_and_conditions || ''
+      }));
+      fetchData();
+    }
   }, [selectedCompany]);
 
   useEffect(() => {
@@ -81,70 +130,14 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     }
   }, [formData.customer_id, customers]);
 
-  const fetchCustomers = async () => {
-    try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
-      setCustomers(response.data);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    }
-  };
-
-  const fetchData = async () => {
-    try {
-      const [customersRes, employeesRes, productsRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.company_id}`),
-        axios.get(`/api/employees/`),
-        axios.get(`/api/products/${selectedCompany?.company_id}`),
-        // axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
-      ]);
-
-      setCustomers(customersRes.data);
-      setEmployees(employeesRes.data);
-      setProducts(productsRes.data);
-      // setTaxRates(taxRatesRes.data);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
-
-  const fetchEstimateItems = async (estimateId: number) => {
-    try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`);
-      return response.data.length > 0 ? response.data : [
-        {
-          product_id: 0,
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          tax_rate: 0,
-          tax_amount: 0,
-          total_price: 0
-        }
-      ];
-    } catch (error) {
-      console.error('Error fetching estimate items:', error);
-      return [
-        {
-          product_id: 0,
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          tax_rate: 0,
-          tax_amount: 0,
-          total_price: 0
-        }
-      ];
-    }
-  };
-
   const addItem = () => {
+    const defaultTaxRate = taxRates.find(tax => tax.is_default === 1);
     setItems([...items, {
       product_id: 0,
       description: '',
       quantity: 1,
       unit_price: 0,
-      tax_rate: 0,
+      tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
       tax_amount: 0,
       total_price: 0
     }]);
@@ -158,7 +151,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
-    // Auto-calculate when product is selected
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -167,7 +159,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       }
     }
 
-    // Calculate tax and total
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
@@ -225,10 +216,10 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   return (
     <motion.div
-        initial={{ opacity: 0, y: 100 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 50 }}
-        transition={{ duration: 0.5 }}
+      initial={{ opacity: 0, y: 100 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+      transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
@@ -242,7 +233,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Header Information */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -263,7 +253,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
 
               <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer Shipping Address
                 </label>
                 <input
@@ -276,7 +266,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
 
               <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Billing Address
                 </label>
                 <input
@@ -332,7 +322,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
 
               <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ship Via
                 </label>
                 <input
@@ -345,7 +335,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
 
               <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Shipping Date
                 </label>
                 <input
@@ -359,7 +349,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Trach Number
+                  Tracking Number
                 </label>
                 <input
                   type="text"
@@ -371,7 +361,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
             </div>
 
-            {/* Items Section */}
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-medium text-gray-900">Items</h4>
@@ -449,11 +438,15 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
                           >
                             <option value={0}>0%</option>
-                            {taxRates.map((tax) => (
-                              <option key={tax.id} value={tax.rate}>
-                                {tax.rate}%
-                              </option>
-                            ))}
+                            {taxRates.length > 0 ? (
+                              taxRates.map((tax) => (
+                                <option key={tax.tax_rate_id} value={tax.rate}>
+                                  {tax.name} ({tax.rate}%)
+                                </option>
+                              ))
+                            ) : (
+                              <option value={0} disabled>No tax rates available</option>
+                            )}
                           </select>
                         </td>
                         <td className="px-4 py-2 text-right">
@@ -475,7 +468,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
             </div>
 
-            {/* Totals Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
@@ -509,7 +501,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                       <span>Subtotal:</span>
                       <span>${subtotal.toFixed(2)}</span>
                     </div>
-                    
                     <div className="flex justify-between items-center">
                       <span>Discount:</span>
                       <div className="flex items-center space-x-2">
@@ -531,12 +522,10 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                         <span className="w-20 text-right">${discountAmount.toFixed(2)}</span>
                       </div>
                     </div>
-                    
                     <div className="flex justify-between">
                       <span>Tax:</span>
                       <span>${totalTax.toFixed(2)}</span>
                     </div>
-                    
                     <div className="flex justify-between font-bold text-lg border-t pt-2">
                       <span>Total:</span>
                       <span>${total.toFixed(2)}</span>
@@ -546,7 +535,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </div>
             </div>
 
-            {/* Submit Buttons */}
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"

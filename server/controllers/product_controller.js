@@ -338,7 +338,7 @@ const deleteProduct = async (req, res) => {
         // }
 
         const [result] = await db.query(
-            'DELETE FROM products WHERE id = ? AND company_id = ?',
+            'UPDATE products SET is_active = 0 WHERE id = ? AND company_id = ?',
             [product_id, company_id]
         );
 

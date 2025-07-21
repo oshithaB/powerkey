@@ -13,10 +13,12 @@ const {
     getEmployees
 } = require('../controllers/product_controller');
 
-router.get('/products/:company_id', verifyToken, getProducts);
+router.get('/getProducts/:company_id', verifyToken, getProducts);
+
 router.post('/products/:company_id', verifyToken, authorizedRoles(['admin']), createProduct);
 router.put('/products/:company_id/:product_id', verifyToken, authorizedRoles(['admin']), updateProduct);
 router.delete('/products/:company_id/:product_id', verifyToken, authorizedRoles(['admin']), deleteProduct);
+
 router.get('/products/:company_id/categories', verifyToken, getCategories);
 router.get('/products/:company_id/vendors', verifyToken, getVendors);
 router.get('/products/employees', verifyToken, getEmployees);

@@ -97,7 +97,7 @@ const updateUser = async (req, res) => {
         const allowedFields = ['fullname', 'username', 'email', 'password'];
         const fieldsToUpdate = {};
         for (const key of allowedFields) {
-            if (updates[key]) {
+            if (updates[key] !== undefined) {
                 fieldsToUpdate[key] = updates[key];
             }
         }

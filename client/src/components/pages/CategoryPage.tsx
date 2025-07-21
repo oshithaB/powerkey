@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance'
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 
 
@@ -33,7 +33,7 @@ export default function CategoryPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`/api/categories/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCategories/${selectedCompany?.company_id}`);
 
       setCategories(response.data);
     } catch (error) {
@@ -51,9 +51,9 @@ export default function CategoryPage() {
       };
 
       if (editingCategory) {
-        await axios.put(`/api/categories/${selectedCompany?.company_id}/${editingCategory.id}`, submitData);
+        await axiosInstance.put(`/api/updateCategory/${selectedCompany?.company_id}/${editingCategory.id}`, submitData);
       } else {
-        await axios.post(`/api/categories/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/createCategory/${selectedCompany?.company_id}`, submitData);
       }
       fetchCategories();
       setShowModal(false);
@@ -75,7 +75,7 @@ export default function CategoryPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
-        await axios.put(`/api/categories/softDelete/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.put(`/api/deleteCategories/softDelete/${selectedCompany?.company_id}/${id}`);
         fetchCategories();
       } catch (error: any) {
         console.error('Error deleting category:', error);

@@ -13,10 +13,6 @@ const getCustomers = async (req, res) => {
             [company_id]
         );
 
-        if (customers.length === 0) {
-            return res.status(404).json({ success: false, message: 'No customers found for this company' });
-        }
-
         return res.status(200).json(customers);
 
     } catch (error) {
@@ -174,34 +170,7 @@ const createCustomer = async (req, res) => {
 const updateCustomer = async (req, res) => {
     try {
         const { company_id, customer_id } = req.params;
-        const {
-            name,
-            email,
-            is_taxable,
-            tax_number,
-            phone,
-            vehicle_number,
-            credit_limit,
-            current_balance,
-            billing_address,
-            billing_city,
-            billing_province,
-            billing_postal_code,
-            billing_country,
-            shipping_same_as_billing,
-            shipping_address,
-            shipping_city,
-            shipping_province,
-            shipping_postal_code,
-            shipping_country,
-            primary_payment_method,
-            terms,
-            delivery_option,
-            invoice_language,
-            sales_tax_registration,
-            opening_balance,
-            as_of_date
-        } = req.body;
+        const update = req.body;
 
         if (!company_id || !customer_id) {
             return res.status(400).json({ success: false, message: 'Company ID and Customer ID are required' });
@@ -216,17 +185,6 @@ const updateCustomer = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Customer not found' });
         }
         
-
-        if (email) {
-            const [emailConflict] = await db.query(
-                'SELECT * FROM customer WHERE company_id = ? AND email = ? AND id != ?',
-                [company_id, email, customer_id]
-            );
-
-            if (emailConflict.length > 0) {
-                return res.status(400).json({ success: false, message: 'Email already in use by another customer' });
-            }
-        }
 
         const allowedFields = [
             'name',
@@ -259,8 +217,41 @@ const updateCustomer = async (req, res) => {
 
         const fieldsToUpdate = {};
         for (const key of allowedFields) {
-            if (req.body[key] !== undefined) {
-                fieldsToUpdate[key] = req.body[key];
+            if (update[key] !== undefined) {
+                fieldsToUpdate[key] = update[key];
+            }
+        }
+
+        if (fieldsToUpdate.email) {
+            const [emailConflict] = await db.query(
+                'SELECT * FROM customer WHERE company_id = ? AND email = ? AND id != ? AND is_active = 1',
+                [company_id, fieldsToUpdate.email, customer_id]
+            );
+
+            if (emailConflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Email already in use by another customer' });
+            }
+        }
+
+        if (fieldsToUpdate.tax_number) {
+            const [taxNumberConflict] = await db.query(
+                'SELECT * FROM customer WHERE company_id = ? AND tax_number = ? AND id != ? AND is_active = 1',
+                [company_id, fieldsToUpdate.tax_number, customer_id]
+            );
+
+            if (taxNumberConflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Tax number already in use by another customer' });
+            }
+        }
+
+        if (fieldsToUpdate.sales_tax_registration) {
+            const [salesTaxConflict] = await db.query(
+                'SELECT * FROM customer WHERE company_id = ? AND sales_tax_registration = ? AND id != ? AND is_active = 1',
+                [company_id, fieldsToUpdate.sales_tax_registration, customer_id]
+            );
+
+            if (salesTaxConflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Sales tax registration already in use by another customer' });
             }
         }
 
@@ -286,7 +277,7 @@ const updateCustomer = async (req, res) => {
 
         values.push(customer_id, company_id);
 
-        const updateQuery = `UPDATE customer SET ${setClauses.join(', ')} WHERE id = ? AND company_id = ?`;
+        const updateQuery = `UPDATE customer SET ${setClauses.join(', ')} WHERE id = ? AND company_id = ? AND is_active = 1`;
         const [result] = await db.query(updateQuery, values);
 
         if (result.affectedRows === 0) {
@@ -321,22 +312,22 @@ const softDeleteCustomer = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Customer not found' });
         }
 
-        const [invoiceCount] = await db.query(
-            'SELECT COUNT(*) as count FROM invoices WHERE customer_id = ?',
-            [customer_id]
-        );
+        // const [invoiceCount] = await db.query(
+        //     'SELECT COUNT(*) as count FROM invoices WHERE customer_id = ?',
+        //     [customer_id]
+        // );
 
-        const [estimateCount] = await db.query(
-            'SELECT COUNT(*) as count FROM estimates WHERE customer_id = ?',
-            [customer_id]
-        );
+        // const [estimateCount] = await db.query(
+        //     'SELECT COUNT(*) as count FROM estimates WHERE customer_id = ?',
+        //     [customer_id]
+        // );
 
-        if (invoiceCount[0]?.count > 0 || estimateCount[0]?.count > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot delete customer with existing invoices or estimates'
-            });
-        }
+        // if (invoiceCount[0]?.count > 0 || estimateCount[0]?.count > 0) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: 'Cannot delete customer with existing invoices or estimates'
+        //     });
+        // }
 
         const [result] = await db.query(
             'UPDATE customer SET is_active = 0 WHERE id = ? AND company_id = ?',

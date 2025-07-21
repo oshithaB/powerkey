@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Truck } from 'lucide-react';
 
 interface Vendor {
@@ -71,7 +71,7 @@ export default function VendorsPage() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get(`/api/vendors/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getVendors/${selectedCompany?.company_id}`);
       setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -92,16 +92,16 @@ export default function VendorsPage() {
     try {
       const payload = {
         ...formData,
-        vendor_company_name: formData.company_name, // Map to backend field
+        vendor_company_name: formData.company_name,
         taxes: formData.default_expense_category,
         expense_rates: formData.billing_rate,
         asOfDate: formData.as_of_date
       };
 
       if (editingVendor) {
-        await axios.put(`/api/vendors/${selectedCompany?.company_id}/${editingVendor.vendor_id}`, payload);
+        await axiosInstance.put(`/api/updateVendors/${selectedCompany?.company_id}/${editingVendor.vendor_id}`, payload);
       } else {
-        await axios.post(`/api/vendors/${selectedCompany?.company_id}`, payload);
+        await axiosInstance.post(`/api/createVendors/${selectedCompany?.company_id}`, payload);
       }
       setShowModal(false);
       resetForm();
@@ -117,7 +117,7 @@ export default function VendorsPage() {
     setEditingVendor(vendor);
     setFormData({
       name: vendor.name,
-      company_name: vendor.vendor_company_name || '', // Map from backend field
+      company_name: vendor.vendor_company_name || '',
       email: vendor.email || '',
       phone: vendor.phone || '',
       address: vendor.address || '',
@@ -143,7 +143,7 @@ export default function VendorsPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this vendor?')) {
       try {
-        await axios.delete(`/api/vendors/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.put(`/api/deleteVendors/${selectedCompany?.company_id}/${id}`);
         fetchVendors();
         setError(null);
       } catch (error: any) {

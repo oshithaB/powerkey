@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -93,7 +94,7 @@ export default function EstimatesPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -102,7 +103,7 @@ export default function EstimatesPage() {
 
   const fetchEstimates = async () => {
     try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
     } catch (error) {
       console.error('Error fetching estimates:', error);
@@ -114,10 +115,10 @@ export default function EstimatesPage() {
   const fetchData = async () => {
     try {
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.company_id}`),
-        axios.get(`/api/employees/`),
-        axios.get(`/api/products/${selectedCompany?.company_id}`),
-        axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+        axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/employees/`),
+        axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
       setCustomers(customersRes.data);

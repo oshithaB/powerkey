@@ -9,7 +9,7 @@ const getVendors = async (req, res) => {
     }
 
     const [vendors] = await db.query(
-      "SELECT * FROM vendor WHERE company_id = ? ORDER BY created_at DESC",
+      "SELECT * FROM vendor WHERE company_id = ? AND is_active = 1 ORDER BY created_at DESC",
       [company_id]
     );
 
@@ -45,6 +45,8 @@ const createVendor = async (req, res) => {
       vehicle_number
     } = req.body;
 
+    console.log("Creating vendor with data:", req.body);
+
     if (!company_id) {
       return res.status(400).json({ success: false, message: 'Company ID is required' });
     }
@@ -64,7 +66,7 @@ const createVendor = async (req, res) => {
     // Check for duplicate email
     if (email) {
       const [existingVendor] = await db.query(
-        'SELECT * FROM vendor WHERE company_id = ? AND email = ?',
+        'SELECT * FROM vendor WHERE company_id = ? AND email = ? AND is_active = 1',
         [company_id, email]
       );
 
@@ -141,7 +143,7 @@ const updateVendor = async (req, res) => {
 
     // Check if vendor exists
     const [existingVendor] = await db.query(
-      'SELECT * FROM vendor WHERE vendor_id = ? AND company_id = ?',
+      'SELECT * FROM vendor WHERE vendor_id = ? AND company_id = ? AND is_active = 1',
       [vendor_id, company_id]
     );
 
@@ -227,7 +229,7 @@ const deleteVendor = async (req, res) => {
 
     // Check if vendor exists
     const [existingVendor] = await db.query(
-      'SELECT * FROM vendor WHERE vendor_id = ? AND company_id = ?',
+      'SELECT * FROM vendor WHERE vendor_id = ? AND company_id = ? AND is_active = 1',
       [vendor_id, company_id]
     );
 
@@ -235,21 +237,21 @@ const deleteVendor = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
 
-    // Check if vendor has any expenses
-    const [expenseCount] = await db.query(
-      'SELECT COUNT(*) as count FROM expenses WHERE vendor_id = ?',
-      [vendor_id]
-    );
+    // // Check if vendor has any expenses
+    // const [expenseCount] = await db.query(
+    //   'SELECT COUNT(*) as count FROM expenses WHERE vendor_id = ?',
+    //   [vendor_id]
+    // );
 
-    if (expenseCount[0]?.count > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete vendor with existing expenses'
-      });
-    }
+    // if (expenseCount[0]?.count > 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'Cannot delete vendor with existing expenses'
+    //   });
+    // }
 
     const [result] = await db.query(
-      'DELETE FROM vendor WHERE vendor_id = ? AND company_id = ?',
+      'UPDATE vendor SET is_active = 0 WHERE vendor_id = ? AND company_id = ?',
       [vendor_id, company_id]
     );
 

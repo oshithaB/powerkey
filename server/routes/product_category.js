@@ -7,43 +7,42 @@ const {
     createCategory,
     getCategories,
     updateCategory,
-    permanentDeleteCategory,
-    softDeleteCategory
+    deleteCategory
 } = require('../controllers/product_category_controller');
 
 // Category routes
 router.post(
-    '/categories/:company_id',
+    '/createCategory/:company_id',
     verifyToken,
     authorizedRoles(['admin']),
     createCategory
 );
 
 router.get(
-    '/categories/:company_id',
+    '/getCategories/:company_id',
     verifyToken,
     getCategories
 );
 
 router.put(
-    '/categories/:company_id/:id',
+    '/updateCategory/:company_id/:id',
     verifyToken,
     authorizedRoles(['admin']),
     updateCategory
 );
 
 router.put(
-    '/categories/softDelete/:company_id/:id',
+    '/deleteCategories/softDelete/:company_id/:id',
     verifyToken,
     authorizedRoles(['admin']),
-    softDeleteCategory
+    deleteCategory
 );
 
-router.delete(
-    '/categories/:company_id/:id',
-    verifyToken,
-    authorizedRoles(['admin']),
-    permanentDeleteCategory
-);
+// router.delete(
+//     '/categories/:company_id/:id',
+//     verifyToken,
+//     authorizedRoles(['admin']),
+//     permanentDeleteCategory
+// );
 
 module.exports = router;

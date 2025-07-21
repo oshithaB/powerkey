@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
 
 interface Product {
@@ -81,7 +82,7 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`/api/products/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -92,7 +93,7 @@ export default function ProductsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`/api/categories/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCategories/${selectedCompany?.company_id}`);
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -101,7 +102,7 @@ export default function ProductsPage() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get(`/api/products/${selectedCompany?.company_id}/vendors`);
+      const response = await axiosInstance.get(`/api/products/${selectedCompany?.company_id}/vendors`);
       setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -110,7 +111,7 @@ export default function ProductsPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees`);
+      const response = await axiosInstance.get(`/api/employees`);
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
+
 import DashboardHome from './DashboardHome';
 import CustomersPage from '../pages/CustomersPage';
 import VendorsPage from '../pages/VendorsPage';
@@ -32,7 +33,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get(`/api/dashboard/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/dashboard/${selectedCompany?.company_id}`);
       setDashboardData(response.data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

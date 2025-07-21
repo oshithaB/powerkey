@@ -10,20 +10,22 @@ import CompanySelection from './components/company/CompanySelection';
 import CreateCompany from './components/company/CreateCompany';
 import Dashboard from './components/dashboard/Dashboard';
 import Layout from './components/layout/Layout';
+import useTokenExpirationCheck from './tokenExpirationCheckHook';
 
-import CreateEstimate from './components/modals/CreateEstimate'
-import CreateInvoice from './components/modals/CreateInvoice';
-import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
+// import CreateEstimate from './components/modals/CreateEstimate'
+// import CreateInvoice from './components/modals/CreateInvoice';
+// import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 
 // Reports
-import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
+// import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
 
 import NotFound from './components/NotFound/NotFound';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  
-  if (loading) {
+  const isChecking = useTokenExpirationCheck();
+
+  if (loading || isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -34,20 +36,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" />;
 }
 
-function ProtectedRouteWithCompany({ children }: { children: React.ReactNode }) {
-  const {selectedCompany} = useCompany();
-
-
-  return <>{children}</>;
-}
-
 
 
 function App() {
+
   return (
-    <AuthProvider>
-      <CompanyProvider>
-        <Router>
+    <Router>
+      <AuthProvider>
+        <CompanyProvider>
           <div className="min-h-screen bg-gray-50">
             <Routes>
               <Route path="/login" element={<Login />} />
@@ -55,9 +51,7 @@ function App() {
               <Route path="/companies" 
               element={
                   <ProtectedRoute>
-                    <ProtectedRouteWithCompany>
-                      <CompanySelection />
-                    </ProtectedRouteWithCompany>
+                    <CompanySelection />
                   </ProtectedRoute>
                 }
               />
@@ -80,48 +74,15 @@ function App() {
                 }
               />
               <Route path="/" element={<Navigate to="/companies" />} />
-              <Route
-                path="/estimates/create"
-                element={
-                  <ProtectedRoute>
-                    <CreateEstimate />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/invoices/create"
-                element={
-                  <ProtectedRoute>
-                    <CreateInvoice />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/purchase-orders"
-                element={
-                  <ProtectedRoute>
-                    <PurchaseOrdersPage />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Reports Routes */}
-              <Route
-                path="/reports/profit&loss"
-                element={
-                  <ProtectedRoute>
-                    <ProfitAndLossReport />
-                  </ProtectedRoute>
-                }
-              />
 
               {/* Catch-all route for 404 Not Found */}
               <Route path='*' element={<NotFound />} />
+
             </Routes>
           </div>
-        </Router>
-      </CompanyProvider>
-    </AuthProvider>
+        </CompanyProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

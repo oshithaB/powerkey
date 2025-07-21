@@ -14,12 +14,7 @@ const verifyToken = (req, res, next) => {
         }
         req.userId = decoded.userId;
         req.role = decoded.role;
-        if (decoded.companyId) {
-            req.companyId = decoded.companyId;
-            console.log(`User ID: ${req.userId}, Role: ${req.role}, Company ID: ${req.companyId}`); //After user select company new jwt token is generated with adding companyId also
-        } else {
-            console.log(`User ID: ${req.userId}, Role: ${req.role}`);
-        }
+        console.log(`User ID: ${req.userId}, Role: ${req.role}`);
         next();
     });
 };

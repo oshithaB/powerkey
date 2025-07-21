@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Building2, Plus, LogOut, Users, Calendar, Edit, Trash2, X } from 'lucide-react';
 
 // Define the Company type
@@ -47,7 +47,7 @@ export default function CompanySelection() {
 
   const fetchCompanies = async () => {
     try {
-      const response = await axios.get('/api/companies');
+      const response = await axiosInstance.get('/api/companies');
       console.log('Companies response:', response.data);
       setCompanies(response.data);
     } catch (error) {
@@ -62,12 +62,9 @@ export default function CompanySelection() {
       console.log('Selecting company:', company);
       
       // Update the token with company information
-      const response = await axios.get(`/api/selectCompany/${company.company_id}`);
+      const response = await axiosInstance.get(`/api/selectCompany/${company.company_id}`);
       
       if (response.data.success) {
-        // Update the token in localStorage
-        localStorage.setItem('authToken', response.data.token);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         
         // Map the company data to match the Company interface
         const mappedCompany: Company = {
@@ -113,7 +110,7 @@ export default function CompanySelection() {
   const handleDeleteCompany = async (companyId: number) => {
     if (window.confirm('Are you sure you want to delete this company? This action cannot be undone.')) {
       try {
-        await axios.delete(`/api/companies/${companyId}`);
+        await axiosInstance.delete(`/api/companies/${companyId}`);
         fetchCompanies(); // Refresh the list
         alert('Company deleted successfully');
       } catch (error: any) {
@@ -136,7 +133,7 @@ export default function CompanySelection() {
         submitData.append('logo', logo);
       }
 
-      await axios.put(`/api/companies/${editingCompany.company_id}`, submitData, {
+      await axiosInstance.put(`/api/companies/${editingCompany.company_id}`, submitData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

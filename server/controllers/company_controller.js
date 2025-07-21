@@ -90,13 +90,6 @@ const createCompany = async (req, res) => {
 
             console.log('New company created:', result);
 
-            // Generate new JWT token with company ID
-            const token = jwt.sign(
-                { userId: req.userId, role: req.role, companyId: companyId },
-                process.env.JWT_SECRET,
-                { expiresIn: '1h' }
-            );
-
             // Return company data along with token
             const companyData = {
                 id: companyId,
@@ -115,7 +108,6 @@ const createCompany = async (req, res) => {
             return res.status(201).json({ 
                 success: true, 
                 message: 'Company created successfully', 
-                token,
                 company: companyData
             });
 
@@ -215,15 +207,8 @@ const selectCompany = async (req, res) => {
         if (company.length === 0) {
             return res.status(404).json({ success: false, message: 'Company not found' });
         }
-        
-        const token = jwt.sign(
-            { userId: req.userId, role: req.role, companyId: companyId },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-        
-        console.log('New JWT token generated for company selection:', token);
-        return res.status(200).json({ success: true, message: 'Company selected successfully', token });
+
+        return res.status(200).json({ success: true, message: 'Company selected successfully' });
     } catch (error) {
         console.error('Error selecting company:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });

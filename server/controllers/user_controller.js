@@ -6,10 +6,14 @@ const bcrypt = require('bcrypt');
 const getUserDetails = async (req, res) => {
     try {
         const userId = req.userId;
+        console.log('User ID from request:', userId);
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'User ID is required' });
+        }
         console.log('Get user details request received for userId:', userId);
 
         const [user] = await db.query(
-            'SELECT * FROM user WHERE user_id = ?',
+            'SELECT * FROM user WHERE user_id = ? AND is_active = 1',
             [userId]
         );
 
@@ -35,7 +39,7 @@ const addUser = async (req, res) => {
         console.log('Add user request received:', req.body);
 
         const [result] = await db.query(
-            'SELECT * FROM user WHERE username = ? OR email = ?',
+            'SELECT * FROM user WHERE username = ? OR email = ? AND is_active = 1',
             [username, email]
         );
         console.log('Checking for existing user:', result);
@@ -101,7 +105,7 @@ const updateUser = async (req, res) => {
         console.log(fieldsToUpdate);
 
         const [existingUserData] = await db.query(
-            'SELECT * FROM user WHERE user_id = ?',
+            'SELECT * FROM user WHERE user_id = ? AND is_active = 1',
             [userId]
         );
 
@@ -134,7 +138,7 @@ const updateUser = async (req, res) => {
             
 
             const [conflict] = await db.query(
-                'SELECT * FROM user WHERE (username = ? OR email = ?) AND user_id != ?',
+                'SELECT * FROM user WHERE (username = ? OR email = ?) AND user_id != ? AND is_active = 1',
                 [
                     fieldsToUpdate.username || '',
                     fieldsToUpdate.email || '',
@@ -179,7 +183,7 @@ const updateUser = async (req, res) => {
         values.push(userId);
 
         const [result] = await db.query(
-            `UPDATE user SET ${setClauses.join(', ')} WHERE user_id = ?`,
+            `UPDATE user SET ${setClauses.join(', ')} WHERE user_id = ? AND is_active = 1`,
             values
         );
 
@@ -201,15 +205,11 @@ const softDeleteUser = async (req, res) => {
         console.log('Soft delete user request received for userId:', userId);
 
         const [result] = await db.query(
-            'SELECT * FROM user WHERE user_id = ?', 
+            'SELECT * FROM user WHERE user_id = ? AND is_active = 1', 
             [ userId ]);
 
         if (result.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-        if (result[0].is_active === 0) {
-            return res.status(400).json({ success: false, message: 'User already inactive' });
         }
 
         const [deleteResult] = await db.query(
@@ -228,35 +228,35 @@ const softDeleteUser = async (req, res) => {
     }
 };
 
-const permanentlyDeleteUser = async (req, res) => {
-    try {
-        const { userId } = req.params;
-        console.log('Permanently delete user request received for userId:', userId);
+// const permanentlyDeleteUser = async (req, res) => {
+//     try {
+//         const { userId } = req.params;
+//         console.log('Permanently delete user request received for userId:', userId);
 
-        const [result] = await db.query(
-            'SELECT * FROM user WHERE user_id = ?',
-            [userId]
-        );
+//         const [result] = await db.query(
+//             'SELECT * FROM user WHERE user_id = ?',
+//             [userId]
+//         );
 
-        if (result.length === 0) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
+//         if (result.length === 0) {
+//             return res.status(404).json({ success: false, message: 'User not found' });
+//         }
 
-        const [deleteResult] = await db.query(
-            'DELETE FROM user WHERE user_id = ?',
-            [userId]
-        );
+//         const [deleteResult] = await db.query(
+//             'DELETE FROM user WHERE user_id = ?',
+//             [userId]
+//         );
 
-        if (deleteResult.affectedRows === 0) {
-            return res.status(500).json({ success: false, message: 'Failed to permanently delete user' });
-        }
+//         if (deleteResult.affectedRows === 0) {
+//             return res.status(500).json({ success: false, message: 'Failed to permanently delete user' });
+//         }
 
-        return res.status(200).json({ success: true, message: 'User permanently deleted successfully' });
-    } catch (error) {
-        console.error('Error permanently deleting user:', error);
-        return res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-};
+//         return res.status(200).json({ success: true, message: 'User permanently deleted successfully' });
+//     } catch (error) {
+//         console.error('Error permanently deleting user:', error);
+//         return res.status(500).json({ success: false, message: 'Internal server error' });
+//     }
+// };
 
 
 
@@ -265,5 +265,5 @@ module.exports = {
     addUser,
     updateUser,
     softDeleteUser,
-    permanentlyDeleteUser
+    // permanentlyDeleteUser
 };

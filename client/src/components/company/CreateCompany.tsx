@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Building2, ArrowLeft, Upload, Plus, Trash2 } from 'lucide-react';
 
 interface TaxRate {
@@ -102,15 +102,11 @@ export default function CreateCompany() {
         submitData.append('taxRates', JSON.stringify(taxRates.filter(tax => tax.name && tax.rate > 0)));
       }
 
-      const response = await axios.post('/api/createCompany', submitData, {
+      const response = await axiosInstance.post('/api/createCompany', submitData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
-
-      // Update token but don't set selected company
-      const { token } = response.data;
-      localStorage.setItem('authToken', token);
       
       // Clear any previously selected company to ensure user goes to company selection
       setSelectedCompany(null);

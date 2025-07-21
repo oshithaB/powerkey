@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axiosInstance from '../axiosInstance';
 import axios from 'axios';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 interface User {
   id: number;
@@ -33,28 +35,48 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const userData = localStorage.getItem('user');
+    const companyData = localStorage.getItem('selectedCompany');
 
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        if (parsedUser?.fullname) {
-          setUser(parsedUser);
-        } else {
-          console.warn('Invalid user object in localStorage:', parsedUser);
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      console.log('Token payload:', payload);
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (payload.exp && payload.exp < currentTime) {
+        console.warn('Token has expired');
+        localStorage.removeItem('authToken');
+        if (userData) {
+          localStorage.removeItem('user');
         }
-      } catch (err) {
-        console.error('Failed to parse user from localStorage:', err);
+        if (companyData) {
+          localStorage.removeItem('selectedCompany');
+        }
+        delete axiosInstance.defaults.headers.common['Authorization'];
+        setUser(null);
+        navigate('/login'); // Redirect to login if token is expired
+        return;
+      } else {
+        console.log('Token is valid');
+        axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        if (userData) {
+          try {
+            const parsedUser = JSON.parse(userData);
+            if (parsedUser?.fullname) {
+              setUser(parsedUser);
+            } else {
+              console.warn('Invalid user object in localStorage:', parsedUser);
+            }
+          } catch (err) {
+            console.error('Failed to parse user from localStorage:', err);
+          }
+        }
       }
     }
-
     setLoading(false);
   }, []);
 
@@ -69,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
@@ -94,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('selectedCompany');
-    delete axios.defaults.headers.common['Authorization'];
+    delete axiosInstance.defaults.headers.common['Authorization'];
     setUser(null);
   };
 
@@ -125,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     login,
     register,

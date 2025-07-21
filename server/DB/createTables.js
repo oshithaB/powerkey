@@ -1,3 +1,5 @@
+const bcrypt = require('bcrypt');
+
 async function createTables(db) {
 
     const tables = [
@@ -16,6 +18,16 @@ async function createTables(db) {
             created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (company_id),
             UNIQUE KEY unique_registration_number (registration_number)
+        )`,
+        `CREATE TABLE IF NOT EXISTS tax_rates (
+            tax_rate_id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id int NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            rate DECIMAL(5,2) NOT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY company_id (company_id),
+            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
         )`,
         `CREATE TABLE IF NOT EXISTS role (
             role_id int NOT NULL AUTO_INCREMENT,
@@ -38,7 +50,7 @@ async function createTables(db) {
             UNIQUE KEY email (email),
             UNIQUE KEY username (username),
             KEY role_id (role_id),
-            CONSTRAINT user_ibfk_1 FOREIGN KEY (role_id) REFERENCES role (role_id) ON DELETE CASCADE
+            CONSTRAINT user_ibfk_1 FOREIGN KEY (role_id) REFERENCES role (role_id)
         )`,
         `CREATE TABLE IF NOT EXISTS customer (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -68,6 +80,7 @@ async function createTables(db) {
             invoice_language VARCHAR(100),
             sales_tax_registration VARCHAR(100),
             opening_balance DECIMAL(12, 2) DEFAULT 0.00,
+            is_active BOOLEAN DEFAULT TRUE,
             as_of_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -100,16 +113,6 @@ async function createTables(db) {
             KEY company_id (company_id),
             CONSTRAINT vendor_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
-        `CREATE TABLE IF NOT EXISTS tax_rates (
-            tax_rate_id INT AUTO_INCREMENT PRIMARY KEY,
-            company_id int NOT NULL,
-            name VARCHAR(100) NOT NULL,
-            rate DECIMAL(5,2) NOT NULL,
-            is_default BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            KEY company_id (company_id),
-            CONSTRAINT tax_rates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE
-        )`,
         `CREATE TABLE IF NOT EXISTS employees (
             id int NOT NULL AUTO_INCREMENT,
             name varchar(200) NOT NULL,
@@ -121,19 +124,6 @@ async function createTables(db) {
             created_at timestamp DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY email (email)
-        )`,
-        `CREATE TABLE IF NOT EXISTS categories (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL UNIQUE,
-            description TEXT,
-            amount DECIMAL(15,2) DEFAULT 0.00,
-            tax_rate_id INT DEFAULT NULL,
-            employee_id INT DEFAULT NULL,
-            company_id INT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (tax_rate_id) REFERENCES tax_rates(tax_rate_id) ON DELETE SET NULL,
-            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
-            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
         `CREATE TABLE IF NOT EXISTS product_categories (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -169,51 +159,51 @@ async function createTables(db) {
             CONSTRAINT products_ibfk_3 FOREIGN KEY (preferred_vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
             CONSTRAINT products_ibfk_4 FOREIGN KEY (added_employee_id) REFERENCES employees (id) ON DELETE SET NULL
         )`,
-        `CREATE TABLE IF NOT EXISTS orders (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            company_id INT NOT NULL,
-            vendor_id INT,
-            mailling_address TEXT,
-            email VARCHAR(255),
-            customer_id INT,
-            shipping_address TEXT,
-            order_no VARCHAR(100) NOT NULL,
-            order_date DATE NOT NULL,
-            category_id INT,
-            class VARCHAR(100),
-            location VARCHAR(100),
-            ship_via VARCHAR(100),
-            total_amount DECIMAL(15,2) DEFAULT 0.00,
-            status ENUM('open', 'closed') DEFAULT 'open',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            KEY company_id (company_id),
-            KEY vendor_id (vendor_id),
-            KEY customer_id (customer_id),
-            KEY category_id (category_id),
-            CONSTRAINT orders_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE,
-            CONSTRAINT orders_ibfk_2 FOREIGN KEY (vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
-            CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL,
-            CONSTRAINT orders_ibfk_4 FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
-        )`,
-        `CREATE TABLE IF NOT EXISTS order_items (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            order_id INT NOT NULL,
-            product_id INT,
-            name VARCHAR(200) NOT NULL,
-            sku VARCHAR(100),
-            description TEXT,
-            qty INT NOT NULL,
-            rate DECIMAL(15,2) NOT NULL,
-            amount DECIMAL(15,2) DEFAULT 0.00,
-            class VARCHAR(100),
-            received BOOLEAN DEFAULT FALSE,
-            closed BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            KEY order_id (order_id),
-            KEY product_id (product_id),
-            CONSTRAINT order_items_ibfk_1 FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
-            CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
-        )`
+        // `CREATE TABLE IF NOT EXISTS orders (
+        //     id INT AUTO_INCREMENT PRIMARY KEY,
+        //     company_id INT NOT NULL,
+        //     vendor_id INT,
+        //     mailling_address TEXT,
+        //     email VARCHAR(255),
+        //     customer_id INT,
+        //     shipping_address TEXT,
+        //     order_no VARCHAR(100) NOT NULL,
+        //     order_date DATE NOT NULL,
+        //     category_id INT,
+        //     class VARCHAR(100),
+        //     location VARCHAR(100),
+        //     ship_via VARCHAR(100),
+        //     total_amount DECIMAL(15,2) DEFAULT 0.00,
+        //     status ENUM('open', 'closed') DEFAULT 'open',
+        //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        //     KEY company_id (company_id),
+        //     KEY vendor_id (vendor_id),
+        //     KEY customer_id (customer_id),
+        //     KEY category_id (category_id),
+        //     CONSTRAINT orders_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE,
+        //     CONSTRAINT orders_ibfk_2 FOREIGN KEY (vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
+        //     CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL,
+        //     CONSTRAINT orders_ibfk_4 FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
+        // )`,
+        // `CREATE TABLE IF NOT EXISTS order_items (
+        //     id INT AUTO_INCREMENT PRIMARY KEY,
+        //     order_id INT NOT NULL,
+        //     product_id INT,
+        //     name VARCHAR(200) NOT NULL,
+        //     sku VARCHAR(100),
+        //     description TEXT,
+        //     qty INT NOT NULL,
+        //     rate DECIMAL(15,2) NOT NULL,
+        //     amount DECIMAL(15,2) DEFAULT 0.00,
+        //     class VARCHAR(100),
+        //     received BOOLEAN DEFAULT FALSE,
+        //     closed BOOLEAN DEFAULT FALSE,
+        //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        //     KEY order_id (order_id),
+        //     KEY product_id (product_id),
+        //     CONSTRAINT order_items_ibfk_1 FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+        //     CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+        // )`
         // `CREATE TABLE IF NOT EXISTS invoices (
         //     id int NOT NULL AUTO_INCREMENT,
         //     company_id int NOT NULL,
@@ -240,6 +230,19 @@ async function createTables(db) {
         //     KEY customer_id (customer_id),
         //     CONSTRAINT invoices_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id),
         //     CONSTRAINT invoices_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customers (id)
+        // )`,
+        // `CREATE TABLE IF NOT EXISTS categories (
+        //     id INT AUTO_INCREMENT PRIMARY KEY,
+        //     name VARCHAR(100) NOT NULL UNIQUE,
+        //     description TEXT,
+        //     amount DECIMAL(15,2) DEFAULT 0.00,
+        //     tax_rate_id INT DEFAULT NULL,
+        //     employee_id INT DEFAULT NULL,
+        //     company_id INT NOT NULL,
+        //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        //     FOREIGN KEY (tax_rate_id) REFERENCES tax_rates(tax_rate_id) ON DELETE SET NULL,
+        //     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+        //     FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         // )`
     ];
 
@@ -258,8 +261,21 @@ async function createTables(db) {
             await db.execute("INSERT INTO role (name) VALUES ('admin')");
             console.log('Default roles inserted');
         }
+
+        const fullname = 'Aruna Kaldera';
+        const username = 'arunaNSK02';
+        const email = 'arunaNSK02@example.com';
+        const password = 'aK@80612776';
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        const [existingUser] = await db.execute('SELECT COUNT(*) as count FROM user');
+        if (existingUser[0].count === 0) {
+            await db.execute(`INSERT INTO user (role_id, full_name, username, email, password_hash) VALUES (1, '${fullname}', '${username}', '${email}', '${passwordHash}')`);
+            console.log('Default user (Admin) inserted', `email: ${email}, password: ${password}`);
+        }
     } catch (error) {
-        console.error('Error inserting default roles:', error);
+        console.error('Error inserting default data:', error);
     }
 }
 

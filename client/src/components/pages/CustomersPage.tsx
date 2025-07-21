@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance'
 import { Plus, Search, Edit, Trash2, Mail, Phone, Truck } from 'lucide-react';
 
 interface Customer {
@@ -77,7 +77,7 @@ export default function CustomersPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -99,9 +99,9 @@ export default function CustomersPage() {
       };
 
       if (editingCustomer) {
-        await axios.put(`/api/customers/${selectedCompany?.company_id}/${editingCustomer.id}`, submitData);
+        await axiosInstance.put(`/api/updateCustomers/${selectedCompany?.company_id}/${editingCustomer.id}`, submitData);
       } else {
-        await axios.post(`/api/customers/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/createCustomers/${selectedCompany?.company_id}`, submitData);
       }
       fetchCustomers();
       setShowModal(false);
@@ -147,7 +147,7 @@ export default function CustomersPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this customer?')) {
       try {
-        await axios.delete(`/api/customers/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.put(`/api/deleteCustomers/${selectedCompany?.company_id}/${id}`);
         fetchCustomers();
       } catch (error) {
         console.error('Error deleting customer:', error);

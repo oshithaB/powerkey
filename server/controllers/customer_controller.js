@@ -9,11 +9,16 @@ const getCustomers = async (req, res) => {
         }
 
         const [customers] = await db.query(
-            'SELECT * FROM customer WHERE company_id = ? ORDER BY created_at DESC',
+            'SELECT * FROM customer WHERE company_id = ? AND is_active = 1 ORDER BY created_at DESC',
             [company_id]
         );
 
+        if (customers.length === 0) {
+            return res.status(404).json({ success: false, message: 'No customers found for this company' });
+        }
+
         return res.status(200).json(customers);
+
     } catch (error) {
         console.error('Error fetching customers:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });
@@ -61,27 +66,26 @@ const createCustomer = async (req, res) => {
         }
 
         if (email) {
-            const [existingCustomer] = await db.query(
-                'SELECT * FROM customer WHERE company_id = ? AND email = ?',
+            const [emailConflict] = await db.query(
+                'SELECT * FROM customer WHERE company_id = ? AND email = ? AND is_active = 1',
                 [company_id, email]
             );
 
-            if (existingCustomer.length > 0) {
-                return res.status(400).json({ success: false, message: 'Customer with this email already exists' });
+            if (emailConflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Email already in use by another customer' });
             }
         }
 
-        // const [lastCustomer] = await db.query(
-        //     'SELECT id FROM customer WHERE company_id = ? ORDER BY id DESC LIMIT 1',
-        //     [company_id]
-        // );
+        if (tax_number) {
+            const [taxNumberConflict] = await db.query(
+                'SELECT * FROM customer WHERE company_id = ? AND tax_number = ? AND is_active = 1',
+                [company_id, tax_number]
+            );
 
-        // let customerCode = 'CUST001';
-        // if (lastCustomer.length > 0 && lastCustomer[0].id) {
-        //     const lastCode = lastCustomer[0].id;
-        //     const lastNumber = parseInt(lastCode.replace('CUST', ''));
-        //     customerCode = `CUST${String(lastNumber + 1).padStart(3, '0')}`;
-        // }
+            if (taxNumberConflict.length > 0) {
+                return res.status(400).json({ success: false, message: 'Tax number already in use by another customer' });
+            }
+        }
 
         const [result] = await db.query(
             `INSERT INTO customer (
@@ -204,13 +208,14 @@ const updateCustomer = async (req, res) => {
         }
 
         const [existingCustomer] = await db.query(
-            'SELECT * FROM customer WHERE id = ? AND company_id = ?',
+            'SELECT * FROM customer WHERE id = ? AND company_id = ? AND is_active = 1',
             [customer_id, company_id]
         );
 
         if (existingCustomer.length === 0) {
             return res.status(404).json({ success: false, message: 'Customer not found' });
         }
+        
 
         if (email) {
             const [emailConflict] = await db.query(
@@ -299,7 +304,7 @@ const updateCustomer = async (req, res) => {
     }
 };
 
-const deleteCustomer = async (req, res) => {
+const softDeleteCustomer = async (req, res) => {
     try {
         const { company_id, customer_id } = req.params;
 
@@ -308,7 +313,7 @@ const deleteCustomer = async (req, res) => {
         }
 
         const [existingCustomer] = await db.query(
-            'SELECT * FROM customer WHERE id = ? AND company_id = ?',
+            'SELECT * FROM customer WHERE id = ? AND company_id = ? AND is_active = 1',
             [customer_id, company_id]
         );
 
@@ -334,7 +339,7 @@ const deleteCustomer = async (req, res) => {
         }
 
         const [result] = await db.query(
-            'DELETE FROM customer WHERE id = ? AND company_id = ?',
+            'UPDATE customer SET is_active = 0 WHERE id = ? AND company_id = ?',
             [customer_id, company_id]
         );
 
@@ -357,5 +362,5 @@ module.exports = {
     getCustomers,
     createCustomer,
     updateCustomer,
-    deleteCustomer
+    softDeleteCustomer
 };

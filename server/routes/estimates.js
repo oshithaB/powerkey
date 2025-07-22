@@ -6,7 +6,8 @@ const authorizedRoles = require('../middleware/authorized-roles');
 const {
     getEstimates,
     createEstimate,
-    deleteEstimate
+    deleteEstimate,
+    getEstimatesItems
 } = require('../controllers/estimate_controller');
 
 router.get(
@@ -28,6 +29,13 @@ router.delete(
     verifyToken,
     authorizedRoles(['admin', 'user']),
     deleteEstimate
+);
+
+router.get(
+    '/estimatesItems/:companyId/:estimateId',
+    verifyToken,
+    authorizedRoles(['admin', 'user']),
+    getEstimatesItems
 );
 
 module.exports = router;

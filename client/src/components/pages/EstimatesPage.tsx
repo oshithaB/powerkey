@@ -184,7 +184,7 @@ export default function EstimatesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this estimate?')) {
       try {
-        await axios.delete(`/api/estimates/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/deleteEstimate/${selectedCompany?.company_id}/${id}`);
         fetchEstimates();
       } catch (error: any) {
         const backendMessage = error.response?.data?.error;
@@ -796,7 +796,7 @@ export default function EstimatesPage() {
                     <option value="">Select Employee</option>
                     {employees.map((employee) => (
                       <option key={employee.id} value={employee.id}>
-                        {employee.first_name} {employee.last_name}
+                        {employee.name}
                       </option>
                     ))}
                   </select>

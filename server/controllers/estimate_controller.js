@@ -228,7 +228,41 @@ const createEstimate = async (req, res) => {
     }
 };
 
+const deleteEstimate = async (req, res) => {
+    try {
+        const { estimateId } = req.params;
+
+        if (!estimateId) {
+            return res.status(400).json({ error: "Estimate ID is required" });
+        }
+
+        // Check if estimate exists
+        const [estimate] = await db.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+        if (estimate.length === 0) {
+            return res.status(404).json({ error: "Estimate not found" });
+        }
+
+        // Delete estimate items
+        await db.query('DELETE FROM estimate_items WHERE estimate_id = ?', [estimateId]);
+
+        // Delete estimate
+        const [result] = await db.query('DELETE FROM estimates WHERE id = ?', [estimateId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ error: "Failed to delete estimate" });
+        }
+
+        res.status(200).json({ message: "Estimate deleted successfully" });
+    }
+
+    catch (error) {
+        console.error("Error deleting estimate:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
 module.exports = {
     getEstimates,
-    createEstimate
+    createEstimate,
+    deleteEstimate
 };

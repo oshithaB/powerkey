@@ -143,11 +143,11 @@ export default function ProductsPage() {
       data.append('reorder_level', productFormData.reorder_level.toString());
 
       if (editingProduct) {
-        await axios.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
+        await axiosInstance.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        await axios.post(`/api/products/${selectedCompany?.company_id}`, data, {
+        await axiosInstance.post(`/api/products/${selectedCompany?.company_id}`, data, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }

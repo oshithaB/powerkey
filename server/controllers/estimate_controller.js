@@ -49,7 +49,7 @@ const getEstimates = async (req, res) => {
         console.error("Error fetching estimates:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-};
+}
 
 const createEstimate = async (req, res) => {
     try {

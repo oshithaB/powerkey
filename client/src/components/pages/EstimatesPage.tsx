@@ -13,8 +13,8 @@ interface Estimate {
   estimate_number: string;
   customer_id: number;
   customer_name?: string;
-  customer_billing_address?: string;
-  customer_shipping_address?: string;
+  billing_address?: string;
+  shipping_address?: string;
   employee_id: number;
   employee_name: string;
   estimate_date: string;
@@ -134,7 +134,7 @@ export default function EstimatesPage() {
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {
-      const response = await axios.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`);
+      const response = await axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`);
       return response.data.length > 0 ? response.data : [
         {
           product_id: 0,
@@ -221,13 +221,30 @@ export default function EstimatesPage() {
   const handleDownloadPDF = async () => {
     try {
       if (printRef.current) {
-        const canvas = await html2canvas(printRef.current, { scale: 2 });
+        // Preload the logo image to ensure it’s available for html2canvas
+        const logoUrl = selectedCompany?.company_logo ? `http://localhost:3000${selectedCompany.company_logo}` : null;
+        let logoImage: HTMLImageElement | null = null;
+        if (logoUrl) {
+          logoImage = new Image();
+          logoImage.crossOrigin = 'Anonymous'; // Handle CORS
+          logoImage.src = logoUrl;
+          await new Promise((resolve, reject) => {
+            logoImage.onload = resolve;
+            logoImage.onerror = reject;
+          });
+        }
+  
+        const canvas = await html2canvas(printRef.current, {
+          scale: 2,
+          useCORS: true, // Enable CORS for external images
+          logging: false, // Disable logging for cleaner console
+        });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
+  
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`estimate_${printingEstimate?.estimate_number}.pdf`);
         setShowPrintPreview(false);
@@ -236,7 +253,7 @@ export default function EstimatesPage() {
       }
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF');
+      alert('Failed to generate PDF. Ensure the logo image is accessible.');
     }
   };
 
@@ -393,8 +410,8 @@ export default function EstimatesPage() {
   const filteredEstimates = estimates.filter(estimate =>
     estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.customer_billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.customer_shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())
+    estimate.billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    estimate.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const { subtotal, totalTax, discountAmount, total } = calculateTotals();
@@ -616,16 +633,26 @@ export default function EstimatesPage() {
 
             <div className="overflow-y-auto max-h-[70vh]">
               <div ref={printRef} className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900">
-                <div className="border-b pb-4 mb-4">
+              <div className="flex justify-between items-start border-b pb-4 mb-4">
+                <div>
                   <h1 className="text-3xl font-bold">Estimate #{printingEstimate.estimate_number}</h1>
                   <p className="text-sm text-gray-600">ID: {printingEstimate.id}</p>
                 </div>
+                {selectedCompany?.company_logo && (
+                  <img
+                    src={`http://localhost:3000${selectedCompany.company_logo}`}
+                    alt={`${selectedCompany.name} Logo`}
+                    className="h-16 w-auto max-w-[150px] object-contain"
+                  />
+                )}
+              </div>
                 
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <div>
                     <h3 className="text-lg font-semibold">Customer</h3>
                     <p>{printingEstimate.customer_name || 'Unknown Customer'}</p>
-                    <p>{printingEstimate.customer_billing_address || 'No address provided'}</p>
+                    <p>Billing Address: {printingEstimate.billing_address && printingEstimate.billing_address.trim() ? printingEstimate.billing_address : 'No billing address available'}</p>
+                    <p>Shipping Address: {printingEstimate.shipping_address && printingEstimate.shipping_address.trim() ? printingEstimate.shipping_address : 'No shipping address available'}</p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Details</h3>

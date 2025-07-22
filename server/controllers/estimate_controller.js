@@ -261,8 +261,42 @@ const deleteEstimate = async (req, res) => {
     }
 }
 
+const getEstimatesItems = async (req, res) => {
+    try {
+        const { estimateId } = req.params;
+
+        if (!estimateId) {
+            return res.status(400).json({ error: "Estimate ID is required" });
+        }
+
+        const query = `SELECT 
+                            ei.id,
+                            ei.estimate_id,
+                            ei.product_id,
+                            p.name AS product_name,
+                            ei.description,
+                            ei.quantity,
+                            ei.unit_price,
+                            ei.tax_rate,
+                            ei.tax_amount,
+                            ei.total_price
+                        FROM 
+                            estimate_items ei
+                        JOIN 
+                            products p ON ei.product_id = p.id
+                        WHERE 
+                            ei.estimate_id = ?;`;
+        const [items] = await db.query(query, [estimateId]);
+        res.json(items);
+    } catch (error) {
+        console.error("Error fetching estimate items:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
 module.exports = {
     getEstimates,
     createEstimate,
-    deleteEstimate
+    deleteEstimate,
+    getEstimatesItems
 };

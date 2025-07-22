@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, User, Mail, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -33,7 +33,7 @@ export default function EmployeesPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get('/api/employees');
+      const response = await axiosInstance.get('/api/employees');
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -46,13 +46,13 @@ export default function EmployeesPage() {
     e.preventDefault();
     if (formData.hire_date && isNaN(new Date(formData.hire_date).getTime())) {
       console.error('Invalid hire date');
-      return; // Or show an error to the user
+      return;
     }
     try {
       if (editingEmployee) {
-        await axios.put(`/api/employees/${editingEmployee.id}`, formData);
+        await axiosInstance.put(`/api/employees/${editingEmployee.id}`, formData);
       } else {
-        await axios.post('/api/employees', formData);
+        await axiosInstance.post('/api/employees', formData);
       }
       fetchEmployees();
       setShowModal(false);
@@ -63,7 +63,6 @@ export default function EmployeesPage() {
   };
 
   const handleEdit = (employee: Employee) => {
-    console.log('Editing employee:', employee);
     setEditingEmployee(employee);
     setFormData({
       name: employee.name || '',
@@ -78,7 +77,7 @@ export default function EmployeesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this employee?')) {
       try {
-        await axios.delete(`/api/employees/${id}`);
+        await axiosInstance.delete(`/api/employees/${id}`);
         fetchEmployees();
       } catch (error) {
         console.error('Error deleting employee:', error);
@@ -128,7 +127,6 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
         <input
@@ -140,7 +138,6 @@ export default function EmployeesPage() {
         />
       </div>
 
-      {/* Employees Table */}
       <div className="card">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -152,7 +149,7 @@ export default function EmployeesPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Email
                 </th>
-                <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -202,7 +199,6 @@ export default function EmployeesPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {employee.hire_date ? format(new Date(employee.hire_date), 'MMM dd, yyyy') : '-'}
                   </td>
-                  
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
@@ -226,9 +222,8 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px'}}>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -244,12 +239,11 @@ export default function EmployeesPage() {
                       type="text"
                       required
                       className="input"
-                      placeholder='Enter Employee Name'
+                      placeholder="Enter Employee Name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Hire Date
@@ -262,7 +256,6 @@ export default function EmployeesPage() {
                     />
                   </div>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -271,7 +264,7 @@ export default function EmployeesPage() {
                     <input
                       type="email"
                       className="input"
-                      placeholder='Enter Employee Email'
+                      placeholder="Enter Employee Email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
@@ -283,13 +276,12 @@ export default function EmployeesPage() {
                     <input
                       type="tel"
                       className="input"
-                      placeholder='Enter Employee Phone'
+                      placeholder="Enter Employee Phone"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
                 </div>
-                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Address
@@ -297,12 +289,11 @@ export default function EmployeesPage() {
                   <input
                     type="text"
                     className="input"
-                    placeholder='Enter Employee Address'
+                    placeholder="Enter Employee Address"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
-                
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"

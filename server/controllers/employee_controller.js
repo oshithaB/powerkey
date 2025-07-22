@@ -16,7 +16,7 @@ const createEmployee = async (req, res) => {
 
         // Check if employee already exists by email (email is unique in the database)
         const [existingEmployee] = await db.query(
-            'SELECT * FROM employees WHERE email = ? AND is_active = 1', 
+            'SELECT * FROM employees WHERE email = ?', 
             [email]
         );
         console.log('Existing employee check result:', existingEmployee);
@@ -58,8 +58,7 @@ const createEmployee = async (req, res) => {
 const getEmployees = async (req, res) => {
     try {
         console.log('Get employees request received');
-        const [employees] = await db.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY created_at DESC');
-        
+        const [employees] = await db.query('SELECT * FROM employees');
         console.log('Employees fetched:', employees);        
         return res.status(200).json(employees);
     } catch (error) {

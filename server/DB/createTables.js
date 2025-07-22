@@ -164,12 +164,11 @@ async function createTables(db) {
             estimate_number VARCHAR(100) NOT NULL UNIQUE,
             company_id INT NOT NULL,
             customer_id INT NOT NULL,
-            employee_id INT NOT NULL,
+            employee_id INT,
             estimate_date DATE NOT NULL,
             expiry_date DATE,
             subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             discount_type ENUM('percentage', 'fixed') NOT NULL,
-            discount_value DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
@@ -177,6 +176,11 @@ async function createTables(db) {
             is_active BOOLEAN DEFAULT TRUE,
             notes TEXT,
             terms TEXT,
+            shipping_address VARCHAR(255),
+            billing_address VARCHAR(255),
+            ship_via VARCHAR(100),
+            shipping_date DATE,
+            tracking_number VARCHAR(100),
             invoice_id INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             KEY company_id (company_id),
@@ -185,8 +189,8 @@ async function createTables(db) {
             KEY invoice_id (invoice_id),
             CONSTRAINT estimates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
             CONSTRAINT estimates_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer(id),
-            CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employee(id)
-        );`,
+            CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+        )`,
         `CREATE TABLE IF NOT EXISTS estimate_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
             estimate_id INT NOT NULL,
@@ -197,8 +201,9 @@ async function createTables(db) {
             tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
             tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-            FOREIGN KEY (estimate_id) REFERENCES estimates(id) ON DELETE CASCADE
-        );`
+            FOREIGN KEY (estimate_id) REFERENCES estimates(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        )`
         // `CREATE TABLE IF NOT EXISTS orders (
         //     id INT AUTO_INCREMENT PRIMARY KEY,
         //     company_id INT NOT NULL,

@@ -13,6 +13,8 @@ interface Estimate {
   estimate_number: string;
   customer_id: number;
   customer_name?: string;
+  customer_billing_address?: string;
+  customer_shipping_address?: string;
   employee_id: number;
   employee_name: string;
   estimate_date: string;
@@ -103,7 +105,7 @@ export default function EstimatesPage() {
 
   const fetchEstimates = async () => {
     try {
-      const response = await axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
     } catch (error) {
       console.error('Error fetching estimates:', error);
@@ -390,7 +392,9 @@ export default function EstimatesPage() {
 
   const filteredEstimates = estimates.filter(estimate =>
     estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    estimate.customer_billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    estimate.customer_shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const { subtotal, totalTax, discountAmount, total } = calculateTotals();
@@ -621,6 +625,7 @@ export default function EstimatesPage() {
                   <div>
                     <h3 className="text-lg font-semibold">Customer</h3>
                     <p>{printingEstimate.customer_name || 'Unknown Customer'}</p>
+                    <p>{printingEstimate.customer_billing_address || 'No address provided'}</p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Details</h3>

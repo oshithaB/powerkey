@@ -19,6 +19,7 @@ router.post(
 router.get(
     '/employees',
     verifyToken,
+    authorizedRoles(['admin', 'user']),
     getEmployees
 );
 

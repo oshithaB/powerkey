@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 interface EstimateModalProps {
-  estimate: any;
-  onSave: () => void;
+  estimate?: any;
+  onSave?: () => void;
 }
 
 interface EstimateItem {
@@ -44,10 +44,11 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const [products, setProducts] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    estimate_number: '',
+  const initialFormData = {
+    estimate_number: `EST-${Date.now()}`,
     customer_id: '',
     employee_id: '',
     estimate_date: new Date().toISOString().split('T')[0],
@@ -61,28 +62,34 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     ship_via: '',
     shipping_date: '',
     tracking_number: ''
-  });
+  };
 
-  const [items, setItems] = useState<EstimateItem[]>([
-    {
-      product_id: 0,
-      description: '',
-      quantity: 1,
-      unit_price: 0,
-      tax_rate: 0,
-      tax_amount: 0,
-      total_price: 0
-    }
-  ]);
+  const initialItems = [{
+    product_id: 0,
+    description: '',
+    quantity: 1,
+    unit_price: 0,
+    tax_rate: 0,
+    tax_amount: 0,
+    total_price: 0
+  }];
+
+  const [formData, setFormData] = useState(estimate ? {
+    ...initialFormData,
+    ...estimate,
+    estimate_date: estimate.estimate_date.split('T')[0]
+  } : initialFormData);
+
+  const [items, setItems] = useState<EstimateItem[]>(estimate?.items || initialItems);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-          axios.get(`/api/customers/${selectedCompany?.company_id}`),
-          axios.get(`/api/employees/`),
-          axios.get(`/api/products/${selectedCompany?.company_id}`),
-          axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+          axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
+          axiosInstance.get(`/api/employees/`),
+          axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
+          axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
         ]);
 
         setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
@@ -105,6 +112,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       } catch (error) {
         console.error('Error fetching data:', error);
         setTaxRates([]);
+        setError('Failed to fetch data');
       }
     };
 
@@ -112,12 +120,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       setCompany(selectedCompany);
       setFormData(prev => ({
         ...prev,
-        notes: selectedCompany.notes || '',
-        terms: selectedCompany.terms_and_conditions || ''
+        notes: estimate?.notes || selectedCompany.notes || '',
+        terms: estimate?.terms || selectedCompany.terms_and_conditions || ''
       }));
       fetchData();
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, estimate]);
 
   useEffect(() => {
     const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
@@ -162,25 +170,25 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = (subtotal * item.tax_rate) / 100;
-      item.total_price = subtotal + item.tax_amount;
+      item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
+      item.total_price = Number((subtotal + item.tax_amount).toFixed(2));
     }
 
     setItems(updatedItems);
   };
 
   const calculateTotals = () => {
-    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    const totalTax = items.reduce((sum, item) => sum + item.tax_amount, 0);
+    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
+    const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
-      discountAmount = (subtotal * formData.discount_value) / 100;
+      discountAmount = Number(((subtotal * formData.discount_value) / 100).toFixed(2));
     } else {
-      discountAmount = formData.discount_value;
+      discountAmount = Number(formData.discount_value.toFixed(2));
     }
 
-    const total = subtotal - discountAmount + totalTax;
+    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
 
     return { subtotal, totalTax, discountAmount, total };
   };
@@ -188,25 +196,67 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      const submitData = {
-        ...formData,
-        items,
-        customer_id: parseInt(formData.customer_id),
-        employee_id: formData.employee_id ? parseInt(formData.employee_id) : null
-      };
-
-      if (estimate) {
-        await axios.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
-      } else {
-        await axios.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
+      if (!formData.estimate_number) {
+        throw new Error('Estimate number is required');
+      }
+      if (!formData.customer_id) {
+        throw new Error('Customer is required');
+      }
+      if (!formData.estimate_date) {
+        throw new Error('Estimate date is required');
+      }
+      if (!items.some(item => item.product_id !== 0)) {
+        throw new Error('At least one valid item is required');
       }
 
-      onSave();
-    } catch (error) {
+      const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+
+      const submitData = {
+        ...formData,
+        company_id: selectedCompany?.company_id,
+        customer_id: parseInt(formData.customer_id) || null,
+        employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
+        subtotal: Number(subtotal),
+        tax_amount: Number(totalTax),
+        discount_amount: Number(discountAmount),
+        total_amount: Number(total),
+        items: items.map(item => ({
+          ...item,
+          product_id: parseInt(item.product_id as any) || null,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price),
+          tax_rate: Number(item.tax_rate),
+          tax_amount: Number(item.tax_amount),
+          total_price: Number(item.total_price)
+        }))
+      };
+
+      console.log("Submitting data:", submitData);
+
+      if (estimate) {
+        await axiosInstance.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
+      } else {
+        await axiosInstance.post(`/api/createEstimates/${selectedCompany?.company_id}`, submitData);
+      }
+
+      // Reset form and items after successful save
+      setFormData(initialFormData);
+      setItems(initialItems);
+      
+      // Navigate back if no onSave callback is provided
+      if (onSave && typeof onSave === 'function') {
+        onSave();
+      } else {
+        navigate(-1);
+      }
+    } catch (error: any) {
       console.error('Error saving estimate:', error);
-      alert('Failed to save estimate');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to save estimate';
+      setError(errorMessage);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -232,8 +282,28 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
             </button>
           </div>
 
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimate Number *
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.estimate_number}
+                  onChange={(e) => setFormData({ ...formData, estimate_number: e.target.value })}
+                  placeholder="Enter estimate number"
+                  required
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer *
@@ -242,6 +312,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   className="input"
                   value={formData.customer_id}
                   onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                  required
                 >
                   <option value="">Select Customer</option>
                   {customers.map((customer) => (
@@ -395,6 +466,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             className="input"
                             value={item.product_id}
                             onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
+                            required
                           >
                             <option value={0}>Select Product</option>
                             {products.map((product) => (
@@ -411,24 +483,29 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             value={item.description}
                             onChange={(e) => updateItem(index, 'description', e.target.value)}
                             placeholder="Item description"
+                            required
                           />
                         </td>
                         <td className="px-4 py-2">
                           <input
                             type="number"
                             step="0.01"
+                            min="0.01"
                             className="input w-20"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            required
                           />
                         </td>
                         <td className="px-4 py-2">
                           <input
                             type="number"
                             step="0.01"
+                            min="0"
                             className="input w-24"
                             value={item.unit_price}
                             onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            required
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -515,6 +592,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
                           className="input w-24"
                           value={formData.discount_value}
                           onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })}

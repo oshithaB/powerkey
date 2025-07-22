@@ -14,7 +14,7 @@ import useTokenExpirationCheck from './tokenExpirationCheckHook';
 
 import CreateEstimate from './components/modals/CreateEstimate'
 // import CreateInvoice from './components/modals/CreateInvoice';
-// import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
+import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 
 // Reports
 // import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
@@ -82,6 +82,16 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              <Route
+                path="/purchase-orders"
+                element={
+                  <ProtectedRoute>
+                    <PurchaseOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+
               <Route path="/" element={<Navigate to="/companies" />} />
 
               {/* Catch-all route for 404 Not Found */}

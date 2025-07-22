@@ -5,6 +5,7 @@ const authorizedRoles = require('../middleware/authorized-roles');
 
 const {
     getEstimates,
+    createEstimate
 } = require('../controllers/estimate_controller');
 
 router.get(
@@ -13,5 +14,12 @@ router.get(
     authorizedRoles(['admin', 'user']),
     getEstimates
 );
+
+router.post(
+    '/createEstimates/:companyId',
+    verifyToken,
+    authorizedRoles(['admin', 'user']),
+    createEstimate
+)
 
 module.exports = router;

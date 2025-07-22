@@ -8,7 +8,7 @@ const customerController = require('../controllers/customer_controller');
 
 // Order routes
 router.get('/orders/count/:companyId', orderController.getOrderCount);
-router.get('/orders/:companyId', orderController.getOrders);
+router.get('/getOrders/:companyId', orderController.getOrders);
 router.post('/orders/:companyId', orderController.createOrder);
 router.get('/order-items/:companyId', orderController.getOrderItems);
 router.post('/order-items/:companyId', orderController.createOrderItem);

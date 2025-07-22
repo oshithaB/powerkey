@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 
 interface Order {
   id: number;
@@ -25,7 +25,7 @@ interface Order {
 }
 
 interface OrderItem {
-  id: number;
+  id: number | string; // Allow string for temporary IDs
   order_id: number;
   product_id: number | null;
   name: string;
@@ -37,6 +37,7 @@ interface OrderItem {
   class: string;
   received: boolean;
   closed: boolean;
+  isEditing?: boolean; // Flag for inline editing
 }
 
 interface Vendor {
@@ -87,19 +88,6 @@ export default function PurchaseOrdersPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [showItemForm, setShowItemForm] = useState(false);
-  const [newItem, setNewItem] = useState<Omit<OrderItem, 'id' | 'order_id'>>({
-    product_id: null,
-    name: '',
-    sku: '',
-    description: '',
-    qty: 1,
-    rate: 0,
-    amount: 0,
-    class: '',
-    received: false,
-    closed: false,
-  });
   const [orderCount, setOrderCount] = useState(0);
 
   useEffect(() => {
@@ -114,7 +102,7 @@ export default function PurchaseOrdersPage() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get(`/api/vendors/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getVendors/${selectedCompany?.company_id}`);
       setVendors(response.data);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -123,7 +111,7 @@ export default function PurchaseOrdersPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`/api/categories/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCategories/${selectedCompany?.company_id}`);
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -132,7 +120,7 @@ export default function PurchaseOrdersPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees`);
+      const response = await axiosInstance.get(`/api/employees`);
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -141,7 +129,7 @@ export default function PurchaseOrdersPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -150,8 +138,8 @@ export default function PurchaseOrdersPage() {
 
   const fetchOrderCount = async () => {
     try {
-      const response = await axios.get(`/api/orders/count/${selectedCompany?.company_id}`);
-      const count = response.data.count + 1; // Increment for new order
+      const response = await axiosInstance.get(`/api/orders/count/${selectedCompany?.company_id}`);
+      const count = response.data.count + 1;
       setOrderCount(count);
       setOrder((prev) => ({
         ...prev,
@@ -168,8 +156,6 @@ export default function PurchaseOrdersPage() {
 
   const handleOrderChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    // Handle vendor selection and auto-populate mailing address
     if (name === 'vendor_id') {
       const selectedVendor = vendors.find(vendor => vendor.vendor_id === Number(value));
       setOrder((prev) => ({
@@ -177,17 +163,14 @@ export default function PurchaseOrdersPage() {
         vendor_id: value === '' ? null : Number(value),
         mailling_address: selectedVendor ? selectedVendor.address : '',
       }));
-    } 
-    // Handle customer selection and auto-populate shipping address
-    else if (name === 'customer_id') {
+    } else if (name === 'customer_id') {
       const selectedCustomer = customers.find(customer => customer.id === Number(value));
       setOrder((prev) => ({
         ...prev,
         customer_id: value === '' ? null : Number(value),
         shipping_address: selectedCustomer ? selectedCustomer.shipping_address : '',
       }));
-    } 
-    else {
+    } else {
       setOrder((prev) => ({
         ...prev,
         [name]: value === '' ? null : value,
@@ -195,26 +178,25 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const handleItemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleItemChange = (id: number | string, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewItem((prev) => ({
-      ...prev,
-      [name]: value === '' ? null : value,
-    }));
+    setOrderItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [name]: value === '' ? (name === 'qty' ? 1 : name === 'rate' ? 0 : '') : Number.isNaN(Number(value)) ? value : Number(value),
+              amount: name === 'qty' || name === 'rate' ? (Number(item.qty) * Number(item.rate)).toFixed(2) : item.amount,
+            }
+          : item
+      )
+    );
   };
 
   const addItem = () => {
-    const amount = Number(newItem.qty) * Number(newItem.rate);
-    setOrderItems((prev) => [
-      ...prev,
-      {
-        ...newItem,
-        id: prev.length + 1,
-        order_id: order.id,
-        amount: amount.toFixed(2),
-      },
-    ]);
-    setNewItem({
+    const newItem: OrderItem = {
+      id: `temp_${Date.now()}`,
+      order_id: order.id,
       product_id: null,
       name: '',
       sku: '',
@@ -225,27 +207,52 @@ export default function PurchaseOrdersPage() {
       class: '',
       received: false,
       closed: false,
-    });
-    setShowItemForm(false);
+      isEditing: true,
+    };
+    setOrderItems([...orderItems, newItem]);
   };
 
-  const removeItem = (id: number) => {
+  const saveItem = (id: number | string) => {
+    setOrderItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              id: prev.length + 1,
+              amount: (Number(item.qty) * Number(item.rate)).toFixed(2),
+              isEditing: false,
+            }
+          : item
+      )
+    );
+  };
+
+  const cancelItem = (id: number | string) => {
+    setOrderItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const removeItem = (id: number | string) => {
     setOrderItems((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const hasEditingItem = orderItems.some(item => item.isEditing);
+      if (hasEditingItem) {
+        alert('Please save or cancel the new item before submitting the order.');
+        return;
+      }
       const orderData = {
         ...order,
         total_amount: orderItems.reduce((sum, item) => sum + Number(item.amount), 0).toFixed(2),
         company_id: selectedCompany?.company_id,
       };
-      const response = await axios.post(`/api/orders/${selectedCompany?.company_id}`, orderData);
+      const response = await axiosInstance.post(`/api/orders/${selectedCompany?.company_id}`, orderData);
       const orderId = response.data.id;
 
       for (const item of orderItems) {
-        await axios.post(`/api/order-items/${selectedCompany?.company_id}`, {
+        await axiosInstance.post(`/api/order-items/${selectedCompany?.company_id}`, {
           ...item,
           order_id: orderId,
         });
@@ -316,7 +323,6 @@ export default function PurchaseOrdersPage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className='block text-sm font-medium text-gray-700'>Mailing Address</label>
                 <input
@@ -328,7 +334,6 @@ export default function PurchaseOrdersPage() {
                   placeholder="Enter mailing address"
                 />
               </div>
-
               <div>
                 <label className='block text-sm font-medium text-gray-700'>Email</label>
                 <input
@@ -358,7 +363,6 @@ export default function PurchaseOrdersPage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className='block text-sm font-medium text-gray-700'>Customer Shipping Address</label>
                 <input
@@ -403,7 +407,6 @@ export default function PurchaseOrdersPage() {
                 </select>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Location</label>
@@ -446,101 +449,13 @@ export default function PurchaseOrdersPage() {
                 <h4 className="text-md font-medium text-gray-900">Order Items</h4>
                 <button
                   type="button"
-                  onClick={() => setShowItemForm(true)}
+                  onClick={addItem}
                   className="btn btn-primary btn-sm"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </button>
               </div>
-
-              {showItemForm && (
-                <div className="border p-4 rounded-md mb-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Item Name</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={newItem.name}
-                        onChange={handleItemChange}
-                        className="input"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">SKU</label>
-                      <input
-                        type="text"
-                        name="sku"
-                        value={newItem.sku}
-                        onChange={handleItemChange}
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Description</label>
-                      <input
-                        type="text"
-                        name="description"
-                        value={newItem.description}
-                        onChange={handleItemChange}
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                      <input
-                        type="number"
-                        name="qty"
-                        value={newItem.qty}
-                        onChange={handleItemChange}
-                        className="input"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Rate</label>
-                      <input
-                        type="number"
-                        name="rate"
-                        value={newItem.rate}
-                        onChange={handleItemChange}
-                        className="input"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Class</label>
-                      <input
-                        type="text"
-                        name="class"
-                        value={newItem.class}
-                        onChange={handleItemChange}
-                        className="input"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex justify-end space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowItemForm(false)}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      className="btn btn-primary btn-sm"
-                    >
-                      Add Item
-                    </button>
-                  </div>
-                </div>
-              )}
 
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -565,9 +480,6 @@ export default function PurchaseOrdersPage() {
                         Amount
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Class
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -575,20 +487,101 @@ export default function PurchaseOrdersPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {orderItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.sku || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.description || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.qty}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${Number(item.rate).toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${Number(item.amount).toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.class || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.isEditing ? (
+                            <input
+                              type="text"
+                              name="name"
+                              value={item.name}
+                              onChange={(e) => handleItemChange(item.id, e)}
+                              className="input w-full"
+                              placeholder='Product Name'
+                              required
+                            />
+                          ) : (
+                            item.name
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.isEditing ? (
+                            <input
+                              type="text"
+                              name="sku"
+                              value={item.sku}
+                              onChange={(e) => handleItemChange(item.id, e)}
+                              className="input w-full"
+                              placeholder='Product SKU'
+                            />
+                          ) : (
+                            item.sku || '-'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.isEditing ? (
+                            <input
+                              type="text"
+                              name="description"
+                              value={item.description}
+                              onChange={(e) => handleItemChange(item.id, e)}
+                              className="input w-full"
+                              placeholder='Product Description'
+                            />
+                          ) : (
+                            item.description || '-'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.isEditing ? (
+                            <input
+                              type="number"
+                              name="qty"
+                              value={item.qty}
+                              onChange={(e) => handleItemChange(item.id, e)}
+                              className="input w-full"
+                              min="1"
+                              required
+                            />
+                          ) : (
+                            item.qty
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {item.isEditing ? (
+                            <input
+                              type="number"
+                              name="rate"
+                              value={item.rate}
+                              onChange={(e) => handleItemChange(item.id, e)}
+                              className="input w-full"
+                              step="0.01"
+                              required
+                            />
+                          ) : (
+                            `$${Number(item.rate).toFixed(2)}`
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          ${Number(item.amount).toFixed(2)}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => removeItem(item.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                          {item.isEditing ? (
+                            <div className="flex space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

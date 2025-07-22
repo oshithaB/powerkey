@@ -185,7 +185,7 @@ async function createTables(db) {
             KEY invoice_id (invoice_id),
             CONSTRAINT estimates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
             CONSTRAINT estimates_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer(id),
-            CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employee(id)
+            CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employees(id)
         );`,
         `CREATE TABLE IF NOT EXISTS estimate_items (
             id INT AUTO_INCREMENT PRIMARY KEY,

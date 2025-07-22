@@ -15,7 +15,7 @@ const getEstimates = async (req, res) => {
                             e.customer_id,
                             c.name AS customer_name,
                             e.employee_id,
-                            e.name AS employee_name,
+                            emp.name AS employee_name, -- Fixed alias reference
                             e.estimate_date,
                             e.expiry_date,
                             e.subtotal,
@@ -35,7 +35,7 @@ const getEstimates = async (req, res) => {
                         JOIN 
                             customer c ON e.customer_id = c.id
                         JOIN 
-                            employee emp ON e.employee_id = emp.id
+                            employees emp ON e.employee_id = emp.id
                         WHERE 
                             e.company_id = ?;
                         `;
@@ -45,7 +45,7 @@ const getEstimates = async (req, res) => {
         console.error("Error fetching estimates:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-}
+};
 
 module.exports = {
     getEstimates

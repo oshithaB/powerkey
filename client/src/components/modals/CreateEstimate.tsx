@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -79,10 +79,10 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     const fetchData = async () => {
       try {
         const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-          axios.get(`/api/customers/${selectedCompany?.company_id}`),
-          axios.get(`/api/employees/`),
-          axios.get(`/api/products/${selectedCompany?.company_id}`),
-          axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+          axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
+          axiosInstance.get(`/api/employees/`),
+          axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
+          axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
         ]);
 
         setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
@@ -198,9 +198,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       };
 
       if (estimate) {
-        await axios.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
+        await axiosInstance.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
       } else {
-        await axios.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
       }
 
       onSave();

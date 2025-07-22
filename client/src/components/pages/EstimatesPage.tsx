@@ -14,8 +14,7 @@ interface Estimate {
   customer_id: number;
   customer_name?: string;
   employee_id: number;
-  first_name?: string;
-  last_name?: string;
+  employee_name: string;
   estimate_date: string;
   expiry_date?: string | null;
   subtotal: number;
@@ -27,7 +26,8 @@ interface Estimate {
   status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
   notes: string;
   terms: string;
-  converted_to_invoice_id?: number;
+  is_active: boolean;
+  invoice_id: number | null;
   created_at: string;
 }
 
@@ -517,9 +517,7 @@ export default function EstimatesPage() {
                     {estimate.customer_name || 'Unknown Customer'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {estimate.first_name && estimate.last_name 
-                      ? `${estimate.first_name} ${estimate.last_name}`
-                      : 'Not assigned'}
+                    {estimate.employee_name || 'Not assigned'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -630,9 +628,7 @@ export default function EstimatesPage() {
                     {printingEstimate.expiry_date && (
                       <p>Expiry Date: {formatDate(printingEstimate.expiry_date)}</p>
                     )}
-                    <p>Employee: {printingEstimate.first_name && printingEstimate.last_name 
-                      ? `${printingEstimate.first_name} ${printingEstimate.last_name}`
-                      : 'Not assigned'}</p>
+                    <p>Employee: {printingEstimate.employee_name || 'Not assigned'}</p>
                     <p>Status: {printingEstimate.status.charAt(0).toUpperCase() + printingEstimate.status.slice(1)}</p>
                   </div>
                 </div>

@@ -162,11 +162,9 @@ async function createTables(db) {
         `CREATE TABLE IF NOT EXISTS estimates (
             id INT AUTO_INCREMENT PRIMARY KEY,
             estimate_number VARCHAR(100) NOT NULL UNIQUE,
+            company_id INT NOT NULL,
             customer_id INT NOT NULL,
-            customer_name VARCHAR(255),
             employee_id INT NOT NULL,
-            first_name VARCHAR(100),
-            last_name VARCHAR(100),
             estimate_date DATE NOT NULL,
             expiry_date DATE,
             subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
@@ -179,8 +177,15 @@ async function createTables(db) {
             is_active BOOLEAN DEFAULT TRUE,
             notes TEXT,
             terms TEXT,
-            converted_to_invoice_id INT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            invoice_id INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY company_id (company_id),
+            KEY customer_id (customer_id),
+            KEY employee_id (employee_id),
+            KEY invoice_id (invoice_id),
+            CONSTRAINT estimates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
+            CONSTRAINT estimates_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer(id),
+            CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employee(id)
         );`,
         `CREATE TABLE IF NOT EXISTS estimate_items (
             id INT AUTO_INCREMENT PRIMARY KEY,

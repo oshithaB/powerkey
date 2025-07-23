@@ -172,7 +172,7 @@ async function createTables(db) {
             discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-            status ENUM('pending', 'accepted', 'declined', 'closed') NOT NULL DEFAULT 'draft',
+            status ENUM('pending', 'accepted', 'declined', 'closed') NOT NULL DEFAULT 'pending',
             is_active BOOLEAN DEFAULT TRUE,
             notes TEXT,
             terms TEXT,

@@ -147,7 +147,7 @@ const createEstimate = async (req, res) => {
             discount_amount || 0,
             tax_amount || 0,
             total_amount || 0,
-            status || 'draft',
+            status || 'pending',
             is_active !== undefined ? is_active : true,
             notes || null,
             terms || null,

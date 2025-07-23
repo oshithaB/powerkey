@@ -797,6 +797,16 @@ export default function EstimatesPage() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="text-center text-sm text-gray-500 mt-20">
+                    .......................................................................................... <br />
+                    Accepted By
+                  </div>
+
+                  <div className="text-center text-sm text-gray-500 mt-20">
+                    .......................................................................................... <br />
+                    Accepted Date
+                  </div>
                 </div>
               </div>
             </div>

@@ -13,7 +13,7 @@ import Layout from './components/layout/Layout';
 import useTokenExpirationCheck from './tokenExpirationCheckHook';
 
 import CreateEstimate from './components/modals/CreateEstimate'
-// import CreateInvoice from './components/modals/CreateInvoice';
+import CreateInvoice from './components/modals/CreateInvoice';
 import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 
 // Reports
@@ -88,6 +88,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <PurchaseOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/invoices/create"
+                element={
+                  <ProtectedRoute>
+                    <CreateInvoice />
                   </ProtectedRoute>
                 }
               />

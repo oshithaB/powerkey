@@ -63,6 +63,7 @@ export default function EstimatesPage() {
   const [dateFilter, setDateFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     estimate_number: '',
@@ -221,12 +222,12 @@ export default function EstimatesPage() {
   const handleDownloadPDF = async () => {
     try {
       if (printRef.current) {
-        // Preload the logo image to ensure it’s available for html2canvas
+        // Preload the logo image to ensure it’s available
         const logoUrl = selectedCompany?.company_logo ? `http://localhost:3000${selectedCompany.company_logo}` : null;
         let logoImage: HTMLImageElement | null = null;
         if (logoUrl) {
           logoImage = new Image();
-          logoImage.crossOrigin = 'Anonymous'; // Handle CORS
+          logoImage.crossOrigin = 'Anonymous';
           logoImage.src = logoUrl;
           await new Promise((resolve, reject) => {
             logoImage.onload = resolve;
@@ -234,18 +235,52 @@ export default function EstimatesPage() {
           });
         }
   
-        const canvas = await html2canvas(printRef.current, {
-          scale: 2,
-          useCORS: true, // Enable CORS for external images
-          logging: false, // Disable logging for cleaner console
-        });
-        const imgData = canvas.toDataURL('image/png');
+        // Create a new jsPDF instance
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const maxContentHeight = pageHeight - 2 * margin;
   
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        // Capture the entire print preview content with high resolution
+        const scale = 3; // Increase scale for better quality
+        const canvas = await html2canvas(printRef.current, {
+          scale,
+          useCORS: true,
+          logging: false,
+          windowWidth: printRef.current.scrollWidth,
+          windowHeight: printRef.current.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/png', 1.0); // Ensure maximum quality
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pageWidth - 2 * margin;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+  
+        // Calculate number of pages needed
+        const totalPages = Math.ceil(imgHeight / maxContentHeight);
+  
+        // Add content to PDF, splitting across pages
+        for (let i = 0; i < totalPages; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          const srcY = i * maxContentHeight * (canvas.width / imgWidth);
+          const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.width / imgWidth));
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = pageContentHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            // Ensure high-quality rendering
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
+            const pageImgData = tempCanvas.toDataURL('image/png', 1.0); // Maximum quality
+            pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
+          }
+        }
+  
+        // Save the PDF
         pdf.save(`estimate_${printingEstimate?.estimate_number}.pdf`);
         setShowPrintPreview(false);
         setPrintingEstimate(null);
@@ -407,11 +442,25 @@ export default function EstimatesPage() {
     }
   };
 
+  useEffect(() => {
+    if (customerFilter) {
+      const filteredSuggestions = customers.filter(customer =>
+        customer.name.toLowerCase().includes(customerFilter.toLowerCase())
+      );
+      setCustomerSuggestions(filteredSuggestions);
+    } else {
+      setCustomerSuggestions([]);
+    }
+  }, [customerFilter, customers]);
+  
   const filteredEstimates = estimates.filter(estimate =>
-    estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())
+    (estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (statusFilter === '' || estimate.status === statusFilter) &&
+    (dateFilter === '' || estimate.estimate_date === dateFilter) &&
+    (customerFilter === '' || estimate.customer_name?.toLowerCase() === customerFilter.toLowerCase())
   );
 
   const { subtotal, totalTax, discountAmount, total } = calculateTotals();
@@ -443,49 +492,60 @@ export default function EstimatesPage() {
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-      {/* Status Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-        <select
-          className="input pr-3 w-full"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Estimates</option>
-          <option value="pending">Pending</option>
-          <option value="accepted">Accepted</option>
-          <option value="declined">Declined</option>
-          <option value="closed">Closed</option>
-        </select>
-      </div>
+        {/* Status Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select
+            className="input pr-3 w-full"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Estimates</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+            <option value="declined">Declined</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
 
-      {/* Date Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-        <input
-          type="date"
-          className="input pr-3 w-full"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-        />
-      </div>
+        {/* Date Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+          <input
+            type="date"
+            className="input pr-3 w-full"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+        </div>
 
-      {/* Customer Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-        <select
-          className="input pr-3 w-full"
-          value={customerFilter}
-          onChange={(e) => setCustomerFilter(e.target.value)}
-        >
-          <option value="">All Customers</option>
-          {customers.map(customer => (
-            <option key={customer.id} value={customer.name}>
-              {customer.name}
-            </option>
-          ))}
-        </select>
-      </div>
+        {/* Customer Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+          <input
+            type="text"
+            className="input pr-3 w-full"
+            value={customerFilter}
+            onChange={(e) => setCustomerFilter(e.target.value)}
+            placeholder="Search customers..."
+          />
+          {customerSuggestions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {customerSuggestions.map(customer => (
+                <li
+                  key={customer.id}
+                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => {
+                    setCustomerFilter(customer.name);
+                    setCustomerSuggestions([]);
+                  }}
+                >
+                  {customer.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
       </div>
 
@@ -647,12 +707,15 @@ export default function EstimatesPage() {
                 )}
               </div>
                 
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-3 gap-20 mb-6">
                   <div>
-                    <h3 className="text-lg font-semibold">Customer</h3>
-                    <p>{printingEstimate.customer_name || 'Unknown Customer'}</p>
-                    <p>Billing Address: {printingEstimate.billing_address && printingEstimate.billing_address.trim() ? printingEstimate.billing_address : 'No billing address available'}</p>
-                    <p>Shipping Address: {printingEstimate.shipping_address && printingEstimate.shipping_address.trim() ? printingEstimate.shipping_address : 'No shipping address available'}</p>
+                    <h3 className="text-lg font-semibold">Address</h3>
+                    {/* <p>{printingEstimate.customer_name || 'Unknown Customer'}</p> */}
+                    <p>{printingEstimate.billing_address && printingEstimate.billing_address.trim() ? printingEstimate.billing_address : 'No billing address available'}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Ship To</h3>
+                    <p>{printingEstimate.shipping_address && printingEstimate.shipping_address.trim() ? printingEstimate.shipping_address : 'No shipping address available'}</p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Details</h3>
@@ -733,6 +796,16 @@ export default function EstimatesPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="text-center text-sm text-gray-500 mt-20">
+                    .......................................................................................... <br />
+                    Accepted By
+                  </div>
+
+                  <div className="text-center text-sm text-gray-500 mt-20">
+                    .......................................................................................... <br />
+                    Accepted Date
                   </div>
                 </div>
               </div>

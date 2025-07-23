@@ -4,6 +4,7 @@ import axios from 'axios';
 import { X, Plus, Trash2, FileCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import axiosInstance from '../../axiosInstance';
 
 interface InvoiceModalProps {
   invoice: any;
@@ -78,10 +79,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const fetchData = async () => {
     try {
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-        axios.get(`/api/customers/${selectedCompany?.company_id}`),
-        axios.get(`/api/employees/${selectedCompany?.company_id}`),
-        axios.get(`/api/products/${selectedCompany?.company_id}`),
-        axios.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+        axiosInstance.get(`/api/customers/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/employees/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/products/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
       setCustomers(customersRes.data);
@@ -96,7 +97,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const fetchInvoiceItems = async () => {
     if (!invoice) return;
     try {
-      const response = await axios.get(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}/items`);
+      const response = await axiosInstance.get(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}/items`);
       setItems(response.data);
     } catch (error) {
       console.error('Error fetching invoice items:', error);

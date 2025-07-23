@@ -63,6 +63,7 @@ export default function EstimatesPage() {
   const [dateFilter, setDateFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     estimate_number: '',
@@ -441,11 +442,25 @@ export default function EstimatesPage() {
     }
   };
 
+  useEffect(() => {
+    if (customerFilter) {
+      const filteredSuggestions = customers.filter(customer =>
+        customer.name.toLowerCase().includes(customerFilter.toLowerCase())
+      );
+      setCustomerSuggestions(filteredSuggestions);
+    } else {
+      setCustomerSuggestions([]);
+    }
+  }, [customerFilter, customers]);
+  
   const filteredEstimates = estimates.filter(estimate =>
-    estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    estimate.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())
+    (estimate.estimate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.billing_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     estimate.shipping_address?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (statusFilter === '' || estimate.status === statusFilter) &&
+    (dateFilter === '' || estimate.estimate_date === dateFilter) &&
+    (customerFilter === '' || estimate.customer_name?.toLowerCase() === customerFilter.toLowerCase())
   );
 
   const { subtotal, totalTax, discountAmount, total } = calculateTotals();
@@ -477,49 +492,60 @@ export default function EstimatesPage() {
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-      {/* Status Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-        <select
-          className="input pr-3 w-full"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Estimates</option>
-          <option value="pending">Pending</option>
-          <option value="accepted">Accepted</option>
-          <option value="declined">Declined</option>
-          <option value="closed">Closed</option>
-        </select>
-      </div>
+        {/* Status Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select
+            className="input pr-3 w-full"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Estimates</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+            <option value="declined">Declined</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
 
-      {/* Date Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-        <input
-          type="date"
-          className="input pr-3 w-full"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-        />
-      </div>
+        {/* Date Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+          <input
+            type="date"
+            className="input pr-3 w-full"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+        </div>
 
-      {/* Customer Filter */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-        <select
-          className="input pr-3 w-full"
-          value={customerFilter}
-          onChange={(e) => setCustomerFilter(e.target.value)}
-        >
-          <option value="">All Customers</option>
-          {customers.map(customer => (
-            <option key={customer.id} value={customer.name}>
-              {customer.name}
-            </option>
-          ))}
-        </select>
-      </div>
+        {/* Customer Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+          <input
+            type="text"
+            className="input pr-3 w-full"
+            value={customerFilter}
+            onChange={(e) => setCustomerFilter(e.target.value)}
+            placeholder="Search customers..."
+          />
+          {customerSuggestions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {customerSuggestions.map(customer => (
+                <li
+                  key={customer.id}
+                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  onClick={() => {
+                    setCustomerFilter(customer.name);
+                    setCustomerSuggestions([]);
+                  }}
+                >
+                  {customer.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
       </div>
 

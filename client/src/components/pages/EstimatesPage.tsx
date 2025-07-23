@@ -522,29 +522,35 @@ export default function EstimatesPage() {
         {/* Customer Filter */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-          <input
-            type="text"
-            className="input pr-3 w-full"
-            value={customerFilter}
-            onChange={(e) => setCustomerFilter(e.target.value)}
-            placeholder="Search customers..."
-          />
-          {customerSuggestions.length > 0 && (
-            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-              {customerSuggestions.map(customer => (
-                <li
-                  key={customer.id}
-                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                  onClick={() => {
-                    setCustomerFilter(customer.name);
-                    setCustomerSuggestions([]);
-                  }}
-                >
-                  {customer.name}
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="relative">
+            <input
+              type="text"
+              className="input pr-3 w-full"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                if (!e.target.value) setCustomerSuggestions([]); // Clear suggestions if input is empty
+              }}
+              placeholder="Search customers..."
+              onBlur={() => setCustomerSuggestions([])} // Clear suggestions when input loses focus
+            />
+            {customerSuggestions.length > 0 && (
+              <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
+                {customerSuggestions.map(customer => (
+                  <li
+                    key={customer.id}
+                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                    onMouseDown={() => { // Use onMouseDown instead of onClick for better reliability
+                      setCustomerFilter(customer.name);
+                      setCustomerSuggestions([]); // Clear suggestions immediately
+                    }}
+                  >
+                    {customer.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
       </div>
@@ -612,11 +618,11 @@ export default function EstimatesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      ${estimate.total_amount?.toLocaleString() || '0.00'}
+                      Rs. {estimate.total_amount?.toLocaleString() || '0.00'}
                     </div>
                     {estimate.discount_amount > 0 && (
                       <div className="text-sm text-gray-500">
-                        Discount: ${estimate.discount_amount.toLocaleString()}
+                        Discount: Rs. {estimate.discount_amount.toLocaleString()}
                       </div>
                     )}
                   </td>
@@ -780,19 +786,19 @@ export default function EstimatesPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Subtotal:</span>
-                          <span>${Number(printingEstimate.subtotal || 0).toFixed(2)}</span>
+                          <span>Rs. {Number(printingEstimate.subtotal || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Discount ({printingEstimate.discount_type === 'percentage' ? '%' : '$'}):</span>
-                          <span>${Number(printingEstimate.discount_amount || 0).toFixed(2)}</span>
+                          <span>Rs. {Number(printingEstimate.discount_amount || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Tax:</span>
-                          <span>${Number(printingEstimate.tax_amount || 0).toFixed(2)}</span>
+                          <span>Rs. {Number(printingEstimate.tax_amount || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-bold text-lg border-t pt-2">
                           <span>Total:</span>
-                          <span>${Number(printingEstimate.total_amount || 0).toFixed(2)}</span>
+                          <span>Rs. {Number(printingEstimate.total_amount || 0).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>

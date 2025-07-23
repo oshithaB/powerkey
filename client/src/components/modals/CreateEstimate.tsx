@@ -12,6 +12,7 @@ interface EstimateModalProps {
 
 interface EstimateItem {
   product_id: number;
+  product_name: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -45,6 +46,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
+  const [productSuggestions, setProductSuggestions] = useState<Product[]>([]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const initialFormData = {
@@ -138,10 +142,51 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     }
   }, [formData.customer_id, customers]);
 
+  useEffect(() => {
+    if (activeSuggestionIndex !== null) {
+      const activeItem = items[activeSuggestionIndex];
+      if (activeItem?.product_name) {
+        const filteredSuggestions = products.filter(product =>
+          product.name.toLowerCase().includes(activeItem.product_name.toLowerCase())
+        );
+        setProductSuggestions(filteredSuggestions);
+      } else {
+        setProductSuggestions(products); // Show all products if input is empty
+      }
+    } else {
+      setProductSuggestions([]); // Clear suggestions when no item is active
+    }
+  }, [items, products, activeSuggestionIndex]);
+
+  const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+  
+    if (field === 'product_id' && value) {
+      const product = products.find(p => p.id === parseInt(value));
+      if (product) {
+        updatedItems[index].product_name = product.name;
+        updatedItems[index].description = product.description || '';
+        updatedItems[index].unit_price = product.unit_price || 0;
+        updatedItems[index].product_id = product.id;
+      }
+    }
+  
+    if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
+      const item = updatedItems[index];
+      const subtotal = item.quantity * item.unit_price;
+      item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
+      item.total_price = Number((subtotal + item.tax_amount).toFixed(2));
+    }
+  
+    setItems(updatedItems);
+  };
+
   const addItem = () => {
     const defaultTaxRate = taxRates.find(tax => tax.is_default === 1);
     setItems([...items, {
       product_id: 0,
+      product_name: '',
       description: '',
       quantity: 1,
       unit_price: 0,
@@ -149,32 +194,11 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       tax_amount: 0,
       total_price: 0
     }]);
+    setProductSuggestions(products); // Reset suggestions to full product list when adding new item
   };
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-
-    if (field === 'product_id' && value) {
-      const product = products.find(p => p.id === parseInt(value));
-      if (product) {
-        updatedItems[index].description = product.name;
-        updatedItems[index].unit_price = product.unit_price;
-      }
-    }
-
-    if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
-      const item = updatedItems[index];
-      const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.total_price = Number((subtotal + item.tax_amount).toFixed(2));
-    }
-
-    setItems(updatedItems);
   };
 
   const calculateTotals = () => {
@@ -460,21 +484,71 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   </thead>
                   <tbody>
                     {items.map((item, index) => (
-                      <tr key={index} className="border-t">
+                      <tr key={index} className="border-t" style={{ paddingBottom: '2rem' }}>
                         <td className="px-4 py-2">
-                          <select
-                            className="input"
-                            value={item.product_id}
-                            onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
-                            required
-                          >
-                            <option value={0}>Select Product</option>
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.name}
-                              </option>
-                            ))}
-                          </select>
+                          <input
+                            type="text"
+                            value={item.product_name || ''}
+                            onChange={(e) => {
+                              updateItem(index, 'product_name', e.target.value);
+                              setActiveSuggestionIndex(index); // Set active item for suggestions
+                            }}
+                            onFocus={() => {
+                              setActiveSuggestionIndex(index); // Show suggestions on focus
+                              const filtered = products.filter(product =>
+                                product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
+                              );
+                              setProductSuggestions(filtered.length > 0 ? filtered : products);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                if (activeSuggestionIndex === index) {
+                                  setProductSuggestions([]);
+                                  setActiveSuggestionIndex(null);
+                                }
+                              }, 200); // Increased delay to allow clicking suggestions
+                            }}
+                            placeholder="Search product"
+                            className="border rounded px-2 py-1 w-full"
+                          />
+                          {activeSuggestionIndex === index && productSuggestions.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                              {productSuggestions.map(product => (
+                                <li
+                                  key={product.id}
+                                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                                  onMouseDown={() => {
+                                    const updatedItems = [...items];
+                                    updatedItems[index] = {
+                                      ...updatedItems[index],
+                                      product_id: product.id,
+                                      product_name: product.name,
+                                      description: product.description || '',
+                                      unit_price: product.unit_price || 0,
+                                    };
+                                    const defaultTaxRate = taxRates.find(tax => tax.is_default === 1);
+                                    const taxRate = updatedItems[index].tax_rate || (defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0);
+                                    updatedItems[index].tax_rate = taxRate;
+                                    const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
+                                    updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
+                                    updatedItems[index].total_price = Number((subtotal + updatedItems[index].tax_amount).toFixed(2));
+                                    setItems(updatedItems);
+                                    setProductSuggestions([]);
+                                    setActiveSuggestionIndex(null);
+                                  }}
+                                >
+                                  {product.image && (
+                                    <img
+                                      src={`http://localhost:3000${product.image}`}
+                                      alt={product.name}
+                                      className="w-8 h-8 object-cover mr-2 rounded"
+                                    />
+                                  )}
+                                  <span>{product.name}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </td>
                         <td className="px-4 py-2">
                           <input

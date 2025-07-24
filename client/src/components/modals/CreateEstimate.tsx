@@ -506,7 +506,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                   setProductSuggestions([]);
                                   setActiveSuggestionIndex(null);
                                 }
-                              }, 200); // Increased delay to allow clicking suggestions
+                              }, 200);
                             }}
                             placeholder="Search product"
                             className="border rounded px-2 py-1 w-full"
@@ -588,20 +588,23 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             value={item.tax_rate}
                             onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
                           >
-                            <option value={0}>0%</option>
+                            
                             {taxRates.length > 0 ? (
-                              taxRates.map((tax) => (
-                                <option key={tax.tax_rate_id} value={tax.rate}>
-                                  {tax.name} ({tax.rate}%)
-                                </option>
-                              ))
+                              <>
+                                {taxRates.map((tax) => (
+                                  <option key={tax.tax_rate_id} value={tax.rate}>
+                                    {tax.name} ({tax.rate}%)
+                                  </option>
+                                ))}
+                                <option value={0}>0% No Tax</option>
+                              </>
                             ) : (
                               <option value={0} disabled>No tax rates available</option>
                             )}
                           </select>
                         </td>
                         <td className="px-4 py-2 text-right">
-                          ${item.total_price.toFixed(2)}
+                          Rs. {item.total_price.toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
                           <button
@@ -650,7 +653,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>Rs. {subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Discount:</span>
@@ -660,7 +663,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                           value={formData.discount_type}
                           onChange={(e) => setFormData({ ...formData, discount_type: e.target.value as 'percentage' | 'fixed' })}
                         >
-                          <option value="fixed">$</option>
+                          <option value="fixed">Rs. </option>
                           <option value="percentage">%</option>
                         </select>
                         <input
@@ -671,16 +674,16 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                           value={formData.discount_value}
                           onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })}
                         />
-                        <span className="w-20 text-right">${discountAmount.toFixed(2)}</span>
+                        <span className="w-20 text-right">Rs. {discountAmount.toFixed(2)}</span>
                       </div>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>
-                      <span>${totalTax.toFixed(2)}</span>
+                      <span>Rs. {totalTax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-lg border-t pt-2">
                       <span>Total:</span>
-                      <span>${total.toFixed(2)}</span>
+                      <span>Rs. {total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

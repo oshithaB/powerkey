@@ -33,7 +33,7 @@ export default function CreateCompany() {
   const [logoPreview, setLogoPreview] = useState<string>('');
 
   const [taxRates, setTaxRates] = useState<TaxRate[]>([
-    { name: 'VAT', rate: 10, is_default: true },
+    { name: 'VAT', rate: 18, is_default: true },
     { name: 'Sales Tax', rate: 8.5, is_default: false }
   ]);
 

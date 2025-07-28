@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-interface EstimateModalProps {
-  estimate?: any;
-  onSave?: () => void;
-}
-
 interface EstimateItem {
+  id?: number;
   product_id: number;
   product_name: string;
   description: string;
@@ -38,55 +34,79 @@ interface TaxRate {
   created_at: string;
 }
 
-export default function EstimateModal({ estimate, onSave }: EstimateModalProps) {
+interface Estimate {
+  id: number;
+  estimate_number: string;
+  customer_id: number;
+  customer_name?: string;
+  billing_address?: string;
+  shipping_address?: string;
+  employee_id: number;
+  employee_name: string;
+  estimate_date: string;
+  expiry_date?: string | null;
+  subtotal: number;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
+  notes: string;
+  terms: string;
+  is_active: boolean;
+  invoice_id: number | null;
+  created_at: string;
+  ship_via?: string;
+  shipping_date?: string;
+  tracking_number?: string;
+}
+
+export default function EditEstimate() {
   const { selectedCompany } = useCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [company, setCompany] = useState<any>();
   const [employees, setEmployees] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { estimate, items: initialItems } = location.state || {};
 
   const initialFormData = {
-    estimate_number: `EST-${Date.now()}`,
-    customer_id: '',
-    employee_id: '',
-    estimate_date: new Date().toISOString().split('T')[0],
-    expiry_date: '',
-    discount_type: 'fixed' as 'percentage' | 'fixed',
-    discount_value: 0,
-    notes: '',
-    terms: '',
-    shipping_address: '',
-    billing_address: '',
-    ship_via: '',
-    shipping_date: '',
-    tracking_number: ''
+    estimate_number: estimate?.estimate_number || `EST-${Date.now()}`,
+    customer_id: estimate?.customer_id?.toString() || '',
+    employee_id: estimate?.employee_id?.toString() || '',
+    estimate_date: estimate ? estimate.estimate_date.split('T')[0] : new Date().toISOString().split('T')[0],
+    expiry_date: estimate?.expiry_date ? estimate.expiry_date.split('T')[0] : '',
+    discount_type: estimate?.discount_type || 'fixed' as 'percentage' | 'fixed',
+    discount_value: estimate?.discount_value || 0,
+    notes: estimate?.notes || '',
+    terms: estimate?.terms || '',
+    shipping_address: estimate?.shipping_address || '',
+    billing_address: estimate?.billing_address || '',
+    ship_via: estimate?.ship_via || '',
+    shipping_date: estimate?.shipping_date ? estimate.shipping_date.split('T')[0] : '',
+    tracking_number: estimate?.tracking_number || ''
   };
 
-  const initialItems = [{
-    product_id: 0,
-    description: '',
-    quantity: 1,
-    unit_price: 0,
-    actual_unit_price: 0,
-    tax_rate: 0,
-    tax_amount: 0,
-    total_price: 0
-  }];
-
-  const [formData, setFormData] = useState(estimate ? {
-    ...initialFormData,
-    ...estimate,
-    estimate_date: estimate.estimate_date.split('T')[0]
-  } : initialFormData);
-
-  const [items, setItems] = useState<EstimateItem[]>(estimate?.items || initialItems);
+  const [formData, setFormData] = useState(initialFormData);
+  const [items, setItems] = useState<EstimateItem[]>(initialItems || [
+    {
+      product_id: 0,
+      product_name: '',
+      description: '',
+      quantity: 1,
+      unit_price: 0,
+      actual_unit_price: 0,
+      tax_rate: 0,
+      tax_amount: 0,
+      total_price: 0
+    }
+  ]);
 
   const fetchData = async () => {
     try {
@@ -123,13 +143,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   useEffect(() => {
     if (selectedCompany) {
-      setCompany(selectedCompany);
+      fetchData();
       setFormData(prev => ({
         ...prev,
         notes: estimate?.notes || selectedCompany.notes || '',
         terms: estimate?.terms || selectedCompany.terms_and_conditions || ''
       }));
-      fetchData();
     }
   }, [selectedCompany, estimate]);
 
@@ -138,8 +157,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     if (selectedCustomer) {
       setFormData(prev => ({
         ...prev,
-        shipping_address: selectedCustomer.shipping_address || '',
-        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || ''
+        shipping_address: selectedCustomer.shipping_address || prev.shipping_address,
+        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || prev.billing_address
       }));
     }
   }, [formData.customer_id, customers]);
@@ -153,21 +172,17 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         );
         setProductSuggestions(filteredSuggestions);
       } else {
-        setProductSuggestions(products); // Show all products if input is empty
+        setProductSuggestions(products);
       }
     } else {
-      setProductSuggestions([]); // Clear suggestions when no item is active
+      setProductSuggestions([]);
     }
   }, [items, products, activeSuggestionIndex]);
-
-  useEffect(() => {
-
-  }, [items, products, taxRates]);
 
   const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
-  
+
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -177,15 +192,15 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         updatedItems[index].product_id = product.id;
       }
     }
-  
+
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
+      item.actual_unit_price = Number(((item.unit_price * (100 - item.tax_rate)) / 100).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
-  
+
     setItems(updatedItems);
   };
 
@@ -202,7 +217,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       tax_amount: 0,
       total_price: 0
     }]);
-    setProductSuggestions(products); // Reset suggestions to full product list when adding new item
+    setProductSuggestions(products);
   };
 
   const removeItem = (index: number) => {
@@ -210,8 +225,12 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   };
 
   const calculateTotals = () => {
-    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
-    const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
+    const subtotal = items.length > 0 
+      ? Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2))
+      : 0;
+    const totalTax = items.length > 0 
+      ? Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2))
+      : 0;
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
@@ -219,9 +238,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     } else {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
-
+  
     const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
-
+  
     return { subtotal, totalTax, discountAmount, total };
   };
 
@@ -247,17 +266,32 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       const { subtotal, totalTax, discountAmount, total } = calculateTotals();
 
       const submitData = {
-        ...formData,
+        id: estimate.id,
+        estimate_number: formData.estimate_number,
         company_id: selectedCompany?.company_id,
         customer_id: parseInt(formData.customer_id) || null,
         employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
+        estimate_date: formData.estimate_date,
+        expiry_date: formData.expiry_date || null,
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
+        discount_type: formData.discount_type,
         discount_amount: Number(discountAmount),
+        discount_value: Number(formData.discount_value),
         total_amount: Number(total),
+        status: estimate.status || 'draft',
+        is_active: estimate.is_active !== undefined ? estimate.is_active : true,
+        notes: formData.notes || null,
+        terms: formData.terms || null,
+        shipping_address: formData.shipping_address || null,
+        billing_address: formData.billing_address || null,
+        ship_via: formData.ship_via || null,
+        shipping_date: formData.shipping_date || null,
+        tracking_number: formData.tracking_number || null,
         items: items.map(item => ({
-          ...item,
+          id: item.id,
           product_id: parseInt(item.product_id as any) || null,
+          description: item.description,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
           actual_unit_price: Number(item.actual_unit_price),
@@ -267,27 +301,28 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         }))
       };
 
-      console.log("Submitting data:", submitData);
+      await axiosInstance.put(`/api/editEstimate/${selectedCompany?.company_id}/${estimate.id}`, submitData);
 
-      if (estimate) {
-        await axiosInstance.put(`/api/estimates/${selectedCompany?.company_id}/${estimate.id}`, submitData);
-      } else {
-        await axiosInstance.post(`/api/createEstimates/${selectedCompany?.company_id}`, submitData);
-      }
-
-      // Reset form and items after successful save
       setFormData(initialFormData);
-      setItems(initialItems);
-      
-      // Navigate back if no onSave callback is provided
-      if (onSave && typeof onSave === 'function') {
-        onSave();
-      } else {
-        navigate(-1);
-      }
+      setItems([
+        {
+          product_id: 0,
+          product_name: '',
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          actual_unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ]);
+
+      navigate('/dashboard/estimates', { replace: true });
+      alert('Estimate updated successfully');
     } catch (error: any) {
-      console.error('Error saving estimate:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to save estimate';
+      console.error('Error updating estimate:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to update estimate';
       setError(errorMessage);
       alert(errorMessage);
     } finally {
@@ -308,7 +343,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
-              Create New Estimate
+              Edit Estimate #{estimate?.estimate_number}
             </h3>
             <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
@@ -495,16 +530,16 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index} className="border-t" style={{ paddingBottom: '2rem' }}>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 relative">
                           <input
                             type="text"
                             value={item.product_name || ''}
                             onChange={(e) => {
                               updateItem(index, 'product_name', e.target.value);
-                              setActiveSuggestionIndex(index); // Set active item for suggestions
+                              setActiveSuggestionIndex(index);
                             }}
                             onFocus={() => {
-                              setActiveSuggestionIndex(index); // Show suggestions on focus
+                              setActiveSuggestionIndex(index);
                               const filtered = products.filter(product =>
                                 product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
                               );
@@ -541,7 +576,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * (100 - updatedItems[index].tax_rate)) / 100;
+                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * (100 - taxRate)) / 100).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
@@ -597,24 +632,24 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                           Rs. {(item.actual_unit_price ?? 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
-                          <select
-                            className="input w-20"
-                            value={item.tax_rate}
-                            onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
-                          >
-                            {taxRates.length > 0 ? (
-                              <>
-                                {taxRates.map((tax) => (
-                                  <option key={tax.tax_rate_id} value={parseFloat(tax.rate)}>
-                                    {tax.name} ({tax.rate}%)
-                                  </option>
-                                ))}
-                                <option value={0}>0% No Tax</option>
-                              </>
-                            ) : (
-                              <option value={0} disabled>No tax rates available</option>
-                            )}
-                          </select>
+                            <select
+                                className="input w-20"
+                                value={item.tax_rate}
+                                onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                            >
+                                {taxRates.length > 0 ? (
+                                <>
+                                    {taxRates.map((tax) => (
+                                    <option key={tax.tax_rate_id} value={parseFloat(tax.rate)}>
+                                        {tax.name} ({tax.rate}%)
+                                    </option>
+                                    ))}
+                                    <option value={0}>0% No Tax</option>
+                                </>
+                                ) : (
+                                <option value={0} disabled>No tax rates available</option>
+                                )}
+                            </select>
                         </td>
                         <td className="px-4 py-2 text-center border border-gray-200">
                           Rs. {item.total_price.toFixed(2)}
@@ -716,7 +751,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                 disabled={loading}
                 className="btn btn-primary btn-md"
               >
-                {loading ? 'Saving...' : estimate ? 'Update Estimate' : 'Create Estimate'}
+                {loading ? 'Updating...' : 'Update Estimate'}
               </button>
             </div>
           </form>

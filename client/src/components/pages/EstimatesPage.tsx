@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, FileText, Eye, Send, FileCheck, Printer, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileText, Eye, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -55,8 +55,6 @@ export default function EstimatesPage() {
   const [taxRates, setTaxRates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [printingEstimate, setPrintingEstimate] = useState<Estimate | null>(null);
   const [printItems, setPrintItems] = useState<EstimateItem[]>([]);
@@ -68,31 +66,6 @@ export default function EstimatesPage() {
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [estimateViewers, setEstimateViewers] = useState<Record<number, string[]>>({});
 
-
-  const [formData, setFormData] = useState({
-    estimate_number: '',
-    customer_id: '',
-    employee_id: '',
-    estimate_date: new Date().toISOString().split('T')[0],
-    expiry_date: '',
-    discount_type: 'fixed' as 'percentage' | 'fixed',
-    discount_value: 0,
-    notes: '',
-    terms: ''
-  });
-
-  const [items, setItems] = useState<EstimateItem[]>([
-    {
-      product_id: 0,
-      description: '',
-      quantity: 0,
-      unit_price: 0,
-      actual_unit_price: 0,
-      tax_rate: 0,
-      tax_amount: 0,
-      total_price: 0
-    }
-  ]);
 
   useEffect(() => {
     fetchEstimates();
@@ -166,52 +139,28 @@ export default function EstimatesPage() {
   const fetchEstimateItems = async (estimateId: number) => {
     try {
       const response = await axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`);
-      return response.data.length > 0 ? response.data : [
-        {
-          product_id: 0,
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          actual_unit_price: 0,
-          tax_rate: 0,
-          tax_amount: 0,
-          total_price: 0
-        }
-      ];
+      const items = Array.isArray(response.data) ? response.data : [];
+      return items.map(item => ({
+        id: item.id,
+        product_id: item.product_id || 0,
+        product_name: item.product_name || '',
+        description: item.description || '',
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.unit_price) || 0,
+        actual_unit_price: Number(item.actual_unit_price) || 0,
+        tax_rate: Number(item.tax_rate) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_price: Number(item.total_price) || 0
+      }));
     } catch (error) {
       console.error('Error fetching estimate items:', error);
-      return [
-        {
-          product_id: 0,
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          actual_unit_price: 0,
-          tax_rate: 0,
-          tax_amount: 0,
-          total_price: 0
-        }
-      ];
+      return [];
     }
   };
 
   const handleEdit = async (estimate: Estimate) => {
-    setEditingEstimate(estimate);
-    setFormData({
-      estimate_number: estimate.estimate_number,
-      customer_id: estimate.customer_id.toString(),
-      employee_id: estimate.employee_id?.toString() || '',
-      estimate_date: estimate.estimate_date || new Date().toISOString().split('T')[0],
-      expiry_date: estimate.expiry_date || '',
-      discount_type: estimate.discount_type,
-      discount_value: estimate.discount_value,
-      notes: estimate.notes || '',
-      terms: estimate.terms || ''
-    });
-    
     const fetchedItems = await fetchEstimateItems(estimate.id);
-    setItems(fetchedItems);
-    setShowModal(true);
+    navigate(`/estimates/edit/${estimate.id}`, { state: { estimate, items: fetchedItems } });
   };
 
   const handleDelete = async (id: number) => {
@@ -324,134 +273,6 @@ export default function EstimatesPage() {
     }
   };
 
-  const addItem = () => {
-    setItems([...items, {
-      product_id: 0,
-      description: '',
-      quantity: 1,
-      unit_price: 0,
-      actual_unit_price: 0,
-      tax_rate: 0,
-      tax_amount: 0,
-      total_price: 0
-    }]);
-  };
-
-  const removeItem = async (index: number) => {
-    const item = items[index];
-    
-    // If editing an existing estimate and the item has an ID, delete it from the backend
-    if (editingEstimate && item.id) {
-      try {
-        await axios.delete(`/api/estimate-items/${selectedCompany?.company_id}/${editingEstimate.id}/${item.id}`);
-        setItems(items.filter((_, i) => i !== index));
-      } catch (error: any) {
-        const backendMessage = error.response?.data?.error;
-        alert(backendMessage || 'Failed to delete estimate item');
-        console.error('Error deleting estimate item:', error);
-      }
-    } else {
-      // For new items or new estimates, remove directly from state
-      setItems(items.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-
-    if (field === 'product_id' && value) {
-      const product = products.find(p => p.id === parseInt(value));
-      if (product) {
-        updatedItems[index].description = product.name;
-        updatedItems[index].unit_price = product.unit_price;
-        updatedItems[index].actual_unit_price = (product.unit_price * 100) / (100 + updatedItems[index].tax_rate);
-      }
-    }
-
-    if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
-      const item = updatedItems[index];
-      const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = (subtotal * item.tax_rate) / 100;
-      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
-      item.total_price = subtotal;
-    }
-
-    setItems(updatedItems);
-  };
-
-  const calculateTotals = (itemsToCalculate: EstimateItem[] = items) => {
-    const subtotal = itemsToCalculate.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    const totalTax = itemsToCalculate.reduce((sum, item) => sum + item.tax_amount, 0);
-    
-    let discountAmount = 0;
-    if (formData.discount_type === 'percentage') {
-      discountAmount = (subtotal * formData.discount_value) / 100;
-    } else {
-      discountAmount = formData.discount_value;
-    }
-
-    const total = subtotal - discountAmount + totalTax;
-
-    return { subtotal, totalTax, discountAmount, total };
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const submitData = {
-        ...formData,
-        items,
-        customer_id: parseInt(formData.customer_id),
-        employee_id: formData.employee_id ? parseInt(formData.employee_id) : null
-      };
-
-      if (editingEstimate) {
-        await axios.put(`/api/estimates/${selectedCompany?.company_id}/${editingEstimate.id}`, submitData);
-      } else {
-        await axios.post(`/api/estimates/${selectedCompany?.company_id}`, submitData);
-      }
-
-      fetchEstimates();
-      setShowModal(false);
-      resetForm();
-    } catch (error) {
-      console.error('Error saving estimate:', error);
-      alert('Failed to save estimate');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      estimate_number: '',
-      customer_id: '',
-      employee_id: '',
-      estimate_date: new Date().toISOString().split('T')[0],
-      expiry_date: '',
-      discount_type: 'fixed',
-      discount_value: 0,
-      notes: '',
-      terms: ''
-    });
-    setItems([
-      {
-        product_id: 0,
-        description: '',
-        quantity: 1,
-        unit_price: 0,
-        actual_unit_price: 0,
-        tax_rate: 0,
-        tax_amount: 0,
-        total_price: 0
-      }
-    ]);
-    setEditingEstimate(null);
-  };
-
   const formatDate = (isoDate: string | Date | null | undefined) => {
     if (!isoDate) return '';
     const date = new Date(isoDate);
@@ -499,9 +320,7 @@ export default function EstimatesPage() {
     (customerFilter === '' || estimate.customer_name?.toLowerCase() === customerFilter.toLowerCase())
   );
 
-  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
-
-  if (loading && !showModal) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -515,7 +334,6 @@ export default function EstimatesPage() {
         <h1 className="text-2xl font-bold text-gray-900"></h1>
         <button
           onClick={() => {
-            resetForm();
             navigate('/estimates/create');
           }}
           className="btn btn-primary btn-md"
@@ -888,299 +706,6 @@ export default function EstimatesPage() {
                 Download PDF
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50" style={{marginTop: "-10px"}}>
-          <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                {editingEstimate ? 'Edit Estimate' : 'Create New Estimate'}
-              </h3>
-              <button 
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }} 
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimate Number
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={formData.estimate_number}
-                    onChange={(e) => setFormData({ ...formData, estimate_number: e.target.value })}
-                    placeholder="AUTO"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer *
-                  </label>
-                  <select
-                    required
-                    className="input"
-                    value={formData.customer_id}
-                    onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
-                  >
-                    <option value="">Select Customer</option>
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Employee
-                  </label>
-                  <select
-                    className="input"
-                    value={formData.employee_id}
-                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                  >
-                    <option value="">Select Employee</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimate Date *
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={formatDate(formData.estimate_date)}
-                    onChange={(e) => setFormData({ ...formData, estimate_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={formatDate(formData.expiry_date)}
-                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-medium text-gray-900">Items</h4>
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Item
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border border-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actual Unit Price</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax %</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item, index) => (
-                        <tr key={index} className="border-t">
-                          <td className="px-4 py-2">
-                            <select
-                              className="input"
-                              value={item.product_id}
-                              onChange={(e) => updateItem(index, 'product_id', parseInt(e.target.value))}
-                            >
-                              <option value={0}>Select Product</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="text"
-                              className="input"
-                              value={item.description}
-                              onChange={(e) => updateItem(index, 'description', e.target.value)}
-                              placeholder="Item description"
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              step="1"
-                              className="input w-20"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="input w-24"
-                              value={item.unit_price}
-                              onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            Rs. {Number(item.actual_unit_price ?? 0).toFixed(2)}
-                          </td>
-                          <td className="px-4 py-2">
-                            <select
-                              className="input w-20"
-                              value={item.tax_rate}
-                              onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
-                            >
-                              <option value={0}>0%</option>
-                              {taxRates.map((tax) => (
-                                <option key={tax.id} value={tax.rate}>
-                                  {tax.rate}%
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            ${Number(item.total_price || 0).toFixed(2)}
-                          </td>
-                          <td className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Notes
-                    </label>
-                    <textarea
-                      className="input min-h-[80px]"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Additional notes..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Terms & Conditions
-                    </label>
-                    <textarea
-                      className="input min-h-[80px]"
-                      value={formData.terms}
-                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                      placeholder="Terms and conditions..."
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Subtotal:</span>
-                        <span>${subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Discount:</span>
-                        <div className="flex items-center space-x-2">
-                          <select
-                            className="input w-24"
-                            value={formData.discount_type}
-                            onChange={(e) => setFormData({ ...formData, discount_type: e.target.value as 'percentage' | 'fixed' })}
-                          >
-                            <option value="fixed">$</option>
-                            <option value="percentage">%</option>
-                          </select>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="input w-24"
-                            value={formData.discount_value}
-                            onChange={(e) => setFormData({ ...formData, discount_value: parseFloat(e.target.value) || 0 })}
-                          />
-                          <span className="w-20 text-right">${Number(discountAmount || 0).toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tax:</span>
-                        <span>${Number(totalTax || 0).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg border-t pt-2">
-                        <span>Total:</span>
-                        <span>${Number(total || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="btn btn-secondary btn-md"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn btn-primary btn-md"
-                >
-                  {loading ? 'Saving...' : editingEstimate ? 'Update Estimate' : 'Create Estimate'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

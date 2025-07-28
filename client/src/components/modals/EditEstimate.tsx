@@ -76,6 +76,21 @@ export default function EditEstimate() {
   const location = useLocation();
   const { estimate, items: initialItems } = location.state || {};
 
+  // Helper function to calculate discount value from discount amount
+  const calculateDiscountValue = (estimate: Estimate) => {
+    if (!estimate || !estimate.discount_amount || estimate.discount_amount === 0) {
+      return 0;
+    }
+    
+    if (estimate.discount_type === 'percentage') {
+      // If it's percentage, calculate the percentage from subtotal
+      return estimate.subtotal > 0 ? Number(((estimate.discount_amount / estimate.subtotal) * 100).toFixed(2)) : 0;
+    } else {
+      // If it's fixed, the discount_value should be the same as discount_amount
+      return estimate.discount_amount;
+    }
+  };
+
   const initialFormData = {
     estimate_number: estimate?.estimate_number || `EST-${Date.now()}`,
     customer_id: estimate?.customer_id?.toString() || '',
@@ -83,7 +98,7 @@ export default function EditEstimate() {
     estimate_date: estimate ? estimate.estimate_date.split('T')[0] : new Date().toISOString().split('T')[0],
     expiry_date: estimate?.expiry_date ? estimate.expiry_date.split('T')[0] : '',
     discount_type: estimate?.discount_type || 'fixed' as 'percentage' | 'fixed',
-    discount_value: estimate?.discount_value || 0,
+    discount_value: estimate ? (estimate.discount_value || calculateDiscountValue(estimate)) : 0,
     notes: estimate?.notes || '',
     terms: estimate?.terms || '',
     shipping_address: estimate?.shipping_address || '',
@@ -151,6 +166,16 @@ export default function EditEstimate() {
       }));
     }
   }, [selectedCompany, estimate]);
+
+  // Update form data when estimate is loaded
+  useEffect(() => {
+    if (estimate) {
+      setFormData(prev => ({
+        ...prev,
+        discount_value: estimate.discount_value || calculateDiscountValue(estimate)
+      }));
+    }
+  }, [estimate]);
 
   useEffect(() => {
     const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
@@ -233,10 +258,11 @@ export default function EditEstimate() {
       : 0;
     
     let discountAmount = 0;
+    const discountValue = Number(formData.discount_value) || 0;
     if (formData.discount_type === 'percentage') {
-      discountAmount = Number(((subtotal * formData.discount_value) / 100).toFixed(2));
+      discountAmount = Number(((subtotal * discountValue) / 100).toFixed(2));
     } else {
-      discountAmount = Number(formData.discount_value.toFixed(2));
+      discountAmount = Number(discountValue.toFixed(2));
     }
   
     const total = Number((subtotal - discountAmount + totalTax).toFixed(2));

@@ -81,7 +81,7 @@ async function createTables(db) {
             sales_tax_registration VARCHAR(100),
             opening_balance DECIMAL(12, 2) DEFAULT 0.00,
             is_active BOOLEAN DEFAULT TRUE,
-            as_of_date DATE,
+            as_of_date varchar(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
@@ -104,7 +104,7 @@ async function createTables(db) {
             terms VARCHAR(255),
             account_number VARCHAR(100),
             balance DECIMAL(15, 2) DEFAULT 0,
-            as_of_date DATE,
+            as_of_date varchar(255),
             vehicle_number varchar(50),
             billing_rate DECIMAL(10, 2) DEFAULT 0.00,
             default_expense_category VARCHAR(255),
@@ -119,7 +119,7 @@ async function createTables(db) {
             email varchar(255),
             phone varchar(20),
             address text,
-            hire_date date,
+            hire_date varchar(255),
             is_active BOOLEAN DEFAULT TRUE,
             created_at timestamp DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -165,8 +165,8 @@ async function createTables(db) {
             company_id INT NOT NULL,
             customer_id INT NOT NULL,
             employee_id INT,
-            estimate_date DATE NOT NULL,
-            expiry_date DATE,
+            estimate_date VARCHAR(255) NOT NULL,
+            expiry_date VARCHAR(255),
             subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             discount_type ENUM('percentage', 'fixed') NOT NULL,
             discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
@@ -179,7 +179,7 @@ async function createTables(db) {
             shipping_address VARCHAR(255),
             billing_address VARCHAR(255),
             ship_via VARCHAR(100),
-            shipping_date DATE,
+            shipping_date VARCHAR(255),
             tracking_number VARCHAR(100),
             invoice_id INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -198,6 +198,7 @@ async function createTables(db) {
             description TEXT NOT NULL,
             quantity DECIMAL(10,2) NOT NULL DEFAULT 1.00,
             unit_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            actual_unit_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00,
             tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
@@ -301,27 +302,60 @@ async function createTables(db) {
 
     // Insert default roles if they don't exist
     try {
-        const [existingRoles] = await db.execute('SELECT COUNT(*) as count FROM role');
-        if (existingRoles[0].count === 0) {
-            await db.execute("INSERT INTO role (name) VALUES ('admin')");
-            console.log('Default roles inserted');
+    // Insert roles if not exist
+    const [existingRoles] = await db.execute('SELECT COUNT(*) as count FROM role');
+    if (existingRoles[0].count === 0) {
+        await db.execute(`
+            INSERT INTO role (name) VALUES 
+            ('admin'),
+            ('sales'),
+            ('staff')
+        `);
+        console.log('Default roles (admin, sales, staff) inserted');
+    }
+
+    // Users to insert
+    const users = [
+        {
+            role_id: 1, // admin
+            full_name: 'Aruna Kaldera',
+            username: 'arunaNSK02',
+            email: 'arunaNSK02@example.com',
+            password: 'aK@80612776'
+        },
+        {
+            role_id: 2, // sales
+            full_name: 'Nimal Perera',
+            username: 'nimalP',
+            email: 'nimal.sales@example.com',
+            password: 'nP@123456'
+        },
+        {
+            role_id: 3, // staff
+            full_name: 'Suneth Silva',
+            username: 'sunethS',
+            email: 'suneth.staff@example.com',
+            password: 'sS@789123'
         }
+    ];
 
-        const fullname = 'Aruna Kaldera';
-        const username = 'arunaNSK02';
-        const email = 'arunaNSK02@example.com';
-        const password = 'aK@80612776';
-
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        const [existingUser] = await db.execute('SELECT COUNT(*) as count FROM user');
-        if (existingUser[0].count === 0) {
-            await db.execute(`INSERT INTO user (role_id, full_name, username, email, password_hash) VALUES (1, '${fullname}', '${username}', '${email}', '${passwordHash}')`);
-            console.log('Default user (Admin) inserted', `email: ${email}, password: ${password}`);
+    // Insert users if user table is empty
+    const [existingUser] = await db.execute('SELECT COUNT(*) as count FROM user');
+    if (existingUser[0].count === 0) {
+        for (const user of users) {
+            const passwordHash = await bcrypt.hash(user.password, 10);
+            await db.execute(
+                `INSERT INTO user (role_id, full_name, username, email, password_hash)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [user.role_id, user.full_name, user.username, user.email, passwordHash]
+            );
+            console.log(`Default user inserted: ${user.email} (Role ID: ${user.role_id})`);
         }
+    }
     } catch (error) {
         console.error('Error inserting default data:', error);
     }
+
 }
 
 module.exports = createTables;

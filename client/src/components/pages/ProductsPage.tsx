@@ -326,7 +326,6 @@ export default function ProductsPage() {
       </div>
 
       <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Products</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

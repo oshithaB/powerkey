@@ -16,7 +16,7 @@ const createEmployee = async (req, res) => {
 
         // Check if employee already exists by email (email is unique in the database)
         const [existingEmployee] = await db.query(
-            'SELECT * FROM employees WHERE email = ?', 
+            'SELECT * FROM employees WHERE email = ? AND is_active = 1', 
             [email]
         );
         console.log('Existing employee check result:', existingEmployee);
@@ -58,7 +58,7 @@ const createEmployee = async (req, res) => {
 const getEmployees = async (req, res) => {
     try {
         console.log('Get employees request received');
-        const [employees] = await db.query('SELECT * FROM employees');
+        const [employees] = await db.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY created_at DESC');
         console.log('Employees fetched:', employees);        
         return res.status(200).json(employees);
     } catch (error) {
@@ -84,7 +84,7 @@ const updateEmployee = async (req, res) => {
 
         // Check if employee exists
         const [existingEmployee] = await db.query(
-            'SELECT * FROM employees WHERE id = ?', 
+            'SELECT * FROM employees WHERE id = ? AND is_active = 1', 
             [id]
         );
 
@@ -95,7 +95,7 @@ const updateEmployee = async (req, res) => {
         // Check if email is already used by another employee
         if (email) {
             const [emailCheck] = await db.query(
-                'SELECT * FROM employees WHERE email = ? AND id != ?', 
+                'SELECT * FROM employees WHERE email = ? AND id != ? AND is_active = 1', 
                 [email, id]
             );
             if (emailCheck.length > 0) {
@@ -140,7 +140,7 @@ const deleteEmployee = async (req, res) => {
 
         // Check if employee exists
         const [existingEmployee] = await db.query(
-            'SELECT * FROM employees WHERE id = ?', 
+            'SELECT * FROM employees WHERE id = ? AND is_active = 1', 
             [id]
         );
 
@@ -149,7 +149,7 @@ const deleteEmployee = async (req, res) => {
         }
 
         // Delete employee
-        await db.query('DELETE FROM employees WHERE id = ?', [id]);
+        await db.query('UPDATE employees SET is_active = 0 WHERE id = ?', [id]);
         console.log('Employee deleted:', id);
 
         return res.status(200).json({ 

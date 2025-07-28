@@ -64,6 +64,7 @@ export default function EmployeesPage() {
 
   const handleEdit = (employee: Employee) => {
     setEditingEmployee(employee);
+    console.log('hire_date:', employee.hire_date);
     setFormData({
       name: employee.name || '',
       email: employee.email || '',

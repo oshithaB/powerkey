@@ -41,7 +41,7 @@ const getEstimates = async (req, res) => {
                         LEFT JOIN 
                             employees emp ON e.employee_id = emp.id
                         WHERE 
-                            e.company_id = ?;
+                            e.company_id = ? AND e.is_active = 1;
                         `;
         const [estimates] = await db.query(query, [companyId]);
         res.json(estimates);
@@ -167,8 +167,8 @@ const createEstimate = async (req, res) => {
 
         // Insert estimate items
         const itemQuery = `INSERT INTO estimate_items
-                          (estimate_id, product_id, description, quantity, unit_price, tax_rate, tax_amount, total_price)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+                          (estimate_id, product_id, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         for (const item of items) {
             const itemValues = [
@@ -177,6 +177,7 @@ const createEstimate = async (req, res) => {
                 item.description,
                 item.quantity,
                 item.unit_price,
+                item.actual_unit_price,
                 item.tax_rate,
                 item.tax_amount,
                 item.total_price
@@ -228,6 +229,122 @@ const createEstimate = async (req, res) => {
     }
 };
 
+const editEstimate = async (req, res) => {
+  try {
+    const {
+      id, // Estimate ID to update
+      estimate_number,
+      company_id,
+      customer_id,
+      employee_id,
+      estimate_date,
+      expiry_date,
+      subtotal,
+      discount_type,
+      discount_amount,
+      tax_amount,
+      total_amount,
+      status,
+      is_active,
+      notes,
+      terms,
+      shipping_address,
+      billing_address,
+      ship_via,
+      shipping_date,
+      tracking_number,
+      items
+    } = req.body;
+
+    if (!id) return res.status(400).json({ error: "Estimate ID is required" });
+
+    // Validate required fields (same as in create)
+    if (!estimate_number || !company_id || !customer_id || !estimate_date || !subtotal || isNaN(subtotal)) {
+      return res.status(400).json({ error: "Required fields are missing or invalid" });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "At least one valid item is required" });
+    }
+
+    for (const item of items) {
+      if (!item.product_id || item.product_id === 0) return res.status(400).json({ error: "Each item must have a valid product ID" });
+      if (!item.description) return res.status(400).json({ error: "Each item must have a description" });
+      if (!item.quantity || item.quantity <= 0) return res.status(400).json({ error: "Each item must have a valid quantity" });
+      if (!item.unit_price || item.unit_price < 0) return res.status(400).json({ error: "Each item must have a valid unit price" });
+      if (item.tax_rate < 0 || item.tax_amount < 0 || item.total_price < 0) {
+        return res.status(400).json({ error: "Tax rate, tax amount, and total price must be valid" });
+      }
+    }
+
+    await db.query('START TRANSACTION');
+
+    // Update estimate
+    const updateEstimateQuery = `
+      UPDATE estimates SET
+        estimate_number = ?, company_id = ?, customer_id = ?, employee_id = ?, estimate_date = ?, expiry_date = ?,
+        subtotal = ?, discount_type = ?, discount_amount = ?, tax_amount = ?, total_amount = ?, status = ?, is_active = ?,
+        notes = ?, terms = ?, shipping_address = ?, billing_address = ?, ship_via = ?, shipping_date = ?, tracking_number = ?
+      WHERE id = ?
+    `;
+
+    const updateValues = [
+      estimate_number, company_id, customer_id, employee_id || null, estimate_date, expiry_date || null,
+      subtotal, discount_type || 'fixed', discount_amount || 0, tax_amount || 0, total_amount || 0, status || 'pending',
+      is_active !== undefined ? is_active : true, notes || null, terms || null, shipping_address || null,
+      billing_address || null, ship_via || null, shipping_date || null, tracking_number || null,
+      id
+    ];
+
+    const [updateResult] = await db.query(updateEstimateQuery, updateValues);
+    if (updateResult.affectedRows === 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ error: "Estimate not found or failed to update" });
+    }
+
+    // Delete existing items for this estimate
+    await db.query('DELETE FROM estimate_items WHERE estimate_id = ?', [id]);
+
+    // Insert updated items
+    const insertItemQuery = `
+      INSERT INTO estimate_items
+        (estimate_id, product_id, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    for (const item of items) {
+      const itemValues = [
+        id,
+        item.product_id,
+        item.description,
+        item.quantity,
+        item.unit_price,
+        item.actual_unit_price || item.unit_price,
+        item.tax_rate,
+        item.tax_amount,
+        item.total_price
+      ];
+      const [itemResult] = await db.query(insertItemQuery, itemValues);
+      if (itemResult.affectedRows === 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ error: "Failed to update estimate items" });
+      }
+    }
+
+    await db.query('COMMIT');
+
+    res.status(200).json({ message: "Estimate updated successfully", estimate_id: id });
+  } catch (error) {
+    await db.query('ROLLBACK');
+    console.error("Error updating estimate:", error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: `Estimate number '${req.body.estimate_number}' already exists` });
+    }
+    res.status(500).json({ error: error.sqlMessage || "Internal server error" });
+  }
+};
+
+
 const deleteEstimate = async (req, res) => {
     try {
         const { estimateId } = req.params;
@@ -237,7 +354,7 @@ const deleteEstimate = async (req, res) => {
         }
 
         // Check if estimate exists
-        const [estimate] = await db.query('SELECT * FROM estimates WHERE id = ?', [estimateId]);
+        const [estimate] = await db.query('SELECT * FROM estimates WHERE id = ? AND is_active = 1', [estimateId]);
         if (estimate.length === 0) {
             return res.status(404).json({ error: "Estimate not found" });
         }
@@ -277,6 +394,7 @@ const getEstimatesItems = async (req, res) => {
                             ei.description,
                             ei.quantity,
                             ei.unit_price,
+                            ei.actual_unit_price,
                             ei.tax_rate,
                             ei.tax_amount,
                             ei.total_price
@@ -294,9 +412,12 @@ const getEstimatesItems = async (req, res) => {
     }
 }
 
+
+
 module.exports = {
     getEstimates,
     createEstimate,
     deleteEstimate,
+    editEstimate,
     getEstimatesItems
 };

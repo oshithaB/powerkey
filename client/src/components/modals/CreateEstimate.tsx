@@ -16,6 +16,7 @@ interface EstimateItem {
   description: string;
   quantity: number;
   unit_price: number;
+  actual_unit_price: number;
   tax_rate: number;
   tax_amount: number;
   total_price: number;
@@ -47,7 +48,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
-  const [productSuggestions, setProductSuggestions] = useState<Product[]>([]);
+  const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const navigate = useNavigate();
 
@@ -73,6 +74,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     description: '',
     quantity: 1,
     unit_price: 0,
+    actual_unit_price: 0,
     tax_rate: 0,
     tax_amount: 0,
     total_price: 0
@@ -86,40 +88,40 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   const [items, setItems] = useState<EstimateItem[]>(estimate?.items || initialItems);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
-          axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
-          axiosInstance.get(`/api/employees/`),
-          axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
-          axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
-        ]);
+  const fetchData = async () => {
+    try {
+      const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
+        axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/employees/`),
+        axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+      ]);
 
-        setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
-        setEmployees(Array.isArray(employeesRes.data) ? employeesRes.data : []);
-        setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-        const taxRatesData = Array.isArray(taxRatesRes.data) && Array.isArray(taxRatesRes.data[0]) 
-          ? taxRatesRes.data[0] 
-          : Array.isArray(taxRatesRes.data) 
-            ? taxRatesRes.data 
-            : [];
-        setTaxRates(taxRatesData);
+      setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
+      setEmployees(Array.isArray(employeesRes.data) ? employeesRes.data : []);
+      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
+      const taxRatesData = Array.isArray(taxRatesRes.data) && Array.isArray(taxRatesRes.data[0]) 
+        ? taxRatesRes.data[0] 
+        : Array.isArray(taxRatesRes.data) 
+          ? taxRatesRes.data 
+          : [];
+      setTaxRates(taxRatesData);
 
-        const defaultTaxRate = taxRatesData.find((tax: TaxRate) => tax.is_default === 1);
-        if (defaultTaxRate) {
-          setItems(prevItems => prevItems.map(item => ({
-            ...item,
-            tax_rate: item.tax_rate === 0 ? parseFloat(defaultTaxRate.rate) : item.tax_rate
-          })));
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setTaxRates([]);
-        setError('Failed to fetch data');
+      const defaultTaxRate = taxRatesData.find((tax: TaxRate) => tax.is_default === 1);
+      if (defaultTaxRate) {
+        setItems(prevItems => prevItems.map(item => ({
+          ...item,
+          tax_rate: item.tax_rate === 0 ? parseFloat(defaultTaxRate.rate) : item.tax_rate
+        })));
       }
-    };
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setTaxRates([]);
+      setError('Failed to fetch data');
+    }
+  };
 
+  useEffect(() => {
     if (selectedCompany) {
       setCompany(selectedCompany);
       setFormData(prev => ({
@@ -158,6 +160,10 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     }
   }, [items, products, activeSuggestionIndex]);
 
+  useEffect(() => {
+
+  }, [items, products, taxRates]);
+
   const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
@@ -176,7 +182,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.total_price = Number((subtotal + item.tax_amount).toFixed(2));
+      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
+      item.total_price = Number(subtotal.toFixed(2));
     }
   
     setItems(updatedItems);
@@ -190,6 +197,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       description: '',
       quantity: 1,
       unit_price: 0,
+      actual_unit_price: 0,
       tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
       tax_amount: 0,
       total_price: 0
@@ -252,6 +260,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
           product_id: parseInt(item.product_id as any) || null,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
+          actual_unit_price: Number(item.actual_unit_price),
           tax_rate: Number(item.tax_rate),
           tax_amount: Number(item.tax_amount),
           total_price: Number(item.total_price)
@@ -477,6 +486,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actual Unit Price</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax %</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -531,7 +541,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].total_price = Number((subtotal + updatedItems[index].tax_amount).toFixed(2));
+                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * (100 - updatedItems[index].tax_rate)) / 100;
+                                    updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
                                     setActiveSuggestionIndex(null);
@@ -582,6 +593,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             required
                           />
                         </td>
+                        <td className="px-4 py-2 text-center">
+                          Rs. {(item.actual_unit_price ?? 0).toFixed(2)}
+                        </td>
                         <td className="px-4 py-2">
                           <select
                             className="input w-20"
@@ -603,7 +617,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                             )}
                           </select>
                         </td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2 text-center border border-gray-200">
                           Rs. {item.total_price.toFixed(2)}
                         </td>
                         <td className="px-4 py-2">

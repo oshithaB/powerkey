@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getSocket } from '../../socket';
 
 interface Estimate {
   id: number;
@@ -39,6 +40,7 @@ interface EstimateItem {
   description: string;
   quantity: number;
   unit_price: number;
+  actual_unit_price: number;
   tax_rate: number;
   tax_amount: number;
   total_price: number;
@@ -64,6 +66,8 @@ export default function EstimatesPage() {
   const [customerFilter, setCustomerFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [estimateViewers, setEstimateViewers] = useState<Record<number, string[]>>({});
+
 
   const [formData, setFormData] = useState({
     estimate_number: '',
@@ -81,8 +85,9 @@ export default function EstimatesPage() {
     {
       product_id: 0,
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
+      actual_unit_price: 0,
       tax_rate: 0,
       tax_amount: 0,
       total_price: 0
@@ -92,21 +97,20 @@ export default function EstimatesPage() {
   useEffect(() => {
     fetchEstimates();
     fetchData();
-    fetchCustomers();
   }, [selectedCompany]);
 
-  const fetchCustomers = async () => {
-    try {
-      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
-      setCustomers(response.data);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    }
-  };
+  // const fetchCustomers = async () => {
+  //   try {
+  //     const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
+  //     setCustomers(response.data);
+  //   } catch (error) {
+  //     console.error('Error fetching customers:', error);
+  //   }
+  // };
 
   const fetchEstimates = async () => {
     try {
-      const response = await axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
     } catch (error) {
       console.error('Error fetching estimates:', error);
@@ -133,6 +137,32 @@ export default function EstimatesPage() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedCompany || estimates.length === 0) return;
+
+    const socket = getSocket();
+    const storedUser = localStorage.getItem('user');
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const user = parsedUser?.fullname || `User_${Math.floor(Math.random() * 10000)}`;
+    const estimateIds = estimates.map((e) => e.id);
+
+    socket.connect();
+
+    socket.emit('start_estimate_listening', { estimateIds, user });
+
+    socket.on('viewers_update', ({ estimateId, viewers }) => {
+      setEstimateViewers(prev => ({
+        ...prev,
+        [estimateId]: viewers
+      }));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [selectedCompany, estimates]);
+
+
   const fetchEstimateItems = async (estimateId: number) => {
     try {
       const response = await axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`);
@@ -142,6 +172,7 @@ export default function EstimatesPage() {
           description: '',
           quantity: 1,
           unit_price: 0,
+          actual_unit_price: 0,
           tax_rate: 0,
           tax_amount: 0,
           total_price: 0
@@ -155,6 +186,7 @@ export default function EstimatesPage() {
           description: '',
           quantity: 1,
           unit_price: 0,
+          actual_unit_price: 0,
           tax_rate: 0,
           tax_amount: 0,
           total_price: 0
@@ -298,6 +330,7 @@ export default function EstimatesPage() {
       description: '',
       quantity: 1,
       unit_price: 0,
+      actual_unit_price: 0,
       tax_rate: 0,
       tax_amount: 0,
       total_price: 0
@@ -332,6 +365,7 @@ export default function EstimatesPage() {
       if (product) {
         updatedItems[index].description = product.name;
         updatedItems[index].unit_price = product.unit_price;
+        updatedItems[index].actual_unit_price = (product.unit_price * 100) / (100 + updatedItems[index].tax_rate);
       }
     }
 
@@ -339,7 +373,8 @@ export default function EstimatesPage() {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = (subtotal * item.tax_rate) / 100;
-      item.total_price = subtotal + item.tax_amount;
+      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
+      item.total_price = subtotal;
     }
 
     setItems(updatedItems);
@@ -408,6 +443,7 @@ export default function EstimatesPage() {
         description: '',
         quantity: 1,
         unit_price: 0,
+        actual_unit_price: 0,
         tax_rate: 0,
         tax_amount: 0,
         total_price: 0
@@ -670,6 +706,23 @@ export default function EstimatesPage() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                      <div className="relative group flex items-center space-x-1">
+                        <div className="relative">
+                          <Eye className="h-4 w-4 text-indigo-600 cursor-pointer" title="Currently viewing" />
+                          
+                          {(estimateViewers[estimate.id]?.length || 0) > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1.5 py-[1px] rounded-full">
+                              {estimateViewers[estimate.id].length}
+                            </span>
+                          )}
+                        </div>
+
+                        {(estimateViewers[estimate.id]?.length || 0) > 0 && (
+                          <span className="absolute z-10 bottom-full mb-2 left-1/2 transform -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            Viewing: {estimateViewers[estimate.id].join(', ')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -955,6 +1008,7 @@ export default function EstimatesPage() {
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actual Unit Price</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax %</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -989,7 +1043,7 @@ export default function EstimatesPage() {
                           <td className="px-4 py-2">
                             <input
                               type="number"
-                              step="0.01"
+                              step="1"
                               className="input w-20"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
@@ -1003,6 +1057,9 @@ export default function EstimatesPage() {
                               value={item.unit_price}
                               onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                             />
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            Rs. {Number(item.actual_unit_price ?? 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-2">
                             <select

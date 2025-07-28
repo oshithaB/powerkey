@@ -3,6 +3,13 @@ const app = express();
 const initDatabase = require("./DB/initdb");
 const cors = require("cors");
 
+const http = require('http');
+const { Server } = require('socket.io');
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+
 (async () => {
   try {
     await initDatabase(); // Initialize the database
@@ -46,6 +53,41 @@ app.use("/api", orderRoutes);
 app.use("/api", tax_ratesRoutes);
 app.use("/api", estimateRoutes);
 
-app.listen(3000, () => {
+const estimateViewers = {}; // { estimateId: Set of usernames }
+
+io.on('connection', (socket) => {
+  console.log('User connected');
+
+  socket.on('start_estimate_listening', ({ estimateIds, user }) => {
+    socket.username = user;
+    socket.estimateIds = estimateIds;
+
+    estimateIds.forEach((id) => {
+      socket.join(id);
+      if (!estimateViewers[id]) estimateViewers[id] = new Set();
+      estimateViewers[id].add(user);
+      io.to(id).emit('viewers_update', {
+        estimateId: id,
+        viewers: [...estimateViewers[id]],
+      });
+    });
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.estimateIds && socket.username) {
+      socket.estimateIds.forEach((id) => {
+        estimateViewers[id]?.delete(socket.username);
+        io.to(id).emit('viewers_update', {
+          estimateId: id,
+          viewers: [...estimateViewers[id]],
+        });
+      });
+    }
+    console.log('User disconnected');
+  });
+});
+
+
+server.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });

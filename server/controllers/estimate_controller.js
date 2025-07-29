@@ -51,6 +51,54 @@ const getEstimates = async (req, res) => {
     }
 }
 
+getEstimatesByCustomer = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+
+        if (!customerId) {
+            return res.status(400).json({ error: "Customer ID is required" });
+        }
+
+        const query = `SELECT 
+                            e.id,
+                            e.estimate_number,
+                            e.company_id,
+                            e.customer_id,
+                            c.name AS customer_name,
+                            e.employee_id,
+                            emp.name AS employee_name,
+                            e.estimate_date,
+                            e.expiry_date,
+                            e.subtotal,
+                            e.discount_type,
+                            e.discount_amount,
+                            e.tax_amount,
+                            e.total_amount,
+                            e.status,
+                            e.is_active,
+                            e.notes,
+                            e.terms,
+                            e.shipping_address,
+                            e.billing_address,
+                            e.ship_via,
+                            e.shipping_date,
+                            e.tracking_number
+                        FROM 
+                            estimates e
+                        JOIN 
+                            customer c ON e.customer_id = c.id
+                        LEFT JOIN 
+                            employees emp ON e.employee_id = emp.id
+                        WHERE 
+                            e.customer_id = ? AND e.is_active = 1;`;
+        const [estimates] = await db.query(query, [customerId]);
+        res.json(estimates);
+    } catch (error) {
+        console.error("Error fetching estimates by customer:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
 const createEstimate = async (req, res) => {
     try {
         console.log("Request body:", req.body);
@@ -419,5 +467,6 @@ module.exports = {
     createEstimate,
     deleteEstimate,
     editEstimate,
-    getEstimatesItems
+    getEstimatesItems,
+    getEstimatesByCustomer
 };

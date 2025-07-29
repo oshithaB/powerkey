@@ -8,7 +8,8 @@ const {
     createEstimate,
     deleteEstimate,
     editEstimate,
-    getEstimatesItems
+    getEstimatesItems,
+    getEstimatesByCustomer
 } = require('../controllers/estimate_controller');
 
 router.get(
@@ -45,6 +46,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     getEstimatesItems
+);
+
+router.get(
+    '/getEstimatesByCustomer/:companyId/:customerId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getEstimatesByCustomer
 );
 
 module.exports = router;

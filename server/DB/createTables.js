@@ -204,7 +204,7 @@ async function createTables(db) {
             total_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             FOREIGN KEY (estimate_id) REFERENCES estimates(id) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id)
-        )`
+        )`,
         // `CREATE TABLE IF NOT EXISTS orders (
         //     id INT AUTO_INCREMENT PRIMARY KEY,
         //     company_id INT NOT NULL,

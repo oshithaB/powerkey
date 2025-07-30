@@ -330,7 +330,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       if (invoice) {
         await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
-        await axiosInstance.post(`/api/invoices/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
       }
 
       setFormData(initialFormData);

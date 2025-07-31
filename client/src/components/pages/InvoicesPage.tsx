@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, FileText, Eye, Send, DollarSign, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import PaymentModal from '../modals/PaymentModal';
@@ -61,13 +62,9 @@ export default function InvoicesPage() {
 
   const fetchInvoices = async () => {
     try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
-      
-      const response = await axios.get(`/api/invoices/${selectedCompany?.company_id}?${params}`);
+      const response = await axiosInstance.get(`/api/getInvoice/${selectedCompany?.company_id}`);
       setInvoices(response.data);
+      console.log('Invoices fetched:', response.data);
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -77,7 +74,7 @@ export default function InvoicesPage() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get(`/api/customers/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -86,18 +83,23 @@ export default function InvoicesPage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`/api/employees/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/employees`);
       setEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
   };
 
-  const handleEdit = (invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    // setShowModal(true);
+  const handleEdit = async (invoice: Invoice) => {
+    try {
+      const response = await axiosInstance.get(`/api/getInvoiceItems/${selectedCompany?.company_id}/${invoice.id}`);
+      const items = response.data;
+      navigate('/invoices/edit', { state: { invoice, items } });
+    } catch (error) {
+      console.error('Error fetching invoice items:', error);
+      alert('Failed to fetch invoice items');
+    }
   };
-
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
@@ -309,9 +311,7 @@ export default function InvoicesPage() {
                     {invoice.customer_name || 'Unknown Customer'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {invoice.first_name && invoice.last_name 
-                      ? `${invoice.first_name} ${invoice.last_name}`
-                      : 'Not assigned'}
+                    {invoice.employee_name || 'Unknown Employee'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -323,14 +323,14 @@ export default function InvoicesPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      ${invoice.total_amount?.toLocaleString() || '0.00'}
+                      Rs. {invoice.total_amount?.toLocaleString() || '0.00'}
                     </div>
                     <div className="text-sm text-gray-500">
-                      Paid: ${invoice.paid_amount?.toLocaleString() || '0.00'}
+                      Paid: Rs. {invoice.paid_amount?.toLocaleString() || '0.00'}
                     </div>
                     {invoice.balance_due > 0 && (
                       <div className="text-sm text-red-600">
-                        Due: ${invoice.balance_due?.toLocaleString() || '0.00'}
+                        Due: Rs. {invoice.balance_due?.toLocaleString() || '0.00'}
                       </div>
                     )}
                   </td>

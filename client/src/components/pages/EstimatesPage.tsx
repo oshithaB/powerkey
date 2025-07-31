@@ -87,6 +87,7 @@ export default function EstimatesPage() {
     try {
       const response = await axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
+      console.log('Fetched estimates:', response.data);
     } catch (error) {
       console.error('Error fetching estimates:', error);
     } finally {

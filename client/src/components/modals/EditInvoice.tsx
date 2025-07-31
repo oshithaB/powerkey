@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { X, Plus, Trash2, FileCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-interface InvoiceModalProps {
-  invoice?: any;
-  onSave?: () => void;
-}
-
 interface InvoiceItem {
+  id?: number;
   product_id: number;
   product_name: string;
   description: string;
@@ -38,59 +34,91 @@ interface TaxRate {
   created_at: string;
 }
 
-export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
+interface Invoice {
+  id: number;
+  invoice_number: string;
+  customer_id: number;
+  customer_name?: string;
+  billing_address?: string;
+  shipping_address?: string;
+  employee_id: number;
+  employee_name?: string;
+  invoice_date: string;
+  due_date: string;
+  subtotal: number;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  balance_due: number;
+  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  notes: string;
+  terms: string;
+  created_at: string;
+  ship_via?: string;
+  shipping_date?: string;
+  tracking_number?: string;
+}
+
+export default function EditInvoice() {
   const { selectedCompany } = useCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [company, setCompany] = useState<any>();
   const [employees, setEmployees] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-  const [customerEstimates, setCustomerEstimates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
-  const [showEstimateSelection, setShowEstimateSelection] = useState(false);
-  const [showEstimateSidebar, setShowEstimateSidebar] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { invoice, items: initialItems } = location.state || {};
 
-  const initialFormData = {
-    invoice_number: `INV-${Date.now()}`,
-    customer_id: '',
-    employee_id: '',
-    estimate_id: '',
-    invoice_date: new Date().toISOString().split('T')[0],
-    due_date: '',
-    discount_type: 'fixed' as 'percentage' | 'fixed',
-    discount_value: 0,
-    notes: '',
-    terms: '',
-    shipping_address: '',
-    billing_address: '',
-    ship_via: '',
-    shipping_date: '',
-    tracking_number: ''
+  const calculateDiscountValue = (invoice: Invoice) => {
+    if (!invoice || !invoice.discount_amount || invoice.discount_amount === 0) {
+      return 0;
+    }
+    
+    if (invoice.discount_type === 'percentage') {
+      return invoice.subtotal > 0 ? Number(((invoice.discount_amount / invoice.subtotal) * 100).toFixed(2)) : 0;
+    } else {
+      return invoice.discount_amount;
+    }
   };
 
-  const initialItems = [{
-    product_id: 0,
-    product_name: '',
-    description: '',
-    quantity: 1,
-    unit_price: 0,
-    actual_unit_price: 0,
-    tax_rate: 0,
-    tax_amount: 0,
-    total_price: 0
-  }];
+  const initialFormData = {
+    invoice_number: invoice?.invoice_number || `INV-${Date.now()}`,
+    customer_id: invoice?.customer_id?.toString() || '',
+    employee_id: invoice?.employee_id?.toString() || '',
+    invoice_date: invoice ? invoice.invoice_date.split('T')[0] : new Date().toISOString().split('T')[0],
+    due_date: invoice?.due_date ? invoice.due_date.split('T')[0] : '',
+    discount_type: invoice?.discount_type || 'fixed' as 'percentage' | 'fixed',
+    discount_value: invoice ? (invoice.discount_value || calculateDiscountValue(invoice)) : 0,
+    notes: invoice?.notes || '',
+    terms: invoice?.terms || '',
+    shipping_address: invoice?.shipping_address || '',
+    billing_address: invoice?.billing_address || '',
+    ship_via: invoice?.ship_via || '',
+    shipping_date: invoice?.shipping_date ? invoice.shipping_date.split('T')[0] : '',
+    tracking_number: invoice?.tracking_number || ''
+  };
 
-  const [formData, setFormData] = useState(invoice ? {
-    ...initialFormData,
-    ...invoice,
-    invoice_date: invoice.invoice_date.split('T')[0]
-  } : initialFormData);
-
-  const [items, setItems] = useState<InvoiceItem[]>(invoice?.items || initialItems);
+  const [formData, setFormData] = useState(initialFormData);
+  const [items, setItems] = useState<InvoiceItem[]>(initialItems || [
+    {
+      product_id: 0,
+      product_name: '',
+      description: '',
+      quantity: 1,
+      unit_price: 0,
+      actual_unit_price: 0,
+      tax_rate: 0,
+      tax_amount: 0,
+      total_price: 0
+    }
+  ]);
 
   const fetchData = async () => {
     try {
@@ -125,51 +153,36 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     }
   };
 
-  const fetchCustomerEstimates = async (customerId: string) => {
-    if (!customerId) return;
-    try {
-      const response = await axiosInstance.get(`/api/getEstimatesByCustomer/${selectedCompany?.company_id}/${customerId}`);
-      console.log('Customer Estimates:', response.data);
-      setCustomerEstimates(Array.isArray(response.data) ? response.data : []);
-      if (response.data.length > 0) {
-        setShowEstimateSelection(true);
-      }
-    } catch (error) {
-      console.error('Error fetching customer estimates:', error);
-      setError('Failed to fetch customer estimates');
-    }
-  };
-
   useEffect(() => {
     if (selectedCompany) {
-      setCompany(selectedCompany);
+      fetchData();
       setFormData(prev => ({
         ...prev,
         notes: invoice?.notes || selectedCompany.notes || '',
         terms: invoice?.terms || selectedCompany.terms_and_conditions || ''
       }));
-      fetchData();
     }
   }, [selectedCompany, invoice]);
+
+  useEffect(() => {
+    if (invoice) {
+      setFormData(prev => ({
+        ...prev,
+        discount_value: invoice.discount_value || calculateDiscountValue(invoice)
+      }));
+    }
+  }, [invoice]);
 
   useEffect(() => {
     const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
     if (selectedCustomer) {
       setFormData(prev => ({
         ...prev,
-        shipping_address: selectedCustomer.shipping_address || '',
-        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || ''
+        shipping_address: selectedCustomer.shipping_address || prev.shipping_address,
+        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || prev.billing_address
       }));
-      if (!invoice && formData.customer_id) {
-        fetchCustomerEstimates(formData.customer_id);
-        setShowEstimateSidebar(true);
-      } else {
-        setShowEstimateSidebar(false);
-      }
-    } else {
-      setShowEstimateSidebar(false);
     }
-  }, [formData.customer_id, customers, invoice]);
+  }, [formData.customer_id, customers]);
 
   useEffect(() => {
     if (activeSuggestionIndex !== null) {
@@ -186,42 +199,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       setProductSuggestions([]);
     }
   }, [items, products, activeSuggestionIndex]);
-
-  const loadEstimateData = async (estimateId: string) => {
-    if (!estimateId) return;
-    try {
-      const [estimateRes, itemsRes] = await Promise.all([
-        axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}`),
-        axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`)
-      ]);
-
-      const estimate = estimateRes.data;
-      setFormData({
-        ...formData,
-        estimate_id: estimateId,
-        customer_id: estimate.customer_id.toString(),
-        due_date: estimate.expiry_date || '',
-        discount_type: estimate.discount_type,
-        discount_value: estimate.discount_value,
-        notes: estimate.notes,
-        terms: estimate.terms,
-        shipping_address: estimate.shipping_address || '',
-        billing_address: estimate.billing_address || '',
-        ship_via: estimate.ship_via || '',
-        shipping_date: estimate.shipping_date || '',
-        tracking_number: estimate.tracking_number || ''
-      });
-      setItems(itemsRes.data.map((item: any) => ({
-        ...item,
-        product_name: item.product_name || '',
-        actual_unit_price: (item.unit_price * (100 - item.tax_rate)) / 100
-      })));
-      setShowEstimateSelection(false);
-    } catch (error) {
-      console.error('Error loading estimate data:', error);
-      setError('Failed to load estimate data');
-    }
-  };
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const updatedItems = [...items];
@@ -241,7 +218,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
+      item.actual_unit_price = Number(((item.unit_price * (100 - item.tax_rate)) / 100).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
 
@@ -269,18 +246,23 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   };
 
   const calculateTotals = () => {
-    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
-    const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
+    const subtotal = items.length > 0 
+      ? Number(items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unit_price)), 0).toFixed(2))
+      : 0;
+    const totalTax = items.length > 0 
+      ? Number(items.reduce((sum, item) => sum + Number(item.tax_amount), 0).toFixed(2))
+      : 0;
     
     let discountAmount = 0;
+    const discountValue = Number(formData.discount_value) || 0;
     if (formData.discount_type === 'percentage') {
-      discountAmount = Number(((subtotal * formData.discount_value) / 100).toFixed(2));
+      discountAmount = Number(((subtotal * discountValue) / 100).toFixed(2));
     } else {
-      discountAmount = Number(formData.discount_value.toFixed(2));
+      discountAmount = Number(discountValue.toFixed(2));
     }
-
+  
     const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
-
+  
     return { subtotal, totalTax, discountAmount, total };
   };
 
@@ -299,6 +281,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       if (!formData.invoice_date) {
         throw new Error('Invoice date is required');
       }
+      if (!formData.due_date) {
+        throw new Error('Due date is required');
+      }
       if (!items.some(item => item.product_id !== 0)) {
         throw new Error('At least one valid item is required');
       }
@@ -306,18 +291,33 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       const { subtotal, totalTax, discountAmount, total } = calculateTotals();
 
       const submitData = {
-        ...formData,
+        id: invoice.id,
+        invoice_number: formData.invoice_number,
         company_id: selectedCompany?.company_id,
         customer_id: parseInt(formData.customer_id) || null,
         employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
-        estimate_id: formData.estimate_id ? parseInt(formData.estimate_id) : null,
+        invoice_date: formData.invoice_date,
+        due_date: formData.due_date,
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
+        discount_type: formData.discount_type,
         discount_amount: Number(discountAmount),
+        discount_value: Number(formData.discount_value),
         total_amount: Number(total),
+        paid_amount: invoice?.paid_amount || 0,
+        balance_due: Number(total - (invoice?.paid_amount || 0)),
+        status: invoice.status || 'draft',
+        notes: formData.notes || null,
+        terms: formData.terms || null,
+        shipping_address: formData.shipping_address || null,
+        billing_address: formData.billing_address || null,
+        ship_via: formData.ship_via || null,
+        shipping_date: formData.shipping_date || null,
+        tracking_number: formData.tracking_number || null,
         items: items.map(item => ({
-          ...item,
+          id: item.id,
           product_id: parseInt(item.product_id as any) || null,
+          description: item.description,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
           actual_unit_price: Number(item.actual_unit_price),
@@ -327,23 +327,28 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         }))
       };
 
-      if (invoice) {
-        await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
-      } else {
-        await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
-      }
+      await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
 
       setFormData(initialFormData);
-      setItems(initialItems);
-      
-      if (onSave && typeof onSave === 'function') {
-        onSave();
-      } else {
-        navigate(-1);
-      }
+      setItems([
+        {
+          product_id: 0,
+          product_name: '',
+          description: '',
+          quantity: 1,
+          unit_price: 0,
+          actual_unit_price: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total_price: 0
+        }
+      ]);
+
+      navigate('/dashboard/invoices', { replace: true });
+      alert('Invoice updated successfully');
     } catch (error: any) {
-      console.error('Error saving invoice:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to save invoice';
+      console.error('Error updating invoice:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to update invoice';
       setError(errorMessage);
       alert(errorMessage);
     } finally {
@@ -364,7 +369,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
-              {invoice ? 'Edit Invoice' : 'Create New Invoice'}
+              Edit Invoice #{invoice?.invoice_number}
             </h3>
             <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
@@ -375,61 +380,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
             <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
               {error}
             </div>
-          )}
-
-          {showEstimateSidebar && customerEstimates.length > 0 && (
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 overflow-y-auto"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-medium text-blue-900">Add to Invoice</h4>
-                  <button
-                    onClick={() => setShowEstimateSidebar(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  {customerEstimates.map((estimate) => (
-                    <div
-                      key={estimate.id}
-                      className="p-4 bg-gray-50 border border-gray-200 rounded-lg"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{estimate.estimate_number}</span> <br />
-                          <span className="text-gray-500">Customer Name: {estimate.customer_name}</span> <br />
-                          <span className="text-gray-500">Estimate Date: {new Date(estimate.estimate_date).toLocaleDateString()}</span> <br />
-                          <span className="text-gray-500">Total: Rs. {estimate.total_amount}</span> <br />
-                          <span className="text-gray-500">Status: ({estimate.status})</span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            loadEstimateData(estimate.id.toString());
-                            setShowEstimateSidebar(false);
-                          }}
-                          className="btn btn-primary btn-sm"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setShowEstimateSidebar(false)}
-                  className="mt-4 btn btn-secondary btn-sm w-full"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -455,10 +405,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                 <select
                   className="input"
                   value={formData.customer_id}
-                  onChange={(e) => {
-                    setFormData({ ...formData, customer_id: e.target.value });
-                    if (!invoice) fetchCustomerEstimates(e.target.value);
-                  }}
+                  onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
                   required
                 >
                   <option value="">Select Customer</option>
@@ -508,7 +455,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   <option value="">Select Employee</option>
                   {employees.map((employee) => (
                     <option key={employee.id} value={employee.id}>
-                      {employee.name}
+                      {employee.name || `${employee.first_name} ${employee.last_name}`}
                     </option>
                   ))}
                 </select>
@@ -529,10 +476,11 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Due Date
+                  Due Date *
                 </label>
                 <input
                   type="date"
+                  required
                   className="input"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
@@ -609,7 +557,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index} className="border-t" style={{ paddingBottom: '2rem' }}>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 relative">
                           <input
                             type="text"
                             value={item.product_name || ''}
@@ -655,7 +603,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * (100 - updatedItems[index].tax_rate)) / 100;
+                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * (100 - taxRate)) / 100).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
@@ -708,7 +656,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                           />
                         </td>
                         <td className="px-4 py-2 text-center">
-                          Rs. {(item.actual_unit_price ?? 0).toFixed(2)}
+                          Rs. {Number(item.actual_unit_price ?? 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
                           <select
@@ -731,7 +679,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                           </select>
                         </td>
                         <td className="px-4 py-2 text-center border border-gray-200">
-                          Rs. {item.total_price.toFixed(2)}
+                          Rs. {Number(item.total_price).toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
                           <button
@@ -753,7 +701,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message On Invoice
+                    Notes
                   </label>
                   <textarea
                     className="input min-h-[80px]"
@@ -764,29 +712,13 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message On Statement
+                    Terms & Conditions
                   </label>
                   <textarea
                     className="input min-h-[80px]"
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."
-                  />
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
-                    Attachment
-                  </label>
-                  <input
-                    type="file"
-                    className="input"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        setFormData({ ...formData, attachment: file });
-                      }
-                    }}
                   />
                 </div>
               </div>
@@ -846,7 +778,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                 disabled={loading}
                 className="btn btn-primary btn-md"
               >
-                {loading ? 'Saving...' : invoice ? 'Update Invoice' : 'Create Invoice'}
+                {loading ? 'Updating...' : 'Update Invoice'}
               </button>
             </div>
           </form>

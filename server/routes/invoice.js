@@ -7,7 +7,9 @@ const path = require('path');
 
 const {
     getInvoices,
-    createOrUpdateInvoice
+    createOrUpdateInvoice,
+    getInvoiceItems,
+    getInvoiceById
 } = require('../controllers/invoice_controller');
 
 // Configure multer for file uploads
@@ -42,6 +44,13 @@ router.get(
     getInvoices
 );
 
+router.get(
+    '/getInvoiceById/:company_id/:invoiceId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getInvoiceById
+)
+
 router.post(
     '/createInvoice/:company_id',
     verifyToken,
@@ -57,5 +66,12 @@ router.put(
     upload.single('attachment'),
     createOrUpdateInvoice
 );
+
+router.get(
+    '/getInvoiceItems/:company_id/:invoiceId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getInvoiceItems
+)
 
 module.exports = router;

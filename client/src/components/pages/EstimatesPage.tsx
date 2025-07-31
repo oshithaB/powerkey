@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { getSocket } from '../../socket';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface Estimate {
   id: number;
@@ -32,6 +32,8 @@ interface Estimate {
   is_active: boolean;
   invoice_id: number | null;
   created_at: string;
+  is_locked?: boolean;
+  locked_by?: User | null;
 }
 
 interface EstimateItem {
@@ -44,6 +46,14 @@ interface EstimateItem {
   tax_rate: number;
   tax_amount: number;
   total_price: number;
+}
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  fullname: string;
+  role: string;
 }
 
 export default function EstimatesPage() {
@@ -64,22 +74,14 @@ export default function EstimatesPage() {
   const [customerFilter, setCustomerFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
-  const [estimateViewers, setEstimateViewers] = useState<Record<number, string[]>>({});
+  const socketRef = useSocket();
+  const [lockedEstimates, setLockedEstimates] = useState<{ [key: number]: User }>({});
 
 
   useEffect(() => {
     fetchEstimates();
     fetchData();
   }, [selectedCompany]);
-
-  // const fetchCustomers = async () => {
-  //   try {
-  //     const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
-  //     setCustomers(response.data);
-  //   } catch (error) {
-  //     console.error('Error fetching customers:', error);
-  //   }
-  // };
 
   const fetchEstimates = async () => {
     try {
@@ -111,30 +113,54 @@ export default function EstimatesPage() {
   };
 
   useEffect(() => {
-    if (!selectedCompany || estimates.length === 0) return;
+    const socket = socketRef.current;
+    console.log('Socket in estimate page:', socket);
+    if (!socket) return;
 
-    const socket = getSocket();
-    const storedUser = localStorage.getItem('user');
-    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-    const user = parsedUser?.fullname || `User_${Math.floor(Math.random() * 10000)}`;
-    const estimateIds = estimates.map((e) => e.id);
+    socket.emit('start_listening');
+    console.log('Socket in estimate page emit start_listening');
 
-    socket.connect();
-
-    socket.emit('start_estimate_listening', { estimateIds, user });
-
-    socket.on('viewers_update', ({ estimateId, viewers }) => {
-      setEstimateViewers(prev => ({
-        ...prev,
-        [estimateId]: viewers
-      }));
+    socket.on('locked_estimates', (locked_estimates) => {
+      setLockedEstimates(locked_estimates);
+      console.log('Received locked estimates:', locked_estimates);
     });
 
     return () => {
-      socket.disconnect();
+      socket.off('locked_estimates');
     };
-  }, [selectedCompany, estimates]);
 
+  }, []);
+
+
+
+  useEffect(() => {
+    if (Object.keys(lockedEstimates).length > 0) {
+      // Handle locked estimates
+      setEstimates(prevEstimates =>
+        prevEstimates.map(estimate => {
+          if (lockedEstimates[estimate.id]) {
+            return {
+              ...estimate,
+              is_locked: true,
+              locked_by: lockedEstimates[estimate.id] // Store the full User object
+            };
+          }
+          return {
+            ...estimate,
+            is_locked: false,
+            locked_by: null
+          };
+        })
+      );
+    } else {
+      setEstimates(prevEstimates => prevEstimates.map(estimate => ({
+        ...estimate,
+        is_locked: false,
+        locked_by: null
+      })));
+    }
+
+  }, [lockedEstimates]);
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {
@@ -158,10 +184,16 @@ export default function EstimatesPage() {
     }
   };
 
+  // const handleEdit = async (estimate: Estimate) => {
+  //   const fetchedItems = await fetchEstimateItems(estimate.id);
+  //   navigate(`/estimates/edit/${estimate.id}`, { state: { estimate, items: fetchedItems } });
+  // };
+
   const handleEdit = async (estimate: Estimate) => {
     const fetchedItems = await fetchEstimateItems(estimate.id);
     navigate(`/estimates/edit/${estimate.id}`, { state: { estimate, items: fetchedItems } });
   };
+
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this estimate?')) {
@@ -334,7 +366,7 @@ export default function EstimatesPage() {
         <h1 className="text-2xl font-bold text-gray-900"></h1>
         <button
           onClick={() => {
-            navigate('/estimates/create');
+            navigate("/estimates/create");
           }}
           className="btn btn-primary btn-md"
         >
@@ -345,10 +377,11 @@ export default function EstimatesPage() {
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
         {/* Status Filter */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Status
+          </label>
           <select
             className="input pr-3 w-full"
             value={statusFilter}
@@ -364,7 +397,9 @@ export default function EstimatesPage() {
 
         {/* Date Filter */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date
+          </label>
           <input
             type="date"
             className="input pr-3 w-full"
@@ -375,7 +410,9 @@ export default function EstimatesPage() {
 
         {/* Customer Filter */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Customer
+          </label>
           <div className="relative">
             <input
               type="text"
@@ -390,11 +427,12 @@ export default function EstimatesPage() {
             />
             {customerSuggestions.length > 0 && (
               <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
-                {customerSuggestions.map(customer => (
+                {customerSuggestions.map((customer) => (
                   <li
                     key={customer.id}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                    onMouseDown={() => { // Use onMouseDown instead of onClick for better reliability
+                    onMouseDown={() => {
+                      // Use onMouseDown instead of onClick for better reliability
                       setCustomerFilter(customer.name);
                       setCustomerSuggestions([]); // Clear suggestions immediately
                     }}
@@ -406,9 +444,7 @@ export default function EstimatesPage() {
             )}
           </div>
         </div>
-
       </div>
-
 
       {/* Estimates Table */}
       <div className="card">
@@ -440,111 +476,139 @@ export default function EstimatesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEstimates.map((estimate) => (
-                <tr key={estimate.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {estimate.estimate_number}
+              {filteredEstimates.map((estimate, index) => (
+                <React.Fragment key={estimate.id}>
+                  {estimate.is_locked ? (
+                    <tr className="bg-gray-100">
+                      <td
+                        colSpan={7}
+                        className="px-6 py-4 text-center text-sm text-gray-500"
+                      >
+                        This estimate is currently being edited by{" "}
+                        {estimate.locked_by?.fullname || "another user"}.
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {estimate.estimate_number}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              #{estimate.id}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          #{estimate.id}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {estimate.customer_name || 'Unknown Customer'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {estimate.employee_name || 'Not assigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {format(new Date(estimate.estimate_date), 'MMM dd, yyyy')}
-                    </div>
-                    {estimate.expiry_date && (
-                      <div className="text-sm text-gray-500">
-                        Expires: {format(new Date(estimate.expiry_date), 'MMM dd, yyyy')}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      Rs. {estimate.total_amount?.toLocaleString() || '0.00'}
-                    </div>
-                    {estimate.discount_amount > 0 && (
-                      <div className="text-sm text-gray-500">
-                        Discount: Rs. {estimate.discount_amount.toLocaleString()}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(estimate.status)}`}>
-                      {estimate.status.charAt(0).toUpperCase() + estimate.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(estimate)}
-                        className="text-primary-600 hover:text-primary-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePrint(estimate)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePrint(estimate)}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Print"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>
-                      {estimate.status !== 'converted' && (
-                        <button
-                          onClick={() => handleConvertToInvoice(estimate.id)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Convert to Invoice"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(estimate.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <div className="relative group flex items-center space-x-1">
-                        <div className="relative">
-                          <Eye className="h-4 w-4 text-indigo-600 cursor-pointer" title="Currently viewing" />
-                          
-                          {(estimateViewers[estimate.id]?.length || 0) > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1.5 py-[1px] rounded-full">
-                              {estimateViewers[estimate.id].length}
-                            </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {estimate.customer_name || "Unknown Customer"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {estimate.employee_name || "Not assigned"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {format(
+                            new Date(estimate.estimate_date),
+                            "MMM dd, yyyy"
                           )}
                         </div>
-
-                        {(estimateViewers[estimate.id]?.length || 0) > 0 && (
-                          <span className="absolute z-10 bottom-full mb-2 left-1/2 transform -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            Viewing: {estimateViewers[estimate.id].join(', ')}
-                          </span>
+                        {estimate.expiry_date && (
+                          <div className="text-sm text-gray-500">
+                            Expires:{" "}
+                            {format(
+                              new Date(estimate.expiry_date),
+                              "MMM dd, yyyy"
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          Rs.{" "}
+                          {estimate.total_amount?.toLocaleString() || "0.00"}
+                        </div>
+                        {estimate.discount_amount > 0 && (
+                          <div className="text-sm text-gray-500">
+                            Discount: Rs.{" "}
+                            {estimate.discount_amount.toLocaleString()}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                            estimate.status
+                          )}`}
+                        >
+                          {estimate.status.charAt(0).toUpperCase() +
+                            estimate.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(estimate)}
+                            className="text-primary-600 hover:text-primary-900"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handlePrint(estimate)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handlePrint(estimate)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Print"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                          {estimate.status !== "converted" && (
+                            <button
+                              onClick={() =>
+                                handleConvertToInvoice(estimate.id)
+                              }
+                              className="text-green-600 hover:text-green-900"
+                              title="Convert to Invoice"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(estimate.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
+              {/* {filteredEstimates.map((estimate, index) =>
+                estimate.is_locked ? (
+                  <tr key={estimate.id} className="bg-gray-100">
+                    <td
+                      colSpan={7}
+                      className="px-6 py-4 text-center text-sm text-gray-500"
+                    >
+                      This estimate is currently being edited by{" "}
+                      {estimate.locked_by?.fullname || "another user"}.
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={estimate.id} className="hover:bg-gray-50"></tr>
+                )
+              )} */}
             </tbody>
           </table>
         </div>
@@ -552,10 +616,15 @@ export default function EstimatesPage() {
 
       {/* Print Preview Modal */}
       {showPrintPreview && printingEstimate && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50" style={{ marginTop: "-10px" }}>
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50"
+          style={{ marginTop: "-10px" }}
+        >
           <div className="relative top-4 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Print Preview</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Print Preview
+              </h3>
               <button
                 onClick={() => {
                   setShowPrintPreview(false);
@@ -569,39 +638,68 @@ export default function EstimatesPage() {
             </div>
 
             <div className="overflow-y-auto max-h-[70vh]">
-              <div ref={printRef} className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900">
-              <div className="flex justify-between items-start border-b pb-4 mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold">Estimate #{printingEstimate.estimate_number}</h1>
-                  <p className="text-sm text-gray-600">ID: {printingEstimate.id}</p>
+              <div
+                ref={printRef}
+                className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900"
+              >
+                <div className="flex justify-between items-start border-b pb-4 mb-4">
+                  <div>
+                    <h1 className="text-3xl font-bold">
+                      Estimate #{printingEstimate.estimate_number}
+                    </h1>
+                    <p className="text-sm text-gray-600">
+                      ID: {printingEstimate.id}
+                    </p>
+                  </div>
+                  {selectedCompany?.company_logo && (
+                    <img
+                      src={`http://localhost:3000${selectedCompany.company_logo}`}
+                      alt={`${selectedCompany.name} Logo`}
+                      className="h-16 w-auto max-w-[150px] object-contain"
+                    />
+                  )}
                 </div>
-                {selectedCompany?.company_logo && (
-                  <img
-                    src={`http://localhost:3000${selectedCompany.company_logo}`}
-                    alt={`${selectedCompany.name} Logo`}
-                    className="h-16 w-auto max-w-[150px] object-contain"
-                  />
-                )}
-              </div>
-                
+
                 <div className="grid grid-cols-3 gap-20 mb-6">
                   <div>
                     <h3 className="text-lg font-semibold">Address</h3>
                     {/* <p>{printingEstimate.customer_name || 'Unknown Customer'}</p> */}
-                    <p>{printingEstimate.billing_address && printingEstimate.billing_address.trim() ? printingEstimate.billing_address : 'No billing address available'}</p>
+                    <p>
+                      {printingEstimate.billing_address &&
+                      printingEstimate.billing_address.trim()
+                        ? printingEstimate.billing_address
+                        : "No billing address available"}
+                    </p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Ship To</h3>
-                    <p>{printingEstimate.shipping_address && printingEstimate.shipping_address.trim() ? printingEstimate.shipping_address : 'No shipping address available'}</p>
+                    <p>
+                      {printingEstimate.shipping_address &&
+                      printingEstimate.shipping_address.trim()
+                        ? printingEstimate.shipping_address
+                        : "No shipping address available"}
+                    </p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Details</h3>
-                    <p>Estimate Date: {formatDate(printingEstimate.estimate_date) || 'N/A'}</p>
+                    <p>
+                      Estimate Date:{" "}
+                      {formatDate(printingEstimate.estimate_date) || "N/A"}
+                    </p>
                     {printingEstimate.expiry_date && (
-                      <p>Expiry Date: {formatDate(printingEstimate.expiry_date)}</p>
+                      <p>
+                        Expiry Date: {formatDate(printingEstimate.expiry_date)}
+                      </p>
                     )}
-                    <p>Employee: {printingEstimate.employee_name || 'Not assigned'}</p>
-                    <p>Status: {printingEstimate.status.charAt(0).toUpperCase() + printingEstimate.status.slice(1)}</p>
+                    <p>
+                      Employee:{" "}
+                      {printingEstimate.employee_name || "Not assigned"}
+                    </p>
+                    <p>
+                      Status:{" "}
+                      {printingEstimate.status.charAt(0).toUpperCase() +
+                        printingEstimate.status.slice(1)}
+                    </p>
                   </div>
                 </div>
 
@@ -624,13 +722,26 @@ export default function EstimatesPage() {
                         <tr key={index} className="border-t">
                           <td className="px-4 py-2">{index + 1}</td>
                           <td className="px-4 py-2">
-                            {item.product_id ? products.find(p => p.id === item.product_id)?.name || 'N/A' : 'N/A'}
+                            {item.product_id
+                              ? products.find((p) => p.id === item.product_id)
+                                  ?.name || "N/A"
+                              : "N/A"}
                           </td>
-                          <td className="px-4 py-2">{item.description || 'N/A'}</td>
-                          <td className="px-4 py-2 text-right">{item.quantity}</td>
-                          <td className="px-4 py-2 text-right">${Number(item.unit_price || 0).toFixed(2)}</td>
-                          <td className="px-4 py-2 text-right">{item.tax_rate}%</td>
-                          <td className="px-4 py-2 text-right">${Number(item.total_price || 0).toFixed(2)}</td>
+                          <td className="px-4 py-2">
+                            {item.description || "N/A"}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {item.quantity}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            ${Number(item.unit_price || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {item.tax_rate}%
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            ${Number(item.total_price || 0).toFixed(2)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -647,7 +758,9 @@ export default function EstimatesPage() {
                     )}
                     {printingEstimate.terms && (
                       <div className="mt-4">
-                        <h3 className="text-lg font-semibold">Terms & Conditions</h3>
+                        <h3 className="text-lg font-semibold">
+                          Terms & Conditions
+                        </h3>
                         <p className="text-sm">{printingEstimate.terms}</p>
                       </div>
                     )}
@@ -657,31 +770,57 @@ export default function EstimatesPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Subtotal:</span>
-                          <span>Rs. {Number(printingEstimate.subtotal || 0).toFixed(2)}</span>
+                          <span>
+                            Rs.{" "}
+                            {Number(printingEstimate.subtotal || 0).toFixed(2)}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Discount ({printingEstimate.discount_type === 'percentage' ? '%' : '$'}):</span>
-                          <span>Rs. {Number(printingEstimate.discount_amount || 0).toFixed(2)}</span>
+                          <span>
+                            Discount (
+                            {printingEstimate.discount_type === "percentage"
+                              ? "%"
+                              : "$"}
+                            ):
+                          </span>
+                          <span>
+                            Rs.{" "}
+                            {Number(
+                              printingEstimate.discount_amount || 0
+                            ).toFixed(2)}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span>Tax:</span>
-                          <span>Rs. {Number(printingEstimate.tax_amount || 0).toFixed(2)}</span>
+                          <span>
+                            Rs.{" "}
+                            {Number(printingEstimate.tax_amount || 0).toFixed(
+                              2
+                            )}
+                          </span>
                         </div>
                         <div className="flex justify-between font-bold text-lg border-t pt-2">
                           <span>Total:</span>
-                          <span>Rs. {Number(printingEstimate.total_amount || 0).toFixed(2)}</span>
+                          <span>
+                            Rs.{" "}
+                            {Number(printingEstimate.total_amount || 0).toFixed(
+                              2
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="text-center text-sm text-gray-500 mt-20">
-                    .......................................................................................... <br />
+                    ..........................................................................................{" "}
+                    <br />
                     Accepted By
                   </div>
 
                   <div className="text-center text-sm text-gray-500 mt-20">
-                    .......................................................................................... <br />
+                    ..........................................................................................{" "}
+                    <br />
                     Accepted Date
                   </div>
                 </div>

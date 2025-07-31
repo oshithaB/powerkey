@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CompanyProvider, useCompany } from './contexts/CompanyContext';
+import { SocketProvider } from './contexts/SocketContext';
 
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -68,9 +69,11 @@ function App() {
                 path="/dashboard/*"
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <Dashboard />
-                    </Layout>
+                    <SocketProvider>
+                      <Layout>
+                        <Dashboard />
+                      </Layout>
+                    </SocketProvider>
                   </ProtectedRoute>
                 }
               />
@@ -88,7 +91,9 @@ function App() {
                 path="/estimates/edit/:id"
                 element={
                   <ProtectedRoute>
-                    <EditEstimate />
+                    <SocketProvider>
+                      <EditEstimate />
+                    </SocketProvider>
                   </ProtectedRoute>
                 }
               />

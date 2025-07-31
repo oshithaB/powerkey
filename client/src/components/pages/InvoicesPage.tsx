@@ -90,11 +90,16 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleEdit = (invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    // setShowModal(true);
+  const handleEdit = async (invoice: Invoice) => {
+    try {
+      const response = await axiosInstance.get(`/api/getInvoiceItems/${selectedCompany?.company_id}/${invoice.id}`);
+      const items = response.data;
+      navigate('/invoices/edit', { state: { invoice, items } });
+    } catch (error) {
+      console.error('Error fetching invoice items:', error);
+      alert('Failed to fetch invoice items');
+    }
   };
-
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {

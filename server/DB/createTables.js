@@ -247,8 +247,8 @@ async function createTables(db) {
             tax_rate DECIMAL(5,2) NOT NULL,
             tax_amount DECIMAL(10,2) NOT NULL,
             total_price DECIMAL(10,2) NOT NULL,
-            created_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (invoice_id) REFERENCES invoices(id),
             FOREIGN KEY (product_id) REFERENCES products(id)
         )`,
@@ -257,8 +257,8 @@ async function createTables(db) {
             invoice_id INT NOT NULL,
             file_path VARCHAR(255) NOT NULL,
             file_name VARCHAR(255) NOT NULL,
-            created_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (invoice_id) REFERENCES invoices(id)
         )`,
 

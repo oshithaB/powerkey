@@ -240,7 +240,65 @@ const getInvoices = async (req, res) => {
     }
 }
 
+const getInvoiceById = async (req, res) => {
+  try {
+      const { invoiceId } = req.params;
+
+      if (!invoiceId) {
+          return res.status(400).json({ error: "Invoice ID is required" });
+      }
+
+      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                     FROM invoices i
+                     LEFT JOIN customer c ON i.customer_id = c.id
+                     LEFT JOIN employees e ON i.employee_id = e.id
+                     WHERE i.id = ?`;
+      
+      const [invoice] = await db.query(query, [invoiceId]);
+
+      if (invoice.length === 0) {
+          return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Fetch items for the invoice
+      const itemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
+      const [items] = await db.query(itemsQuery, [invoiceId]);
+      invoice[0].items = items;
+
+      res.status(200).json(invoice[0]);
+  } catch (error) {
+      console.error('Error fetching invoice:', error);
+      res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+const getInvoiceItems = async(req, res) => {
+  try {
+    const { invoiceId } = req.params;
+
+    if (!invoiceId) {
+      return res.status(400).json({ error: "Invoice ID is required" });
+    }
+
+    const query = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
+    const [items] = await db.query(query, [invoiceId]);
+
+    if (items.length === 0) {
+      return res.status(404).json({ message: "No items found for this invoice" });
+    }
+
+    res.status(200).json(items);
+  }
+
+  catch (error) {
+    console.error('Error fetching invoice items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createOrUpdateInvoice,
-  getInvoices
+  getInvoices,
+  getInvoiceById,
+  getInvoiceItems
 };

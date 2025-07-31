@@ -46,7 +46,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
     },
     {
       name: 'Total Revenue',
-      value: `$${(metrics.totalRevenue || 0).toLocaleString()}`,
+      value: `Rs. ${(metrics.totalRevenue || 0).toLocaleString()}`,
       icon: DollarSign,
       color: 'bg-yellow-500',
       href: '/dashboard/reports'
@@ -120,7 +120,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-gray-900">
-                        ${invoice.total_amount?.toLocaleString()}
+                        Rs. {invoice.total_amount?.toLocaleString()}
                       </p>
                       <p className="text-sm text-gray-600">
                         {format(new Date(invoice.created_at), 'MMM dd')}
@@ -208,7 +208,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                 <TrendingUp className="h-6 w-6 text-green-600" />
               </div>
               <p className="text-2xl font-bold text-gray-900">
-                ${(metrics.totalRevenue || 0).toLocaleString()}
+                Rs. {(metrics.totalRevenue || 0).toLocaleString()}
               </p>
               <p className="text-sm text-gray-600">Total Revenue</p>
             </div>

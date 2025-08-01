@@ -1,8 +1,8 @@
 const db = require('../DB/db');
 const asyncHandler = require('express-async-handler');
 
-// Create or Update Invoice
-const createOrUpdateInvoice = asyncHandler(async (req, res) => {
+// Create Invoice
+const createInvoice = asyncHandler(async (req, res) => {
   const {
     company_id,
     customer_id,
@@ -77,6 +77,17 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Check for duplicate invoice number
+    const [duplicateInvoice] = await connection.query(
+      `SELECT id FROM invoices WHERE invoice_number = ? AND company_id = ?`,
+      [invoice_number, company_id]
+    );
+
+    if (duplicateInvoice.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+    }
+
     const invoiceData = {
       company_id,
       customer_id,
@@ -103,28 +114,12 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
       updated_at: new Date()
     };
 
-    let invoiceId;
-    if (req.params.id) {
-      // Update existing invoice
-      await connection.query(
-        `UPDATE invoices SET ? WHERE id = ? AND company_id = ?`,
-        [invoiceData, req.params.id, company_id]
-      );
-      invoiceId = req.params.id;
-
-      // Delete existing items
-      await connection.query(
-        `DELETE FROM invoice_items WHERE invoice_id = ?`,
-        [invoiceId]
-      );
-    } else {
-      // Create new invoice
-      const [result] = await connection.query(
-        `INSERT INTO invoices SET ?`,
-        invoiceData
-      );
-      invoiceId = result.insertId;
-    }
+    // Create new invoice
+    const [result] = await connection.query(
+      `INSERT INTO invoices SET ?`,
+      invoiceData
+    );
+    const invoiceId = result.insertId;
 
     // Insert invoice items
     const itemQuery = `INSERT INTO invoice_items
@@ -135,7 +130,7 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
       const itemData = [
         invoiceId,
         item.product_id,
-        item.product_name,
+        item.product_name || null,
         item.description,
         item.quantity,
         item.unit_price,
@@ -146,16 +141,16 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
       ];
       const [itemResult] = await connection.query(itemQuery, itemData);
       if (itemResult.affectedRows === 0) {
-        await connection.query('ROLLBACK');
+        await connection.rollback();
         return res.status(400).json({ error: "Failed to create invoice items" });
       }
     }
 
     // Handle file attachment if provided
-    if (attachment && req.file) {
+    if (req.file) {
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?)`,
         [invoiceId, req.file.path, req.file.originalname, new Date(), new Date()]
       );
     }
@@ -185,14 +180,15 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
       discount_amount,
       total_amount,
       status: 'draft',
-      created_at: new Date().toISOString(),
+      created_at: invoiceData.created_at.toISOString(),
+      updated_at: invoiceData.updated_at.toISOString(),
       items
     };
 
-    res.status(req.params.id ? 200 : 201).json(req.params.id ? { message: 'Invoice updated successfully', invoice: newInvoice } : newInvoice);
+    res.status(201).json(newInvoice);
   } catch (error) {
     await connection.rollback();
-    console.error('Error saving invoice:', error);
+    console.error('Error creating invoice:', error);
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
@@ -201,6 +197,289 @@ const createOrUpdateInvoice = asyncHandler(async (req, res) => {
     connection.release();
   }
 });
+
+// Update Invoice
+const updateInvoice = asyncHandler(async (req, res) => {
+  const {
+    company_id,
+    customer_id,
+    employee_id,
+    estimate_id,
+    invoice_number,
+    invoice_date,
+    due_date,
+    discount_type,
+    discount_value,
+    notes,
+    terms,
+    shipping_address,
+    billing_address,
+    ship_via,
+    shipping_date,
+    tracking_number,
+    subtotal,
+    tax_amount,
+    discount_amount,
+    total_amount,
+    items,
+    attachment
+  } = req.body;
+
+  const invoiceId = req.params.invoiceId; // Changed from req.params.id to req.params.invoiceId
+
+  // Validate required fields
+  if (!invoice_number) {
+    return res.status(400).json({ error: "Invoice number is required" });
+  }
+  if (!company_id) {
+    return res.status(400).json({ error: "Company ID is required" });
+  }
+  if (!customer_id) {
+    return res.status(400).json({ error: "Customer ID is required" });
+  }
+  if (!invoice_date) {
+    return res.status(400).json({ error: "Invoice date is required" });
+  }
+  if (!subtotal || isNaN(subtotal)) {
+    return res.status(400).json({ error: "Valid subtotal is required" });
+  }
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "At least one valid item is required" });
+  }
+
+  // Validate items
+  for (const item of items) {
+    if (!item.product_id || item.product_id === 0) {
+      return res.status(400).json({ error: "Each item must have a valid product ID" });
+    }
+    if (!item.description) {
+      return res.status(400).json({ error: "Each item must have a description" });
+    }
+    if (!item.quantity || item.quantity <= 0) {
+      return res.status(400).json({ error: "Each item must have a valid quantity" });
+    }
+    if (!item.unit_price || item.unit_price < 0) {
+      return res.status(400).json({ error: "Each item must have a valid unit price" });
+    }
+    if (item.tax_rate < 0) {
+      return res.status(400).json({ error: "Tax rate cannot be negative" });
+    }
+    if (item.tax_amount < 0) {
+      return res.status(400).json({ error: "Tax amount cannot be negative" });
+    }
+    if (item.total_price < 0) {
+      return res.status(400).json({ error: "Total price cannot be negative" });
+    }
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Check if invoice exists
+    const [existingInvoice] = await connection.query(
+      `SELECT id, invoice_number FROM invoices WHERE id = ? AND company_id = ?`,
+      [invoiceId, company_id]
+    );
+
+    if (existingInvoice.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    // Check if invoice_number is unique only if it has changed
+    if (invoice_number !== existingInvoice[0].invoice_number) {
+      const [duplicateInvoice] = await connection.query(
+        `SELECT id FROM invoices WHERE invoice_number = ? AND company_id = ? AND id != ?`,
+        [invoice_number, company_id, invoiceId]
+      );
+
+      if (duplicateInvoice.length > 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+      }
+    }
+
+    const invoiceData = {
+      company_id,
+      customer_id,
+      employee_id: employee_id || null,
+      estimate_id: estimate_id || null,
+      invoice_number,
+      invoice_date,
+      due_date: due_date || null,
+      discount_type: discount_type || 'fixed',
+      discount_value: discount_value || 0,
+      notes: notes || null,
+      terms: terms || null,
+      shipping_address: shipping_address || null,
+      billing_address: billing_address || null,
+      ship_via: ship_via || null,
+      shipping_date: shipping_date || null,
+      tracking_number: tracking_number || null,
+      subtotal,
+      tax_amount: tax_amount || 0,
+      discount_amount: discount_amount || 0,
+      total_amount: total_amount || 0,
+      status: 'draft',
+      updated_at: new Date()
+    };
+
+    // Update existing invoice
+    const [updateResult] = await connection.query(
+      `UPDATE invoices SET ? WHERE id = ? AND company_id = ?`,
+      [invoiceData, invoiceId, company_id]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Failed to update invoice" });
+    }
+
+    // Delete existing items
+    await connection.query(
+      `DELETE FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
+
+    // Insert updated invoice items
+    const itemQuery = `INSERT INTO invoice_items
+                      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    for (const item of items) {
+      const itemData = [
+        invoiceId,
+        item.product_id,
+        item.product_name || null,
+        item.description,
+        item.quantity,
+        item.unit_price,
+        item.actual_unit_price,
+        item.tax_rate,
+        item.tax_amount,
+        item.total_price
+      ];
+      const [itemResult] = await connection.query(itemQuery, itemData);
+      if (itemResult.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Failed to create invoice items" });
+      }
+    }
+
+    // Handle file attachment if provided
+    if (req.file) {
+      // Optionally, delete existing attachments for this invoice to avoid duplicates
+      await connection.query(
+        `DELETE FROM invoice_attachments WHERE invoice_id = ?`,
+        [invoiceId]
+      );
+      await connection.query(
+        `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)`,
+        [invoiceId, req.file.path, req.file.originalname, new Date(), new Date()]
+      );
+    }
+
+    await connection.commit();
+
+    const updatedInvoice = {
+      id: invoiceId,
+      invoice_number,
+      company_id,
+      customer_id,
+      employee_id,
+      estimate_id,
+      invoice_date,
+      due_date,
+      discount_type,
+      discount_value,
+      notes,
+      terms,
+      shipping_address,
+      billing_address,
+      ship_via,
+      shipping_date,
+      tracking_number,
+      subtotal,
+      tax_amount,
+      discount_amount,
+      total_amount,
+      status: 'draft',
+      created_at: existingInvoice[0].created_at?.toISOString() || new Date().toISOString(),
+      updated_at: invoiceData.updated_at.toISOString(),
+      items
+    };
+
+    res.status(200).json({ message: 'Invoice updated successfully', invoice: updatedInvoice });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error updating invoice:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+    }
+    res.status(500).json({ error: error.sqlMessage || 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+});
+
+// delete invoice
+const deleteInvoice = async (req, res) => {
+    const { invoiceId } = req.params;
+
+    if (!invoiceId) {
+        return res.status(400).json({ error: "Invoice ID is required" });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // Check if invoice exists
+        const [existingInvoice] = await connection.query(
+            `SELECT id FROM invoices WHERE id = ?`,
+            [invoiceId]
+        );
+
+        if (existingInvoice.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: "Invoice not found" });
+        }
+
+        // Delete invoice items
+        await connection.query(
+            `DELETE FROM invoice_items WHERE invoice_id = ?`,
+            [invoiceId]
+        );
+
+        // Delete invoice attachments
+        await connection.query(
+            `DELETE FROM invoice_attachments WHERE invoice_id = ?`,
+            [invoiceId]
+        );
+
+        // Delete the invoice
+        const [deleteResult] = await connection.query(
+            `DELETE FROM invoices WHERE id = ?`,
+            [invoiceId]
+        );
+
+        if (deleteResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(400).json({ error: "Failed to delete invoice" });
+        }
+
+        await connection.commit();
+        res.status(200).json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error deleting invoice:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        connection.release();
+    }
+}
 
 // Get Invoices
 const getInvoices = async (req, res) => {
@@ -297,7 +576,9 @@ const getInvoiceItems = async(req, res) => {
 }
 
 module.exports = {
-  createOrUpdateInvoice,
+  createInvoice,
+  updateInvoice,
+  deleteInvoice,
   getInvoices,
   getInvoiceById,
   getInvoiceItems

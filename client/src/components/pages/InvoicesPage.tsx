@@ -103,8 +103,9 @@ export default function InvoicesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
-        await axios.delete(`/api/invoices/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/deleteInvoice/${selectedCompany?.company_id}/${id}`);
         fetchInvoices();
+        alert("Successfully deleted")
       } catch (error) {
         console.error('Error deleting invoice:', error);
       }

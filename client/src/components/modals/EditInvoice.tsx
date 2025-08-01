@@ -270,7 +270,7 @@ export default function EditInvoice() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       if (!formData.invoice_number) {
         throw new Error('Invoice number is required');
@@ -287,11 +287,10 @@ export default function EditInvoice() {
       if (!items.some(item => item.product_id !== 0)) {
         throw new Error('At least one valid item is required');
       }
-
+  
       const { subtotal, totalTax, discountAmount, total } = calculateTotals();
-
+  
       const submitData = {
-        id: invoice.id,
         invoice_number: formData.invoice_number,
         company_id: selectedCompany?.company_id,
         customer_id: parseInt(formData.customer_id) || null,
@@ -306,7 +305,7 @@ export default function EditInvoice() {
         total_amount: Number(total),
         paid_amount: invoice?.paid_amount || 0,
         balance_due: Number(total - (invoice?.paid_amount || 0)),
-        status: invoice.status || 'draft',
+        status: invoice?.status || 'draft',
         notes: formData.notes || null,
         terms: formData.terms || null,
         shipping_address: formData.shipping_address || null,
@@ -315,8 +314,8 @@ export default function EditInvoice() {
         shipping_date: formData.shipping_date || null,
         tracking_number: formData.tracking_number || null,
         items: items.map(item => ({
-          id: item.id,
           product_id: parseInt(item.product_id as any) || null,
+          product_name: item.product_name || null,
           description: item.description,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
@@ -326,9 +325,11 @@ export default function EditInvoice() {
           total_price: Number(item.total_price)
         }))
       };
-
-      await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
-
+  
+      console.log('Submitting invoice update:', submitData);
+  
+      await axiosInstance.put(`/api/updateInvoice/${selectedCompany?.company_id}/${invoice.id}`, submitData);
+  
       setFormData(initialFormData);
       setItems([
         {
@@ -343,7 +344,7 @@ export default function EditInvoice() {
           total_price: 0
         }
       ]);
-
+  
       navigate('/dashboard/invoices', { replace: true });
       alert('Invoice updated successfully');
     } catch (error: any) {
@@ -394,7 +395,7 @@ export default function EditInvoice() {
                   value={formData.invoice_number}
                   onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
                   placeholder="Enter invoice number"
-                  required
+                  readOnly
                 />
               </div>
 
@@ -701,7 +702,7 @@ export default function EditInvoice() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
+                    Message On Invoice
                   </label>
                   <textarea
                     className="input min-h-[80px]"
@@ -712,13 +713,29 @@ export default function EditInvoice() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Terms & Conditions
+                    Message On Statement
                   </label>
                   <textarea
                     className="input min-h-[80px]"
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."
+                  />
+                </div>
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                    Attachment
+                  </label>
+                  <input
+                    type="file"
+                    className="input"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        setFormData({ ...formData, attachment: file });
+                      }
+                    }}
                   />
                 </div>
               </div>

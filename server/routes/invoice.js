@@ -7,8 +7,10 @@ const path = require('path');
 
 const {
     getInvoices,
-    createOrUpdateInvoice,
+    createInvoice,
+    updateInvoice,
     getInvoiceItems,
+    deleteInvoice,
     getInvoiceById
 } = require('../controllers/invoice_controller');
 
@@ -56,16 +58,23 @@ router.post(
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     upload.single('attachment'),
-    createOrUpdateInvoice
+    createInvoice
 );
 
 router.put(
-    '/:company_id/:id',
+    '/updateInvoice/:company_id/:invoiceId',
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     upload.single('attachment'),
-    createOrUpdateInvoice
+    updateInvoice
 );
+
+router.delete(
+    '/deleteInvoice/:company_id/:invoiceId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    deleteInvoice
+)
 
 router.get(
     '/getInvoiceItems/:company_id/:invoiceId',

@@ -15,7 +15,6 @@ const {
 router.get(
     '/getEstimates/:companyId',
     verifyToken,
-    authorizedRoles(['admin', 'sale', 'staff']),
     getEstimates
 );
 

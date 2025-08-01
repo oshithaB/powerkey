@@ -55,37 +55,48 @@ app.use("/api", tax_ratesRoutes);
 app.use("/api", estimateRoutes);
 app.use("/api", invoiceRoutes);
 
-const estimateViewers = {}; // { estimateId: Set of usernames }
+const editingEstimates = {}; // { estimateId: userId }
 
-io.on('connection', (socket) => {
-  console.log('User connected');
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
 
-  socket.on('start_estimate_listening', ({ estimateIds, user }) => {
-    socket.username = user;
-    socket.estimateIds = estimateIds;
 
-    estimateIds.forEach((id) => {
-      socket.join(id);
-      if (!estimateViewers[id]) estimateViewers[id] = new Set();
-      estimateViewers[id].add(user);
-      io.to(id).emit('viewers_update', {
-        estimateId: id,
-        viewers: [...estimateViewers[id]],
-      });
-    });
+  socket.on("start_listening", () => {
+    // Send current locked estimates
+    socket.join("estimate_room");
+    console.log("Socket joined estimate_room");
+    socket.emit("locked_estimates", editingEstimates);
+    console.log("Current locked estimates sent to client-socket:", editingEstimates);
   });
 
-  socket.on('disconnect', () => {
-    if (socket.estimateIds && socket.username) {
-      socket.estimateIds.forEach((id) => {
-        estimateViewers[id]?.delete(socket.username);
-        io.to(id).emit('viewers_update', {
-          estimateId: id,
-          viewers: [...estimateViewers[id]],
-        });
-      });
+  socket.on("start_edit_estimate", ({ estimateId, user }) => {
+    socket.estimateId = estimateId; // Store estimateId in socket
+    socket.user = user; // Store user in socket
+    console.log(`User ${user} started editing estimate ${estimateId}`);
+    editingEstimates[estimateId] = user;
+    io.to("estimate_room").emit("locked_estimates", editingEstimates);
+    console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
+  });
+
+  socket.on("stop_edit_estimate", ({ estimateId, user }) => {
+    if (editingEstimates[estimateId] === user) {
+      delete editingEstimates[estimateId];
+      io.to("estimate_room").emit("locked_estimates", editingEstimates);
+      console.log(`User ${user} stopped editing estimate ${estimateId}`);
+      console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
     }
-    console.log('User disconnected');
+  });
+
+  socket.on("disconnect", () => {
+    const estimateId = socket.estimateId;
+    const user = socket.user;
+
+    if (estimateId && user && editingEstimates[estimateId] === user) {
+      delete editingEstimates[estimateId];
+      io.to("estimate_room").emit("locked_estimates", editingEstimates);
+    }
+
+    socket.leave("estimate_room");
   });
 });
 

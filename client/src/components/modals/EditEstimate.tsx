@@ -4,6 +4,8 @@ import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { es } from 'date-fns/locale';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface EstimateItem {
   id?: number;
@@ -75,6 +77,7 @@ export default function EditEstimate() {
   const navigate = useNavigate();
   const location = useLocation();
   const { estimate, items: initialItems } = location.state || {};
+  const socketRef = useSocket();
 
   // Helper function to calculate discount value from discount amount
   const calculateDiscountValue = (estimate: Estimate) => {
@@ -155,6 +158,22 @@ export default function EditEstimate() {
       setError('Failed to fetch data');
     }
   };
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    console.log('Socket in edit estimate:', socket);
+    console.log('User in edit estimate:', user);
+
+    socket.emit('start_edit_estimate', { estimateId: estimate.id, user });
+    console.log('Socket in edit estimate emit start_edit_estimate', { estimateId: estimate.id, user });
+
+    return () => {
+      socket.emit('stop_edit_estimate', { estimateId: estimate.id, user });
+      console.log('Socket disconnected from estimate editing');
+    };
+  }, [estimate.id]);
 
   useEffect(() => {
     if (selectedCompany) {

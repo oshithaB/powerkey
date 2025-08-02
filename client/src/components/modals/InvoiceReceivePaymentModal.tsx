@@ -59,9 +59,74 @@ interface Payment {
   payment_amount: number;
   payment_date: string;
   payment_method: string;
-  notes?: string;
-  [key: number]: number; // Allow invoice ID keys for payment amounts
+  notes?: string | undefined;
+  [key: number]: number | string;
 }
+
+interface CreatePaymentMethodModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (name: string) => Promise<void>;
+  existingMethods: string[];
+}
+
+const CreatePaymentMethodModal: React.FC<CreatePaymentMethodModalProps> = ({
+  isOpen,
+  onClose,
+  onCreate,
+  existingMethods,
+}) => {
+  const [newPaymentMethodName, setNewPaymentMethodName] = useState('');
+
+  const handleCreate = async () => {
+    const trimmedName = newPaymentMethodName.trim();
+    if (!trimmedName) {
+      alert('Payment method name is required.');
+      return;
+    }
+    if (existingMethods.includes(trimmedName.toLowerCase())) {
+      alert('Payment method already exists.');
+      return;
+    }
+    await onCreate(trimmedName);
+    setNewPaymentMethodName('');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Create New Payment Method</h2>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method Name</label>
+          <input
+            type="text"
+            value={newPaymentMethodName}
+            onChange={(e) => setNewPaymentMethodName(e.target.value)}
+            className="input w-full"
+            placeholder="Enter payment method name"
+            maxLength={50}
+            autoFocus
+          />
+        </div>
+        <div className="flex justify-end space-x-2">
+          <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
+            Cancel
+          </button>
+          <button type="button" onClick={handleCreate} className="btn btn-primary btn-md">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const InvoiceReceivePaymentModal: React.FC = () => {
   const navigate = useNavigate();
@@ -69,15 +134,18 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   const { selectedCompany } = useCompany();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<Payment>({
     payment_amount: 0,
     payment_date: new Date().toISOString().split('T')[0],
-    payment_method: 'cash',
+    payment_method: '',
     notes: '',
   });
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -108,6 +176,29 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     fetchInvoices();
   }, [selectedCompany, state]);
 
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      if (!selectedCompany?.company_id) return;
+      setPaymentMethodsLoading(true);
+      try {
+        const response = await axiosInstance.get(`/api/getPaymentMethods`);
+        const methods = response.data.map((method: { name: string }) => method.name);
+        setPaymentMethods(methods);
+        if (methods.length > 0 && !payment.payment_method) {
+          setPayment((prev) => ({ ...prev, payment_method: methods[0] }));
+        }
+      } catch (error) {
+        console.error('Error fetching payment methods:', error);
+        setPaymentMethods([]);
+        alert('Failed to fetch payment methods.');
+      } finally {
+        setPaymentMethodsLoading(false);
+      }
+    };
+
+    fetchPaymentMethods();
+  }, [selectedCompany]);
+
   const handleSelectAll = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);
@@ -125,19 +216,19 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       setPayment(prev => ({ ...prev, payment_amount: 0 }));
     }
   };
-  
+
   const handleSelectInvoice = (invoiceId: number, totalAmount: number | string | null) => {
     const newSelected = selectedInvoices.includes(invoiceId)
       ? selectedInvoices.filter(id => id !== invoiceId)
       : [...selectedInvoices, invoiceId];
-  
+
     setSelectedInvoices(newSelected);
-  
+
     const total = newSelected.reduce((sum, id) => {
       const invoice = invoices.find(inv => inv.id === id);
       return sum + (invoice ? (Number(payment[id]) || Number(invoice.total_amount) || 0) : 0);
     }, 0);
-  
+
     setPayment(prev => ({
       ...prev,
       [invoiceId]: newSelected.includes(invoiceId) ? Number(totalAmount) || 0 : prev[invoiceId] || '',
@@ -165,6 +256,29 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   };
 
+  const handleCreatePaymentMethod = async (name: string) => {
+    try {
+      const response = await axiosInstance.post('/api/createPaymentMethod', {
+        name,
+      });
+      const { name: newMethod } = response.data;
+      setPaymentMethods((prev) => [...prev, newMethod]);
+      setPayment((prev) => ({ ...prev, payment_method: newMethod }));
+      setIsCreatePaymentModalOpen(false);
+      alert('Payment method created successfully.');
+    } catch (error) {
+      console.error('Error creating payment method:', error);
+      alert('Failed to create payment method.');
+    }
+  };
+
+  const formatAmount = (amount: number | string | null | undefined): string => {
+    if (amount === '' || amount == null || isNaN(Number(amount))) {
+      return '';
+    }
+    return parseFloat(amount.toString()).toLocaleString();
+  };
+
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     const customerId = state?.invoice?.customer_id || null;
@@ -175,6 +289,10 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
     if (selectedInvoices.length === 0) {
       alert('No invoices selected');
+      return;
+    }
+    if (!payment.payment_method) {
+      alert('Please select a payment method.');
       return;
     }
 
@@ -192,14 +310,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   };
 
-  const formatAmount = (amount: number | string | null | undefined): string => {
-    if (amount === '' || amount == null || isNaN(Number(amount))) {
-      return '';
-    }
-    return parseFloat(amount.toString()).toLocaleString();
-  };
-
-  if (loading) {
+  if (loading || paymentMethodsLoading) {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -238,7 +349,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Recieve Payment</h2>
+            <h2 className="text-xl font-bold text-gray-900">Receive Payment</h2>
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
               <X className="h-6 w-6" />
             </button>
@@ -282,65 +393,65 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-  {invoices.length === 0 ? (
-    <tr>
-      <td colSpan={7} className="px-4 py-2 text-center text-sm text-gray-500">
-        No invoices found for this customer.
-      </td>
-    </tr>
-  ) : (
-    invoices.map((invoice) => (
-      <tr key={invoice.id}>
-        <td className="px-4 py-2 whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={selectedInvoices.includes(invoice.id)}
-            onChange={() => handleSelectInvoice(invoice.id, invoice.total_amount)}
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-          />
-        </td>
-        <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
-        <td className="px-4 py-2 whitespace-nowrap text-sm">
-          {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
-        </td>
-        <td className="px-4 py-2 whitespace-nowrap text-sm">
-          Rs. {formatAmount(invoice.total_amount)}
-        </td>
-        <td className="px-4 py-2 whitespace-nowrap text-sm">
-          <input
-            type="number"
-            value={payment[invoice.id] || ''}
-            onChange={(e) => handlePaymentChange(e, invoice.id)}
-            className="input w-full"
-            placeholder="Enter amount"
-          />
-        </td>
-        <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
-          Rs. {formatAmount(Number(invoice.total_amount) - (Number(payment[invoice.id]) || 0))}
-        </td>
-        <td className="px-4 py-2 whitespace-nowrap">
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-              (invoice.computed_status || invoice.status) === 'paid'
-                ? 'bg-green-100 text-green-800'
-                : (invoice.computed_status || invoice.status) === 'partially_paid'
-                ? 'bg-yellow-100 text-yellow-800'
-                : (invoice.computed_status || invoice.status) === 'overdue'
-                ? 'bg-red-100 text-red-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}
-          >
-            {(invoice.computed_status || invoice.status)
-              .replace('_', ' ')
-              .charAt(0)
-              .toUpperCase() +
-              (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
-          </span>
-        </td>
-      </tr>
-    ))
-  )}
-</tbody>
+                  {invoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-2 text-center text-sm text-gray-500">
+                        No invoices found for this customer.
+                      </td>
+                    </tr>
+                  ) : (
+                    invoices.map((invoice) => (
+                      <tr key={invoice.id}>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedInvoices.includes(invoice.id)}
+                            onChange={() => handleSelectInvoice(invoice.id, invoice.total_amount)}
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          Rs. {formatAmount(invoice.total_amount)}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          <input
+                            type="number"
+                            value={payment[invoice.id] || ''}
+                            onChange={(e) => handlePaymentChange(e, invoice.id)}
+                            className="input w-full"
+                            placeholder="Enter amount"
+                          />
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
+                          Rs. {formatAmount(Number(invoice.total_amount) - (Number(payment[invoice.id]) || 0))}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              (invoice.computed_status || invoice.status) === 'paid'
+                                ? 'bg-green-100 text-green-800'
+                                : (invoice.computed_status || invoice.status) === 'partially_paid'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : (invoice.computed_status || invoice.status) === 'overdue'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {(invoice.computed_status || invoice.status)
+                              .replace('_', ' ')
+                              .charAt(0)
+                              .toUpperCase() +
+                              (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
               </table>
             </div>
           </div>
@@ -358,26 +469,35 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   required
                 />
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-              <select
-                name="payment_method"
-                value={payment.payment_method}
-                onChange={handlePaymentChange}
-                className="input w-full"
-              >
-                <option value="cash">Cash</option>
-                <option value="credit_card">Credit Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="check">Check</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                <select
+                  name="payment_method"
+                  value={payment.payment_method}
+                  onChange={(e) => {
+                    if (e.target.value === 'create_new') {
+                      setIsCreatePaymentModalOpen(true);
+                    } else {
+                      handlePaymentChange(e);
+                    }
+                  }}
+                  className="input w-full"
+                  disabled={paymentMethodsLoading}
+                >
+                  <option value="create_new">Create New</option>
+                  {paymentMethods.map((method) => (
+                    <option key={method} value={method}>
+                      {method.replace('_', ' ').charAt(0).toUpperCase() + method.replace('_', ' ').slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea
                 name="notes"
-                value={payment.notes}
+                value={payment.notes || ''}
                 onChange={handlePaymentChange}
                 className="input w-full h-24"
                 placeholder="Add any notes about the payment"
@@ -387,12 +507,18 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               <button type="button" onClick={() => navigate(-1)} className="btn btn-secondary btn-md">
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary btn-md">
+              <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading}>
                 <DollarSign className="h-4 w-4 mr-2" />
                 Save Payment
               </button>
             </div>
           </form>
+          <CreatePaymentMethodModal
+            isOpen={isCreatePaymentModalOpen}
+            onClose={() => setIsCreatePaymentModalOpen(false)}
+            onCreate={handleCreatePaymentMethod}
+            existingMethods={paymentMethods}
+          />
         </div>
       </div>
     </motion.div>

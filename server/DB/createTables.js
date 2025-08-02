@@ -261,6 +261,10 @@ async function createTables(db) {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (invoice_id) REFERENCES invoices(id)
         )`,
+        `CREATE TABLE IF NOT EXISTS payment_methods (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE
+        )`,
 
         // `CREATE TABLE IF NOT EXISTS orders (
         //     id INT AUTO_INCREMENT PRIMARY KEY,

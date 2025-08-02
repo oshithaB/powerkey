@@ -5,7 +5,9 @@ const authorizedRoles = require('../middleware/authorized-roles');
 
 const {
     createPaymentMethod,
-    getPaymentMethods
+    getPaymentMethods,
+    createDepositPurposes,
+    getDepositPurposes
 } = require('../controllers/paymentMethod_controller');
 
 router.post(
@@ -21,5 +23,19 @@ router.get(
     authorizedRoles(['admin', 'sale', 'staff']),
     getPaymentMethods
 );
+
+router.post(
+    '/createDepositPurposes',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    createDepositPurposes
+);
+
+router.get(
+    '/getDepositPurposes',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getDepositPurposes
+)
 
 module.exports = router;

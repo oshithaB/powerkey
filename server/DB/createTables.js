@@ -265,6 +265,10 @@ async function createTables(db) {
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(100) NOT NULL UNIQUE
         )`,
+        `CREATE TABLE IF NOT EXISTS deposit_to (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE
+        )`,
 
         // `CREATE TABLE IF NOT EXISTS orders (
         //     id INT AUTO_INCREMENT PRIMARY KEY,

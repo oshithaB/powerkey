@@ -615,10 +615,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                             value={item.product_name || ''}
                             onChange={(e) => {
                               updateItem(index, 'product_name', e.target.value);
-                              setActiveSuggestionIndex(index);
+                              setActiveSuggestionIndex(index); // Set active item for suggestions
                             }}
                             onFocus={() => {
-                              setActiveSuggestionIndex(index);
+                              setActiveSuggestionIndex(index); // Show suggestions on focus
                               const filtered = products.filter(product =>
                                 product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
                               );
@@ -655,7 +655,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * (100 - updatedItems[index].tax_rate)) / 100;
+                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate);
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);

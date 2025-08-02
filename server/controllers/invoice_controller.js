@@ -575,11 +575,130 @@ const getInvoiceItems = async(req, res) => {
   }
 }
 
+// Get Invoices By Customer
+const getInvoicesByCustomer = asyncHandler(async (req, res) => {
+  const { customerId, company_id } = req.params;
+
+  if (!customerId || !company_id) {
+    return res.status(400).json({ error: "Customer ID and Company ID are required" });
+  }
+
+  try {
+    const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                   FROM invoices i
+                   LEFT JOIN customer c ON i.customer_id = c.id
+                   LEFT JOIN employees e ON i.employee_id = e.id
+                   WHERE i.customer_id = ? AND i.company_id = ?
+                   ORDER BY i.created_at DESC`;
+
+    const [invoices] = await db.query(query, [customerId, company_id]);
+
+    if (invoices.length === 0) {
+      return res.status(404).json({ message: "No invoices found for this customer" });
+    }
+
+    // Fetch items for each invoice
+    const invoiceItemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
+    for (const invoice of invoices) {
+      const [items] = await db.query(invoiceItemsQuery, [invoice.id]);
+      invoice.items = items;
+    }
+
+    res.status(200).json(invoices);
+  } catch (error) {
+    console.error('Error fetching invoices by customer:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Record Payment
+const recordPayment = asyncHandler(async (req, res) => {
+  const { customerId, company_id } = req.params;
+  const { payment_amount, payment_date, payment_method, notes, invoice_payments } = req.body;
+
+  if (!customerId || !company_id) {
+    return res.status(400).json({ error: "Customer ID and Company ID are required" });
+  }
+
+  if (!payment_amount || payment_amount <= 0) {
+    return res.status(400).json({ error: "Valid payment amount is required" });
+  }
+
+  if (!payment_date) {
+    return res.status(400).json({ error: "Payment date is required" });
+  }
+
+  if (!invoice_payments || !Array.isArray(invoice_payments) || invoice_payments.length === 0) {
+    return res.status(400).json({ error: "Invoice payment distribution is required" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Create payments table if it doesn't exist
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        invoice_id INT NOT NULL,
+        customer_id INT NOT NULL,
+        company_id INT NOT NULL,
+        payment_amount DECIMAL(10,2) NOT NULL,
+        payment_date DATE NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        reference_number VARCHAR(100),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+        FOREIGN KEY (customer_id) REFERENCES customer(id),
+        FOREIGN KEY (company_id) REFERENCES company(company_id)
+      )
+    `);
+
+    // Record payments and update invoices
+    for (const invoicePayment of invoice_payments) {
+      const { invoice_id, payment_amount: invoicePaymentAmount } = invoicePayment;
+
+      // Insert payment record
+      await connection.query(
+        `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, notes || null]
+      );
+
+      // Update invoice paid amount and balance
+      await connection.query(
+        `UPDATE invoices 
+         SET paid_amount = paid_amount + ?, 
+             balance_due = total_amount - (paid_amount + ?),
+             status = CASE 
+               WHEN (paid_amount + ?) >= total_amount THEN 'paid'
+               WHEN (paid_amount + ?) > 0 THEN 'partially_paid'
+               ELSE status
+             END
+         WHERE id = ? AND company_id = ?`,
+        [invoicePaymentAmount, invoicePaymentAmount, invoicePaymentAmount, invoicePaymentAmount, invoice_id, company_id]
+      );
+    }
+
+    await connection.commit();
+    res.status(200).json({ message: 'Payment recorded successfully' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error recording payment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = {
   createInvoice,
   updateInvoice,
   deleteInvoice,
   getInvoices,
   getInvoiceById,
-  getInvoiceItems
+  getInvoiceItems,
+  getInvoicesByCustomer,
+  recordPayment
 };

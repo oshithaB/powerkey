@@ -11,7 +11,9 @@ const {
     updateInvoice,
     getInvoiceItems,
     deleteInvoice,
-    getInvoiceById
+    getInvoiceById,
+    getInvoicesByCustomer,
+    recordPayment
 } = require('../controllers/invoice_controller');
 
 // Configure multer for file uploads
@@ -82,5 +84,19 @@ router.get(
     authorizedRoles(['admin', 'sale', 'staff']),
     getInvoiceItems
 )
+
+router.get(
+    '/getInvoicesByCustomer/:company_id/:customerId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getInvoicesByCustomer
+);
+
+router.post(
+    '/recordPayment/:company_id/:customerId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    recordPayment
+);
 
 module.exports = router;

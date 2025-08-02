@@ -4,6 +4,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
 import { X, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
 
 interface InvoiceItem {
   id: number;
@@ -59,6 +60,7 @@ interface Payment {
   payment_date: string;
   payment_method: string;
   notes?: string;
+  [key: number]: number; // Allow invoice ID keys for payment amounts
 }
 
 const InvoiceReceivePaymentModal: React.FC = () => {
@@ -74,39 +76,29 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     payment_method: 'cash',
     notes: '',
   });
+  const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     const fetchInvoices = async () => {
       if (!selectedCompany?.company_id) {
-        console.log('No company selected, waiting for company context...');
         setError('No company selected. Please select a company first.');
         setLoading(false);
         return;
       }
 
-      // Use customer_id from state.invoice if available
       const customerId = state?.invoice?.customer_id || null;
 
       if (!customerId || isNaN(customerId)) {
-        console.log('Invalid or missing customer ID from state:', state?.invoice?.customer_id);
         setError('Invalid or missing Customer ID');
         setLoading(false);
         return;
       }
 
-      console.log('Fetching invoices with:', { customerId, companyId: selectedCompany.company_id });
-      console.log('Location state:', state);
-
       try {
         const response = await axiosInstance.get(`/api/getInvoicesByCustomer/${selectedCompany.company_id}/${customerId}`);
-        console.log('API response:', response.data);
         setInvoices(response.data);
       } catch (error: any) {
-        console.error('Error fetching invoices:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-        });
         setError('Failed to fetch invoices. Please try again later.');
       } finally {
         setLoading(false);
@@ -116,17 +108,57 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     fetchInvoices();
   }, [selectedCompany, state]);
 
-  useEffect(() => {
-    if (invoices.length > 0) {
-      console.log('Invoices set:', invoices);
+  const handleSelectAll = () => {
+    const newSelectAll = !selectAll;
+    setSelectAll(newSelectAll);
+    if (newSelectAll) {
+      const newSelected = invoices.map(invoice => invoice.id);
+      setSelectedInvoices(newSelected);
+      const total = invoices.reduce((sum, invoice) => sum + (Number(invoice.total_amount) || 0), 0);
+      setPayment(prev => ({ ...prev, payment_amount: total }));
+    } else {
+      setSelectedInvoices([]);
+      setPayment(prev => ({ ...prev, payment_amount: 0 }));
     }
-  }, [invoices]);
+  };
+  
+  const handleSelectInvoice = (invoiceId: number, totalAmount: number | string | null) => {
+    const newSelected = selectedInvoices.includes(invoiceId)
+      ? selectedInvoices.filter(id => id !== invoiceId)
+      : [...selectedInvoices, invoiceId];
+  
+    setSelectedInvoices(newSelected);
+  
+    const total = newSelected.reduce((sum, id) => {
+      const invoice = invoices.find(inv => inv.id === id);
+      return sum + (invoice ? (Number(payment[id]) || Number(invoice.total_amount) || 0) : 0);
+    }, 0);
+  
+    setPayment(prev => ({
+      ...prev,
+      [invoiceId]: newSelected.includes(invoiceId) ? Number(totalAmount) || 0 : prev[invoiceId] || '',
+      payment_amount: total
+    }));
+    setSelectAll(newSelected.length === invoices.length);
+  };
 
   const handlePaymentChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+    invoiceId?: number
   ) => {
     const { name, value } = e.target;
-    setPayment((prev) => ({ ...prev, [name]: value }));
+    if (invoiceId) {
+      setPayment((prev) => {
+        const updatedPayments = { ...prev, [invoiceId]: value };
+        const total = selectedInvoices.reduce((sum, id) => {
+          const inv = invoices.find((inv) => inv.id === id);
+          return sum + (inv ? (Number(updatedPayments[id]) || 0) : 0);
+        }, 0);
+        return { ...updatedPayments, payment_amount: total };
+      });
+    } else {
+      setPayment((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
@@ -137,8 +169,8 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       alert('Missing customer ID or company ID');
       return;
     }
-    if (invoices.length === 0) {
-      alert('No invoices found for this customer');
+    if (selectedInvoices.length === 0) {
+      alert('No invoices selected');
       return;
     }
 
@@ -146,7 +178,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       await axiosInstance.post(`/api/recordPayment/${selectedCompany.company_id}/${customerId}`, {
         ...payment,
         customer_id: customerId,
-        invoice_ids: invoices.map((invoice) => invoice.id),
+        invoice_ids: selectedInvoices,
       });
       alert('Payment recorded successfully');
       navigate('/invoices');
@@ -156,10 +188,9 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   };
 
-  // Helper function to format amount safely
   const formatAmount = (amount: number | string | null | undefined): string => {
-    if (amount == null || isNaN(Number(amount))) {
-      return '0';
+    if (amount === '' || amount == null || isNaN(Number(amount))) {
+      return '';
     }
     return parseFloat(amount.toString()).toLocaleString();
   };
@@ -194,162 +225,173 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Record Payment</h2>
-          <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: 100 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="container mx-auto px-4 py-8">
+        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Record Payment</h2>
+            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
 
-        <div className="mb-6">
+          <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                Customer: {state?.invoice?.customer_name || 'Unknown Customer'}
+              Customer: {state?.invoice?.customer_name || 'Unknown Customer'}
             </h3>
             <h4 className="text-md font-semibold text-gray-600 mb-2">Invoices</h4>
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
-                    <tr>
+                  <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Invoice #
+                      <input
+                        type="checkbox"
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
+                      Invoice #
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Due Date
+                      Due Date
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total
+                      Total
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Paid
+                      Payment
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Balance Due
+                      Balance Due
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
+                      Status
                     </th>
-                    </tr>
+                  </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {invoices.length === 0 ? (
-                    <tr>
-                        <td colSpan={7} className="px-4 py-2 text-center text-sm text-gray-500">
-                        No invoices found for this customer.
-                        </td>
-                    </tr>
-                    ) : (
-                    invoices.map((invoice) => (
-                        <tr key={invoice.id}>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                            {format(new Date(invoice.invoice_date), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                            {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                            Rs. {formatAmount(invoice.total_amount)}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">
-                            Rs. {formatAmount(invoice.paid_amount)}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
-                            Rs. {formatAmount(invoice.balance_due)}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                            <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                (invoice.computed_status || invoice.status) === 'paid'
-                                ? 'bg-green-100 text-green-800'
-                                : (invoice.computed_status || invoice.status) === 'partially_paid'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : (invoice.computed_status || invoice.status) === 'overdue'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                            >
-                            {(invoice.computed_status || invoice.status)
-                                .replace('_', ' ')
-                                .charAt(0)
-                                .toUpperCase() +
-                                (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
-                            </span>
-                        </td>
-                        </tr>
-                    ))
-                    )}
-                </tbody>
-                </table>
+  {invoices.length === 0 ? (
+    <tr>
+      <td colSpan={7} className="px-4 py-2 text-center text-sm text-gray-500">
+        No invoices found for this customer.
+      </td>
+    </tr>
+  ) : (
+    invoices.map((invoice) => (
+      <tr key={invoice.id}>
+        <td className="px-4 py-2 whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={selectedInvoices.includes(invoice.id)}
+            onChange={() => handleSelectInvoice(invoice.id, invoice.total_amount)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+        </td>
+        <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
+        <td className="px-4 py-2 whitespace-nowrap text-sm">
+          {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
+        </td>
+        <td className="px-4 py-2 whitespace-nowrap text-sm">
+          Rs. {formatAmount(invoice.total_amount)}
+        </td>
+        <td className="px-4 py-2 whitespace-nowrap text-sm">
+          <input
+            type="number"
+            value={payment[invoice.id] || ''}
+            onChange={(e) => handlePaymentChange(e, invoice.id)}
+            className="input w-full"
+            placeholder="Enter amount"
+          />
+        </td>
+        <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
+          Rs. {formatAmount(Number(invoice.total_amount) - (Number(payment[invoice.id]) || 0))}
+        </td>
+        <td className="px-4 py-2 whitespace-nowrap">
+          <span
+            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+              (invoice.computed_status || invoice.status) === 'paid'
+                ? 'bg-green-100 text-green-800'
+                : (invoice.computed_status || invoice.status) === 'partially_paid'
+                ? 'bg-yellow-100 text-yellow-800'
+                : (invoice.computed_status || invoice.status) === 'overdue'
+                ? 'bg-red-100 text-red-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}
+          >
+            {(invoice.computed_status || invoice.status)
+              .replace('_', ' ')
+              .charAt(0)
+              .toUpperCase() +
+              (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
+          </span>
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
+              </table>
             </div>
-        </div>
+          </div>
 
-        <form onSubmit={handleSubmitPayment} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount</label>
-              <input
-                type="number"
-                name="payment_amount"
-                value={payment.payment_amount}
-                onChange={handlePaymentChange}
-                className="input w-full"
-                placeholder="Enter payment amount"
-                required
-              />
+          <form onSubmit={handleSubmitPayment} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                <input
+                  type="date"
+                  name="payment_date"
+                  value={payment.payment_date}
+                  onChange={handlePaymentChange}
+                  className="input w-full"
+                  required
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
-              <input
-                type="date"
-                name="payment_date"
-                value={payment.payment_date}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+              <select
+                name="payment_method"
+                value={payment.payment_method}
                 onChange={handlePaymentChange}
                 className="input w-full"
-                required
+              >
+                <option value="cash">Cash</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                name="notes"
+                value={payment.notes}
+                onChange={handlePaymentChange}
+                className="input w-full h-24"
+                placeholder="Add any notes about the payment"
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-            <select
-              name="payment_method"
-              value={payment.payment_method}
-              onChange={handlePaymentChange}
-              className="input w-full"
-            >
-              <option value="cash">Cash</option>
-              <option value="credit_card">Credit Card</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="check">Check</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea
-              name="notes"
-              value={payment.notes}
-              onChange={handlePaymentChange}
-              className="input w-full h-24"
-              placeholder="Add any notes about the payment"
-            />
-          </div>
-          <div className="flex justify-end space-x-2">
-            <button type="button" onClick={() => navigate(-1)} className="btn btn-secondary">
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Record Payment
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end space-x-2">
+              <button type="button" onClick={() => navigate(-1)} className="btn btn-secondary btn-md">
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary btn-md">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Payment
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

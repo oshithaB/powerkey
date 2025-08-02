@@ -114,8 +114,12 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     if (newSelectAll) {
       const newSelected = invoices.map(invoice => invoice.id);
       setSelectedInvoices(newSelected);
+      const updatedPayments = invoices.reduce((acc, invoice) => ({
+        ...acc,
+        [invoice.id]: Number(invoice.total_amount) || 0
+      }), {});
       const total = invoices.reduce((sum, invoice) => sum + (Number(invoice.total_amount) || 0), 0);
-      setPayment(prev => ({ ...prev, payment_amount: total }));
+      setPayment(prev => ({ ...prev, ...updatedPayments, payment_amount: total }));
     } else {
       setSelectedInvoices([]);
       setPayment(prev => ({ ...prev, payment_amount: 0 }));
@@ -234,7 +238,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Record Payment</h2>
+            <h2 className="text-xl font-bold text-gray-900">Recieve Payment</h2>
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
               <X className="h-6 w-6" />
             </button>
@@ -385,7 +389,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               </button>
               <button type="submit" className="btn btn-primary btn-md">
                 <DollarSign className="h-4 w-4 mr-2" />
-                Record Payment
+                Save Payment
               </button>
             </div>
           </form>

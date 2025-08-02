@@ -575,11 +575,48 @@ const getInvoiceItems = async(req, res) => {
   }
 }
 
+// Get Invoices By Customer
+const getInvoicesByCustomer = asyncHandler(async (req, res) => {
+  const { customerId, company_id } = req.params;
+
+  if (!customerId || !company_id) {
+    return res.status(400).json({ error: "Customer ID and Company ID are required" });
+  }
+
+  try {
+    const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                   FROM invoices i
+                   LEFT JOIN customer c ON i.customer_id = c.id
+                   LEFT JOIN employees e ON i.employee_id = e.id
+                   WHERE i.customer_id = ? AND i.company_id = ?
+                   ORDER BY i.created_at DESC`;
+
+    const [invoices] = await db.query(query, [customerId, company_id]);
+
+    if (invoices.length === 0) {
+      return res.status(404).json({ message: "No invoices found for this customer" });
+    }
+
+    // Fetch items for each invoice
+    const invoiceItemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
+    for (const invoice of invoices) {
+      const [items] = await db.query(invoiceItemsQuery, [invoice.id]);
+      invoice.items = items;
+    }
+
+    res.status(200).json(invoices);
+  } catch (error) {
+    console.error('Error fetching invoices by customer:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = {
   createInvoice,
   updateInvoice,
   deleteInvoice,
   getInvoices,
   getInvoiceById,
-  getInvoiceItems
+  getInvoiceItems,
+  getInvoicesByCustomer
 };

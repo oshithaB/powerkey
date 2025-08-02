@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, FileText, Eye, Send, DollarSign, Filter, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Eye, DollarSign, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import PaymentModal from '../modals/PaymentModal';
 import { useNavigate } from 'react-router-dom';
 
 interface Invoice {
   id: number;
   invoice_number: string;
-  customer_id: number;
+  customer_id: number | null;
   customer_name?: string;
   employee_id: number;
   first_name?: string;
@@ -41,10 +39,8 @@ export default function InvoicesPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  // const [showModal, setShowModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     status: '',
@@ -55,16 +51,21 @@ export default function InvoicesPage() {
   });
 
   useEffect(() => {
+    if (!selectedCompany?.company_id) {
+      console.log('No company selected, redirecting to /companies');
+      navigate('/companies');
+      return;
+    }
     fetchInvoices();
     fetchCustomers();
     fetchEmployees();
-  }, [selectedCompany, filters]);
+  }, [selectedCompany, filters, navigate]);
 
   const fetchInvoices = async () => {
     try {
       const response = await axiosInstance.get(`/api/getInvoice/${selectedCompany?.company_id}`);
+      console.log('Fetched invoices:', response.data.map((inv: Invoice) => ({ id: inv.id, customer_id: inv.customer_id, customer_name: inv.customer_name })));
       setInvoices(response.data);
-      console.log('Invoices fetched:', response.data);
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -100,12 +101,12 @@ export default function InvoicesPage() {
       alert('Failed to fetch invoice items');
     }
   };
+
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
       try {
         await axiosInstance.delete(`/api/deleteInvoice/${selectedCompany?.company_id}/${id}`);
         fetchInvoices();
-        alert("Successfully deleted")
       } catch (error) {
         console.error('Error deleting invoice:', error);
       }
@@ -113,8 +114,16 @@ export default function InvoicesPage() {
   };
 
   const handleAddPayment = (invoice: Invoice) => {
-    setSelectedInvoiceForPayment(invoice);
-    setShowPaymentModal(true);
+    if (!invoice.customer_id || isNaN(invoice.customer_id) || invoice.customer_id <= 0) {
+      console.error('Invalid or missing customer ID for invoice:', {
+        id: invoice.id,
+        customer_id: invoice.customer_id,
+      });
+      alert(`Cannot proceed: Invalid or missing customer ID for invoice ${invoice.invoice_number}`);
+      return;
+    }
+    console.log('Navigating to receive payment for customer ID:', invoice.customer_id);
+    navigate(`/invoices/receive-payment/${invoice.customer_id}`, { state: { invoice } });
   };
 
   const getStatusColor = (status: string) => {
@@ -136,10 +145,40 @@ export default function InvoicesPage() {
     }
   };
 
-  const filteredInvoices = invoices.filter(invoice =>
-    invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleCustomerSearch = (value: string) => {
+    setCustomerFilter(value);
+    if (value) {
+      const filteredSuggestions = customers.filter((customer) =>
+        customer.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setCustomerSuggestions(filteredSuggestions);
+    } else {
+      setCustomerSuggestions([]);
+    }
+  };
+
+  const filteredInvoices = invoices.filter((invoice) => {
+    const matchesSearchTerm =
+      invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      'Unknown Customer'.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filters.status
+      ? (invoice.computed_status || invoice.status) === filters.status
+      : true;
+
+    const matchesCustomer = customerFilter
+      ? invoice.customer_name?.toLowerCase().includes(customerFilter.toLowerCase()) ||
+        'Unknown Customer'.toLowerCase().includes(customerFilter.toLowerCase())
+      : true;
+
+    const invoiceDate = new Date(invoice.invoice_date).getTime();
+    const matchesDate =
+      (!filters.dateFrom || invoiceDate >= new Date(filters.dateFrom).getTime()) &&
+      (!filters.dateTo || invoiceDate <= new Date(filters.dateTo).getTime());
+
+    return matchesSearchTerm && matchesStatus && matchesCustomer && matchesDate;
+  });
 
   if (loading) {
     return (
@@ -162,9 +201,7 @@ export default function InvoicesPage() {
             Filters
           </button>
           <button
-            onClick={() => {
-              navigate('/invoices/create');
-            }}
+            onClick={() => navigate('/invoices/create')}
             className="btn btn-primary btn-md"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -173,11 +210,10 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Filters */}
       {showFilters && (
         <div className="card">
           <div className="card-content">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
@@ -196,70 +232,57 @@ export default function InvoicesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-                <select
-                  className="input"
-                  value={filters.customer}
-                  onChange={(e) => setFilters({ ...filters, customer: e.target.value })}
-                >
-                  <option value="">All Customers</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="input pr-3 w-full"
+                    value={customerFilter}
+                    onChange={(e) => handleCustomerSearch(e.target.value)}
+                    placeholder="Search customers..."
+                    onBlur={() => setCustomerSuggestions([])}
+                  />
+                  {customerSuggestions.length > 0 && (
+                    <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
+                      {customerSuggestions.map((customer) => (
+                        <li
+                          key={customer.id}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={() => {
+                            setCustomerFilter(customer.name);
+                            setCustomerSuggestions([]);
+                          }}
+                        >
+                          {customer.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-                <select
-                  className="input"
-                  value={filters.employee}
-                  onChange={(e) => setFilters({ ...filters, employee: e.target.value })}
-                >
-                  <option value="">All Employees</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.first_name} {employee.last_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={filters.dateFrom}
-                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={filters.dateTo}
-                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="date"
+                    className="input"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                    placeholder="From"
+                  />
+                  <input
+                    type="date"
+                    className="input"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                    placeholder="To"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-        <input
-          type="text"
-          placeholder="Search invoices..."
-          className="input pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Invoices Table */}
       <div className="card">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -340,8 +363,6 @@ export default function InvoicesPage() {
                       {(invoice.computed_status || invoice.status).replace('_', ' ').charAt(0).toUpperCase() + (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
                     </span>
                   </td>
-
-                  {/* Action Buttons  */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
@@ -363,15 +384,14 @@ export default function InvoicesPage() {
                       >
                         <Printer className="h-4 w-4" />
                       </button>
-                      {invoice.balance_due > 0 && (
-                        <button
-                          onClick={() => handleAddPayment(invoice)}
-                          className="text-green-600 hover:text-green-900"
-                          title="Add Payment"
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleAddPayment(invoice)}
+                        className="text-green-600 hover:text-green-900"
+                        title="Add Payment"
+                        disabled={!invoice.customer_id}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => handleDelete(invoice.id)}
                         className="text-red-600 hover:text-red-900"
@@ -387,29 +407,6 @@ export default function InvoicesPage() {
           </table>
         </div>
       </div>
-
-      {/* Modals */}
-      {/* {showModal && (
-        <InvoiceModal
-          invoice={editingInvoice}
-          onClose={() => setShowModal(false)}
-          onSave={() => {
-            fetchInvoices();
-            setShowModal(false);
-          }}
-        />
-      )} */}
-
-      {showPaymentModal && selectedInvoiceForPayment && (
-        <PaymentModal
-          invoice={selectedInvoiceForPayment}
-          onClose={() => setShowPaymentModal(false)}
-          onSave={() => {
-            fetchInvoices();
-            setShowPaymentModal(false);
-          }}
-        />
-      )}
     </div>
   );
 }

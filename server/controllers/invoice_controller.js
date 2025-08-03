@@ -614,7 +614,7 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
 // Record Payment
 const recordPayment = asyncHandler(async (req, res) => {
   const { customerId, company_id } = req.params;
-  const { payment_amount, payment_date, payment_method, notes, invoice_payments } = req.body;
+  const { payment_amount, payment_date, payment_method, deposit_to, notes, invoice_payments } = req.body;
 
   if (!customerId || !company_id) {
     return res.status(400).json({ error: "Customer ID and Company ID are required" });
@@ -628,6 +628,14 @@ const recordPayment = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "Payment date is required" });
   }
 
+  if (!payment_method) {
+    return res.status(400).json({ error: "Payment method is required" });
+  }
+
+  if (!deposit_to) {
+    return res.status(400).json({ error: "Deposit to is required" });
+  }
+
   if (!invoice_payments || !Array.isArray(invoice_payments) || invoice_payments.length === 0) {
     return res.status(400).json({ error: "Invoice payment distribution is required" });
   }
@@ -635,6 +643,13 @@ const recordPayment = asyncHandler(async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+
+    // Verify total payment matches sum of invoice payments
+    const totalInvoicePayments = invoice_payments.reduce((sum, { payment_amount }) => sum + Number(payment_amount), 0);
+    if (Math.abs(totalInvoicePayments - payment_amount) > 0.01) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Sum of invoice payments does not match total payment amount" });
+    }
 
     // Create payments table if it doesn't exist
     await connection.query(`
@@ -646,7 +661,7 @@ const recordPayment = asyncHandler(async (req, res) => {
         payment_amount DECIMAL(10,2) NOT NULL,
         payment_date DATE NOT NULL,
         payment_method VARCHAR(50) NOT NULL,
-        reference_number VARCHAR(100),
+        deposit_to VARCHAR(100) NOT NULL,
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (invoice_id) REFERENCES invoices(id),
@@ -659,25 +674,46 @@ const recordPayment = asyncHandler(async (req, res) => {
     for (const invoicePayment of invoice_payments) {
       const { invoice_id, payment_amount: invoicePaymentAmount } = invoicePayment;
 
-      // Insert payment record
-      await connection.query(
-        `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, notes || null]
+      if (!invoice_id || invoicePaymentAmount <= 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Invalid invoice ID or payment amount" });
+      }
+
+      // Verify invoice exists
+      const [invoice] = await connection.query(
+        `SELECT total_amount, paid_amount FROM invoices WHERE id = ? AND company_id = ? AND customer_id = ?`,
+        [invoice_id, company_id, customerId]
       );
 
-      // Update invoice paid amount and balance
+      if (invoice.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: `Invoice ${invoice_id} not found` });
+      }
+
+      const newPaidAmount = (Number(invoice[0].paid_amount) || 0) + Number(invoicePaymentAmount);
+      const totalAmount = Number(invoice[0].total_amount) || 0;
+      let status = 'draft';
+      if (newPaidAmount >= totalAmount) {
+        status = 'paid';
+      } else if (newPaidAmount > 0) {
+        status = 'partially_paid';
+      }
+
+      // Insert payment record
+      await connection.query(
+        `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, deposit_to, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, deposit_to, notes || null]
+      );
+
+      // Update invoice
       await connection.query(
         `UPDATE invoices 
-         SET paid_amount = paid_amount + ?, 
-             balance_due = total_amount - (paid_amount + ?),
-             status = CASE 
-               WHEN (paid_amount + ?) >= total_amount THEN 'paid'
-               WHEN (paid_amount + ?) > 0 THEN 'partially_paid'
-               ELSE status
-             END
+         SET paid_amount = ?, 
+             balance_due = ?, 
+             status = ?
          WHERE id = ? AND company_id = ?`,
-        [invoicePaymentAmount, invoicePaymentAmount, invoicePaymentAmount, invoicePaymentAmount, invoice_id, company_id]
+        [newPaidAmount, totalAmount - newPaidAmount, status, invoice_id, company_id]
       );
     }
 

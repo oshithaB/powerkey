@@ -232,41 +232,46 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);
     if (newSelectAll) {
-      const newSelected = invoices.map((invoice) => invoice.id);
+      const newSelected = invoices.filter((invoice) => invoice.status !== 'paid').map((invoice) => invoice.id);
       setSelectedInvoices(newSelected);
       const updatedPayments = invoices.reduce(
         (acc, invoice) => ({
           ...acc,
-          [invoice.id]: Number(invoice.total_amount) || 0,
+          [invoice.id]: invoice.status === 'paid' ? 0 : Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0),
         }),
         {}
       );
-      const total = invoices.reduce((sum, invoice) => sum + (Number(invoice.total_amount) || 0), 0);
+      const total = invoices.reduce((sum, invoice) => sum + (invoice.status === 'paid' ? 0 : Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0)), 0);
       setPayment((prev) => ({ ...prev, ...updatedPayments, payment_amount: total }));
     } else {
       setSelectedInvoices([]);
       setPayment((prev) => ({ ...prev, payment_amount: 0 }));
     }
   };
-
+  
   const handleSelectInvoice = (invoiceId: number, totalAmount: number | string | null) => {
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
+    if (invoice?.status === 'paid') return;
+  
     const newSelected = selectedInvoices.includes(invoiceId)
       ? selectedInvoices.filter((id) => id !== invoiceId)
       : [...selectedInvoices, invoiceId];
-
+  
     setSelectedInvoices(newSelected);
-
+  
+    const balanceDue = invoice ? Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0) : 0;
+  
     const total = newSelected.reduce((sum, id) => {
-      const invoice = invoices.find((inv) => inv.id === id);
-      return sum + (invoice ? (Number(payment[id]) || Number(invoice.total_amount) || 0) : 0);
+      const inv = invoices.find((inv) => inv.id === id);
+      return sum + (inv ? (Number(payment[id]) || (inv.status === 'paid' ? 0 : Number(inv.total_amount) - (Number(inv.paid_amount) || 0))) : 0);
     }, 0);
-
+  
     setPayment((prev) => ({
       ...prev,
-      [invoiceId]: newSelected.includes(invoiceId) ? Number(totalAmount) || 0 : prev[invoiceId] || '',
+      [invoiceId]: newSelected.includes(invoiceId) ? balanceDue : '',
       payment_amount: total,
     }));
-    setSelectAll(newSelected.length === invoices.length);
+    setSelectAll(newSelected.length === invoices.filter((invoice) => invoice.status !== 'paid').length);
   };
 
   const handlePaymentChange = (
@@ -322,21 +327,18 @@ const InvoiceReceivePaymentModal: React.FC = () => {
 
   const formatAmount = (amount: number | string | null | undefined): string => {
     if (amount === '' || amount == null || isNaN(Number(amount))) {
-      return '';
+      return '0';
     }
-    return parseFloat(amount.toString()).toLocaleString();
+    const formatted = parseFloat(amount.toString());
+    return formatted < 0 ? '0' : formatted.toLocaleString();
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     const customerId = state?.invoice?.customer_id || null;
-
+  
     if (!customerId || !selectedCompany?.company_id) {
       alert('Missing customer ID or company ID');
-      return;
-    }
-    if (selectedInvoices.length === 0) {
-      alert('No invoices selected');
       return;
     }
     if (!payment.payment_method) {
@@ -347,15 +349,31 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       alert('Please select a deposit purpose.');
       return;
     }
-
+  
+    const invoicePayments = invoices
+      .filter((invoice) => selectedInvoices.includes(invoice.id) && Number(payment[invoice.id]) > 0)
+      .map((invoice) => ({
+        invoice_id: invoice.id,
+        payment_amount: Number(payment[invoice.id]) || 0,
+      }));
+  
+    if (invoicePayments.length === 0) {
+      alert('please select the invoices to pay.');
+      return;
+    }
+  
     try {
       await axiosInstance.post(`/api/recordPayment/${selectedCompany.company_id}/${customerId}`, {
-        ...payment,
+        payment_amount: payment.payment_amount,
+        payment_date: payment.payment_date,
+        payment_method: payment.payment_method,
+        deposit_to: payment.deposit_to,
+        notes: payment.notes,
         customer_id: customerId,
-        invoice_ids: selectedInvoices,
+        invoice_payments: invoicePayments,
       });
       alert('Payment recorded successfully');
-      navigate('/invoices');
+      navigate('/dashboard/invoices');
     } catch (error) {
       console.error('Error recording payment:', error);
       alert('Failed to record payment');
@@ -434,6 +452,9 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                       Total
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Paid Amount
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -447,7 +468,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoices.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-2 text-center text-sm text-gray-500">
+                      <td colSpan={8} className="px-4 py-2 text-center text-sm text-gray-500">
                         No invoices found for this customer.
                       </td>
                     </tr>
@@ -460,6 +481,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                             checked={selectedInvoices.includes(invoice.id)}
                             onChange={() => handleSelectInvoice(invoice.id, invoice.total_amount)}
                             className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                            disabled={invoice.status === 'paid'}
                           />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
@@ -470,16 +492,26 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                           Rs. {formatAmount(invoice.total_amount)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
-                          <input
-                            type="number"
-                            value={payment[invoice.id] || ''}
-                            onChange={(e) => handlePaymentChange(e, invoice.id)}
-                            className="input w-full"
-                            placeholder="Enter amount"
-                          />
+                          Rs. {formatAmount(invoice.paid_amount)}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        <input
+                          type="number"
+                          value={
+                            payment[invoice.id] !== undefined
+                              ? payment[invoice.id]
+                              : selectedInvoices.includes(invoice.id)
+                                ? Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0)
+                                : ''
+                          }
+                          onChange={(e) => handlePaymentChange(e, invoice.id)}
+                          className="input w-full"
+                          placeholder="Enter amount"
+                          disabled={invoice.status === 'paid'}
+                        />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
-                          Rs. {formatAmount(Number(invoice.total_amount) - (Number(payment[invoice.id]) || 0))}
+                          Rs. {formatAmount(Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0) - (Number(payment[invoice.id]) || 0))}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           <span

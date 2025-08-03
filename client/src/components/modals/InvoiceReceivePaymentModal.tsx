@@ -615,7 +615,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading || depositPurposesLoading}>
-                <DollarSign className="h-4 w-4 mr-2" />
                 Save Payment
               </button>
             </div>

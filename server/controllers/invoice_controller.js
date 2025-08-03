@@ -459,6 +459,12 @@ const deleteInvoice = async (req, res) => {
             [invoiceId]
         );
 
+        // Delete payments associated with the invoice
+        await connection.query(
+          `DELETE FROM payments WHERE invoice_id = ?`,
+          [invoiceId]
+        );
+
         // Delete the invoice
         const [deleteResult] = await connection.query(
             `DELETE FROM invoices WHERE id = ?`,
@@ -481,43 +487,141 @@ const deleteInvoice = async (req, res) => {
     }
 }
 
+const getInvoice = async (req, res) => {
+  const { id, company_id } = req.params;
+
+  if (!id || !company_id) {
+    return res.status(400).json({ error: 'Invoice ID and Company ID are required' });
+  }
+
+  try {
+    // Get invoice with customer and employee info
+    const invoiceQuery = `
+      SELECT i.*, c.name AS customer_name, c.phone AS customer_phone,
+             e.name AS employee_name
+      FROM invoices i
+      LEFT JOIN customers c ON i.customer_id = c.id
+      LEFT JOIN employees e ON i.employee_id = e.id
+      WHERE i.id = ? AND i.company_id = ?
+    `;
+    const [invoiceRows] = await db.execute(invoiceQuery, [id, company_id]);
+
+    if (invoiceRows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = invoiceRows[0];
+
+    // Get invoice items
+    const itemsQuery = `
+      SELECT ii.*, p.name AS product_name, p.price AS product_price
+      FROM invoice_items ii
+      LEFT JOIN products p ON ii.product_id = p.id
+      WHERE ii.invoice_id = ?
+    `;
+    const [itemsRows] = await db.execute(itemsQuery, [id]);
+
+    invoice.items = itemsRows;
+
+    res.status(200).json(invoice);
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+module.exports = { getInvoice };
+
 // Get Invoices
 const getInvoices = async (req, res) => {
+  try {
+    const { company_id } = req.params;
+
+    if (!company_id) {
+      return res.status(400).json({ error: "Company ID is required" });
+    }
+
+    const connection = await db.getConnection();
     try {
-        const { company_id } = req.params;
+      await connection.beginTransaction();
 
-        if (!company_id) {
-            return res.status(400).json({ error: "Company ID is required" });
-        }
+      // Fetch invoices
+      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                     FROM invoices i
+                     LEFT JOIN customer c ON i.customer_id = c.id
+                     LEFT JOIN employees e ON i.employee_id = e.id
+                     WHERE i.company_id = ?
+                     ORDER BY i.created_at DESC`;
+      
+      const [invoices] = await connection.query(query, [company_id]);
 
-        const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
-               FROM invoices i
-               LEFT JOIN customer c ON i.customer_id = c.id
-               LEFT JOIN employees e ON i.employee_id = e.id
-               WHERE i.company_id = ?
-               ORDER BY i.created_at DESC`;
-        
-        const [invoices] = await db.query(query, [company_id]);
+      if (invoices.length === 0) {
+        await connection.commit();
+        return res.status(404).json({ message: "No invoices found for this company" });
+      }
 
-        if (invoices.length === 0) {
-            return res.status(404).json({ message: "No invoices found for this company" });
+      const currentDate = new Date();
+
+      for (const invoice of invoices) {
+        const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+        const paidAmount = Number(invoice.paid_amount) || 0;
+        const totalAmount = Number(invoice.total_amount) || 0;
+        const balanceDue = totalAmount - paidAmount;
+
+        // Update overdue status if needed
+        if (
+          dueDate &&
+          dueDate < currentDate &&
+          invoice.status !== 'paid' &&
+          invoice.status !== 'cancelled' &&
+          balanceDue > 0
+        ) {
+          await connection.query(
+            `UPDATE invoices 
+             SET status = 'overdue', balance_due = ?, updated_at = ?
+             WHERE id = ? AND company_id = ?`,
+            [balanceDue, new Date(), invoice.id, company_id]
+          );
+
+          invoice.status = 'overdue';
+          invoice.balance_due = balanceDue;
+          invoice.updated_at = new Date().toISOString();
         }
 
         // Fetch items for each invoice
-        const invoiceItemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
-        for (const invoice of invoices) {
-            const [items] = await db.query(invoiceItemsQuery, [invoice.id]);
-            invoice.items = items;
-        }
+        const [items] = await connection.query(
+          `SELECT * FROM invoice_items WHERE invoice_id = ?`,
+          [invoice.id]
+        );
 
-        res.status(200).json(invoices);
-    }
+        invoice.items = items.map(item => ({
+          ...item,
+          created_at: item.created_at ? new Date(item.created_at).toISOString() : null,
+          updated_at: item.updated_at ? new Date(item.updated_at).toISOString() : null
+        }));
 
-    catch (error) {
-        console.error('Error fetching invoices:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        // Normalize date fields to ISO format
+        invoice.invoice_date = invoice.invoice_date ? new Date(invoice.invoice_date).toISOString() : null;
+        invoice.due_date = invoice.due_date ? new Date(invoice.due_date).toISOString() : null;
+        invoice.shipping_date = invoice.shipping_date ? new Date(invoice.shipping_date).toISOString() : null;
+        invoice.created_at = invoice.created_at ? new Date(invoice.created_at).toISOString() : null;
+        invoice.updated_at = invoice.updated_at ? new Date(invoice.updated_at).toISOString() : null;
+      }
+
+      await connection.commit();
+      res.status(200).json(invoices);
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error processing invoices:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    } finally {
+      connection.release();
     }
-}
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 const getInvoiceById = async (req, res) => {
   try {
@@ -584,27 +688,60 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
   }
 
   try {
-    const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
-                   FROM invoices i
-                   LEFT JOIN customer c ON i.customer_id = c.id
-                   LEFT JOIN employees e ON i.employee_id = e.id
-                   WHERE i.customer_id = ? AND i.company_id = ?
-                   ORDER BY i.created_at DESC`;
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
 
-    const [invoices] = await db.query(query, [customerId, company_id]);
+      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                     FROM invoices i
+                     LEFT JOIN customer c ON i.customer_id = c.id
+                     LEFT JOIN employees e ON i.employee_id = e.id
+                     WHERE i.customer_id = ? AND i.company_id = ?
+                     ORDER BY i.created_at DESC`;
 
-    if (invoices.length === 0) {
-      return res.status(404).json({ message: "No invoices found for this customer" });
+      const [invoices] = await connection.query(query, [customerId, company_id]);
+
+      if (invoices.length === 0) {
+        await connection.commit();
+        return res.status(404).json({ message: "No invoices found for this customer" });
+      }
+
+      // Update status to overdue if due date has passed
+      const currentDate = new Date();
+      for (const invoice of invoices) {
+        const dueDate = new Date(invoice.due_date);
+        if (
+          dueDate < currentDate &&
+          invoice.status !== 'paid' &&
+          invoice.status !== 'cancelled' &&
+          invoice.balance_due > 0
+        ) {
+          await connection.query(
+            `UPDATE invoices 
+             SET status = 'overdue', updated_at = ?
+             WHERE id = ? AND company_id = ?`,
+            [new Date(), invoice.id, company_id]
+          );
+          invoice.status = 'overdue';
+        }
+
+        // Fetch items for each invoice
+        const [items] = await connection.query(
+          `SELECT * FROM invoice_items WHERE invoice_id = ?`,
+          [invoice.id]
+        );
+        invoice.items = items;
+      }
+
+      await connection.commit();
+      res.status(200).json(invoices);
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error processing invoices by customer:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    } finally {
+      connection.release();
     }
-
-    // Fetch items for each invoice
-    const invoiceItemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
-    for (const invoice of invoices) {
-      const [items] = await db.query(invoiceItemsQuery, [invoice.id]);
-      invoice.items = items;
-    }
-
-    res.status(200).json(invoices);
   } catch (error) {
     console.error('Error fetching invoices by customer:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -670,6 +807,8 @@ const recordPayment = asyncHandler(async (req, res) => {
       )
     `);
 
+    const currentDate = new Date();
+
     // Record payments and update invoices
     for (const invoicePayment of invoice_payments) {
       const { invoice_id, payment_amount: invoicePaymentAmount } = invoicePayment;
@@ -681,7 +820,7 @@ const recordPayment = asyncHandler(async (req, res) => {
 
       // Verify invoice exists
       const [invoice] = await connection.query(
-        `SELECT total_amount, paid_amount FROM invoices WHERE id = ? AND company_id = ? AND customer_id = ?`,
+        `SELECT total_amount, paid_amount, due_date FROM invoices WHERE id = ? AND company_id = ? AND customer_id = ?`,
         [invoice_id, company_id, customerId]
       );
 
@@ -692,11 +831,24 @@ const recordPayment = asyncHandler(async (req, res) => {
 
       const newPaidAmount = (Number(invoice[0].paid_amount) || 0) + Number(invoicePaymentAmount);
       const totalAmount = Number(invoice[0].total_amount) || 0;
+      const balanceDue = totalAmount - newPaidAmount;
       let status = 'draft';
+
       if (newPaidAmount >= totalAmount) {
         status = 'paid';
       } else if (newPaidAmount > 0) {
         status = 'partially_paid';
+      }
+
+      // Check for overdue status if not paid
+      const dueDate = new Date(invoice[0].due_date);
+      if (
+        status !== 'paid' &&
+        dueDate < currentDate &&
+        balanceDue > 0 &&
+        status !== 'cancelled'
+      ) {
+        status = 'overdue';
       }
 
       // Insert payment record
@@ -711,9 +863,10 @@ const recordPayment = asyncHandler(async (req, res) => {
         `UPDATE invoices 
          SET paid_amount = ?, 
              balance_due = ?, 
-             status = ?
+             status = ?,
+             updated_at = ?
          WHERE id = ? AND company_id = ?`,
-        [newPaidAmount, totalAmount - newPaidAmount, status, invoice_id, company_id]
+        [newPaidAmount, balanceDue, status, new Date(), invoice_id, company_id]
       );
     }
 

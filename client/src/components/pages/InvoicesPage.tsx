@@ -11,8 +11,7 @@ interface Invoice {
   customer_id: number | null;
   customer_name?: string;
   employee_id: number;
-  first_name?: string;
-  last_name?: string;
+  employee_name?: string; // Updated to match backend
   estimate_id?: number;
   invoice_date: string;
   due_date: string;
@@ -25,7 +24,6 @@ interface Invoice {
   paid_amount: number;
   balance_due: number;
   status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
-  computed_status?: string;
   notes: string;
   terms: string;
   created_at: string;
@@ -59,7 +57,7 @@ export default function InvoicesPage() {
     fetchInvoices();
     fetchCustomers();
     fetchEmployees();
-  }, [selectedCompany, filters, navigate]);
+  }, [selectedCompany, navigate]); // Removed filters from dependencies
 
   const fetchInvoices = async () => {
     try {
@@ -164,7 +162,7 @@ export default function InvoicesPage() {
       'Unknown Customer'.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filters.status
-      ? (invoice.computed_status || invoice.status) === filters.status
+      ? invoice.status === filters.status
       : true;
 
     const matchesCustomer = customerFilter
@@ -359,8 +357,8 @@ export default function InvoicesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.computed_status || invoice.status)}`}>
-                      {(invoice.computed_status || invoice.status).replace('_', ' ').charAt(0).toUpperCase() + (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
+                      {invoice.status.replace('_', ' ').charAt(0).toUpperCase() + invoice.status.replace('_', ' ').slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

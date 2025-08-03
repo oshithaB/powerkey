@@ -227,6 +227,8 @@ async function createTables(db) {
             tax_amount DECIMAL(10,2) DEFAULT 0.00,
             discount_amount DECIMAL(10,2) DEFAULT 0.00,
             total_amount DECIMAL(10,2) NOT NULL,
+            paid_amount DECIMAL(15,2) DEFAULT 0.00,
+            balance_due DECIMAL(15,2) DEFAULT 0.00,
             status ENUM('draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled') DEFAULT 'draft',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -234,7 +236,7 @@ async function createTables(db) {
             FOREIGN KEY (customer_id) REFERENCES customer(id),
             FOREIGN KEY (employee_id) REFERENCES employees(id),
             FOREIGN KEY (estimate_id) REFERENCES estimates(id)
-        )`,
+        );`,
         `CREATE TABLE  IF NOT EXISTS invoice_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
             invoice_id INT NOT NULL,

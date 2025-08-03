@@ -51,7 +51,7 @@ const getEstimates = async (req, res) => {
     }
 }
 
-getEstimatesByCustomer = async (req, res) => {
+const getEstimatesByCustomer = async (req, res) => {
     try {
         const { customerId } = req.params;
 
@@ -392,7 +392,6 @@ const editEstimate = async (req, res) => {
   }
 };
 
-
 const deleteEstimate = async (req, res) => {
     try {
         const { estimateId } = req.params;
@@ -418,9 +417,7 @@ const deleteEstimate = async (req, res) => {
         }
 
         res.status(200).json({ message: "Estimate deleted successfully" });
-    }
-
-    catch (error) {
+    } catch (error) {
         console.error("Error deleting estimate:", error);
         res.status(500).json({ error: "Internal server error" });
     }
@@ -460,7 +457,146 @@ const getEstimatesItems = async (req, res) => {
     }
 }
 
+const convertEstimateToInvoice = async (req, res) => {
+    try {
+        const { companyId, estimateId } = req.params;
 
+        if (!companyId || !estimateId) {
+            return res.status(400).json({ error: "Company ID and Estimate ID are required" });
+        }
+
+        // Start transaction
+        await db.query('START TRANSACTION');
+
+        // Fetch estimate details
+        const [estimate] = await db.query(
+            `SELECT 
+                e.*,
+                c.name AS customer_name,
+                emp.name AS employee_name
+             FROM estimates e
+             JOIN customer c ON e.customer_id = c.id
+             LEFT JOIN employees emp ON e.employee_id = emp.id
+             WHERE e.id = ? AND e.company_id = ? AND e.is_active = 1`,
+            [estimateId, companyId]
+        );
+
+        if (!estimate || estimate.length === 0) {
+            await db.query('ROLLBACK');
+            return res.status(404).json({ error: "Estimate not found" });
+        }
+
+        const estimateData = estimate[0];
+
+        // Check if estimate is already converted using status or invoice_id
+        if (estimateData.status === 'converted' || estimateData.invoice_id !== null) {
+            await db.query('ROLLBACK');
+            return res.status(400).json({ error: "Estimate has already been converted to an invoice" });
+        }
+
+        // Generate invoice number (you may want to implement your own logic for invoice number generation)
+        const invoiceNumber = `INV-${estimateData.estimate_number}-${Date.now()}`;
+
+        // Create invoice
+        const invoiceQuery = `
+            INSERT INTO invoices (
+                company_id, customer_id, employee_id, estimate_id, invoice_number, 
+                invoice_date, due_date, discount_type, discount_value, discount_amount,
+                notes, terms, shipping_address, billing_address, ship_via, 
+                shipping_date, tracking_number, subtotal, tax_amount, total_amount,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const invoiceValues = [
+            companyId,
+            estimateData.customer_id,
+            estimateData.employee_id || null,
+            estimateId,
+            invoiceNumber,
+            new Date().toISOString().split('T')[0], // Current date as invoice_date
+            estimateData.expiry_date || null, // Use estimate expiry date as due date
+            estimateData.discount_type || 'fixed',
+            estimateData.discount_amount || 0.00, // Using discount_amount as discount_value
+            estimateData.discount_amount || 0.00,
+            estimateData.notes || null,
+            estimateData.terms || null,
+            estimateData.shipping_address || null,
+            estimateData.billing_address || null,
+            estimateData.ship_via || null,
+            estimateData.shipping_date || null,
+            estimateData.tracking_number || null,
+            estimateData.subtotal || 0.00,
+            estimateData.tax_amount || 0.00,
+            estimateData.total_amount || 0.00,
+            'draft' // Initial status
+        ];
+
+        const [invoiceResult] = await db.query(invoiceQuery, invoiceValues);
+
+        if (invoiceResult.affectedRows === 0) {
+            await db.query('ROLLBACK');
+            return res.status(400).json({ error: "Failed to create invoice" });
+        }
+
+        // Fetch estimate items
+        const [estimateItems] = await db.query(
+            `SELECT * FROM estimate_items WHERE estimate_id = ?`,
+            [estimateId]
+        );
+
+        // Insert invoice items
+        const itemQuery = `
+            INSERT INTO invoice_items (
+                invoice_id, product_id, description, quantity, unit_price, 
+                actual_unit_price, tax_rate, tax_amount, total_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        for (const item of estimateItems) {
+            const itemValues = [
+                invoiceResult.insertId,
+                item.product_id,
+                item.description,
+                item.quantity,
+                item.unit_price,
+                item.actual_unit_price,
+                item.tax_rate,
+                item.tax_amount,
+                item.total_price
+            ];
+            const [itemResult] = await db.query(itemQuery, itemValues);
+            if (itemResult.affectedRows === 0) {
+                await db.query('ROLLBACK');
+                return res.status(400).json({ error: "Failed to create invoice items" });
+            }
+        }
+
+        // Update estimate status to 'converted' and set invoice_id
+        const updateEstimateQuery = `
+            UPDATE estimates 
+            SET status = 'converted', invoice_id = ?
+            WHERE id = ?
+        `;
+        await db.query(updateEstimateQuery, [invoiceResult.insertId, estimateId]);
+
+        // Commit transaction
+        await db.query('COMMIT');
+
+        res.status(200).json({
+            message: "Estimate converted to invoice successfully",
+            invoice_id: invoiceResult.insertId,
+            invoice_number: invoiceNumber
+        });
+    } catch (error) {
+        await db.query('ROLLBACK');
+        console.error("Error converting estimate to invoice:", error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: `Invoice number '${invoiceNumber}' already exists` });
+        }
+        res.status(500).json({ error: error.sqlMessage || "Internal server error" });
+    }
+};
 
 module.exports = {
     getEstimates,
@@ -468,5 +604,6 @@ module.exports = {
     deleteEstimate,
     editEstimate,
     getEstimatesItems,
+    convertEstimateToInvoice,
     getEstimatesByCustomer
 };

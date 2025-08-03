@@ -4,6 +4,18 @@ import axiosInstance from '../../axiosInstance';
 import { Plus, Edit, Trash2, FileText, Eye, DollarSign, Filter, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface Invoice {
   id: number;
@@ -11,8 +23,7 @@ interface Invoice {
   customer_id: number | null;
   customer_name?: string;
   employee_id: number;
-  first_name?: string;
-  last_name?: string;
+  employee_name?: string;
   estimate_id?: number;
   invoice_date: string;
   due_date: string;
@@ -25,7 +36,6 @@ interface Invoice {
   paid_amount: number;
   balance_due: number;
   status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
-  computed_status?: string;
   notes: string;
   terms: string;
   created_at: string;
@@ -59,7 +69,7 @@ export default function InvoicesPage() {
     fetchInvoices();
     fetchCustomers();
     fetchEmployees();
-  }, [selectedCompany, filters, navigate]);
+  }, [selectedCompany, navigate]);
 
   const fetchInvoices = async () => {
     try {
@@ -164,7 +174,7 @@ export default function InvoicesPage() {
       'Unknown Customer'.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filters.status
-      ? (invoice.computed_status || invoice.status) === filters.status
+      ? invoice.status === filters.status
       : true;
 
     const matchesCustomer = customerFilter
@@ -180,6 +190,59 @@ export default function InvoicesPage() {
     return matchesSearchTerm && matchesStatus && matchesCustomer && matchesDate;
   });
 
+  // Calculate chart data
+  const overdueData = invoices
+  .filter(invoice => invoice.status === 'overdue')
+  .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
+
+  const balanceDueData = invoices
+  .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft')
+  .reduce((acc, invoice) => {
+    const amount = invoice.status === 'partially_paid' 
+      ? (Number(invoice.balance_due) || 0) 
+      : (Number(invoice.total_amount) || 0);
+    return acc + amount;
+  }, 0);
+
+  const paidData = invoices
+  .filter(invoice => invoice.status === 'paid')
+  .reduce((acc, invoice) => acc + (Number(invoice.paid_amount) || 0), 0);
+
+  const chartData = {
+    labels: ['Overdue', 'Balance Due', 'Paid'],
+    datasets: [
+      {
+        label: 'Amount (LKR)',
+        data: [overdueData, balanceDueData, paidData],
+        backgroundColor: ['#dc2626', '#6b7280', '#10b981'],
+        borderColor: ['#dc2626', '#6b7280', '#10b981'],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' as const },
+      title: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => `LKR ${context.parsed.y.toLocaleString()}`
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: (value: number) => `LKR ${value.toLocaleString()}`,
+        },
+      },
+    },
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -190,6 +253,13 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow h-72">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Invoice Summary</h2>
+        <div className="h-full">
+          <Bar data={chartData} options={chartOptions} />
+        </div>
+      </div>
+
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
         <div className="flex space-x-2">
@@ -314,7 +384,7 @@ export default function InvoicesPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
                         <div className="h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -359,8 +429,8 @@ export default function InvoicesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.computed_status || invoice.status)}`}>
-                      {(invoice.computed_status || invoice.status).replace('_', ' ').charAt(0).toUpperCase() + (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
+                      {invoice.status.replace('_', ' ').charAt(0).toUpperCase() + invoice.status.replace('_', ' ').slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

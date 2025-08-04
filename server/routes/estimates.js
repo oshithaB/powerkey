@@ -10,7 +10,8 @@ const {
     editEstimate,
     getEstimatesItems,
     convertEstimateToInvoice,
-    getEstimatesByCustomer
+    getEstimatesByCustomer,
+    updateEstimateAfterInvoice
 } = require('../controllers/estimate_controller');
 
 router.get(
@@ -60,6 +61,13 @@ router.post(
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     convertEstimateToInvoice
-)
+);
+
+router.post(
+    '/updateEstimateAfterInvoice/:companyId/:estimateId',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    updateEstimateAfterInvoice
+  );
 
 module.exports = router;

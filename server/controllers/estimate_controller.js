@@ -41,7 +41,8 @@ const getEstimates = async (req, res) => {
                         LEFT JOIN 
                             employees emp ON e.employee_id = emp.id
                         WHERE 
-                            e.company_id = ? AND e.is_active = 1;
+                            e.company_id = ? AND e.is_active = 1
+                        ORDER BY e.created_at DESC;
                         `;
         const [estimates] = await db.query(query, [companyId]);
         res.json(estimates);
@@ -598,6 +599,42 @@ const convertEstimateToInvoice = async (req, res) => {
     }
 };
 
+const updateEstimateAfterInvoice = async (req, res) => {
+    try {
+      const { companyId, estimateId } = req.params;
+      const { invoice_id } = req.body;
+  
+      if (!companyId || !estimateId || !invoice_id) {
+        return res.status(400).json({ error: "Company ID, Estimate ID, and Invoice ID are required" });
+      }
+  
+      const [estimate] = await db.query(
+        `SELECT * FROM estimates WHERE id = ? AND company_id = ? AND is_active = 1`,
+        [estimateId, companyId]
+      );
+  
+      if (!estimate || estimate.length === 0) {
+        return res.status(404).json({ error: "Estimate not found" });
+      }
+  
+      if (estimate[0].status === 'converted' || estimate[0].invoice_id !== null) {
+        return res.status(400).json({ error: "Estimate has already been converted to an invoice" });
+      }
+  
+      await db.query(
+        `UPDATE estimates 
+         SET status = 'converted', invoice_id = ?
+         WHERE id = ? AND company_id = ?`,
+        [invoice_id, estimateId, companyId]
+      );
+  
+      res.status(200).json({ message: "Estimate updated successfully" });
+    } catch (error) {
+      console.error("Error updating estimate after invoice creation:", error);
+      res.status(500).json({ error: error.sqlMessage || "Internal server error" });
+    }
+  };
+
 module.exports = {
     getEstimates,
     createEstimate,
@@ -605,5 +642,6 @@ module.exports = {
     editEstimate,
     getEstimatesItems,
     convertEstimateToInvoice,
-    getEstimatesByCustomer
+    getEstimatesByCustomer,
+    updateEstimateAfterInvoice
 };

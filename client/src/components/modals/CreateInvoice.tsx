@@ -304,7 +304,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       if (!formData.invoice_number) {
         throw new Error('Invoice number is required');
@@ -318,9 +318,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       if (!items.some(item => item.product_id !== 0)) {
         throw new Error('At least one valid item is required');
       }
-
+  
       const { subtotal, totalTax, discountAmount, total } = calculateTotals();
-
+  
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
@@ -342,13 +342,20 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
           total_price: Number(item.total_price)
         }))
       };
-
+  
+      let response;
       if (invoice) {
-        await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
+        response = await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
-        await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
+        response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
+        // Update estimate status and invoice_id if created from an estimate
+        if (formData.estimate_id) {
+          await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
+            invoice_id: response.data.id,
+          });
+        }
       }
-
+  
       setFormData(initialFormData);
       setItems(initialItems);
       

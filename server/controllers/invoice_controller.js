@@ -447,6 +447,12 @@ const deleteInvoice = async (req, res) => {
             return res.status(404).json({ error: "Invoice not found" });
         }
 
+        // update the estimate status to pending and remove the invoice_id
+        await connection.query(
+            `UPDATE estimates SET status = 'pending', invoice_id = NULL WHERE invoice_id = ?`,
+            [invoiceId]
+        );
+
         // Delete invoice items
         await connection.query(
             `DELETE FROM invoice_items WHERE invoice_id = ?`,

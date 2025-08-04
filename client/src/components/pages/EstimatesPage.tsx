@@ -212,7 +212,7 @@ export default function EstimatesPage() {
   const handleConvertToInvoice = async (estimateId: number) => {
     if (window.confirm('Convert this estimate to an invoice?')) {
       try {
-        const response = await axios.post(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/convert`);
+        const response = await axiosInstance.post(`/api/convertEstimateToInvoice/${selectedCompany?.company_id}/${estimateId}`);
         alert('Estimate converted to invoice successfully!');
         fetchEstimates();
       } catch (error: any) {

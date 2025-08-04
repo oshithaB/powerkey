@@ -191,32 +191,48 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (!estimateId) return;
     try {
       const [estimateRes, itemsRes] = await Promise.all([
-        axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}`),
-        axiosInstance.get(`/api/estimates/${selectedCompany?.company_id}/${estimateId}/items`)
+        axiosInstance.get(`/api/getEstimatesByCustomer/${selectedCompany?.company_id}/${formData.customer_id}`),
+        axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`)
       ]);
 
-      const estimate = estimateRes.data;
+      const estimate = estimateRes.data.find((e: any) => e.id === parseInt(estimateId));
+      if (!estimate) {
+        throw new Error('Selected estimate not found');
+      }
+
       setFormData({
         ...formData,
+        invoice_number: `INV-${estimate.estimate_number}-${Date.now()}`,
         estimate_id: estimateId,
         customer_id: estimate.customer_id.toString(),
-        due_date: estimate.expiry_date || '',
-        discount_type: estimate.discount_type,
-        discount_value: estimate.discount_value,
-        notes: estimate.notes,
-        terms: estimate.terms,
+        employee_id: estimate.employee_id ? estimate.employee_id.toString() : '',
+        invoice_date: new Date().toISOString().split('T')[0],
+        due_date: estimate.expiry_date ? estimate.expiry_date.split('T')[0] : '',
+        discount_type: estimate.discount_type || 'fixed',
+        discount_value: Number(estimate.discount_amount) || 0,
+        notes: estimate.notes || '',
+        terms: estimate.terms || '',
         shipping_address: estimate.shipping_address || '',
         billing_address: estimate.billing_address || '',
         ship_via: estimate.ship_via || '',
-        shipping_date: estimate.shipping_date || '',
+        shipping_date: estimate.shipping_date ? estimate.shipping_date.split('T')[0] : '',
         tracking_number: estimate.tracking_number || ''
       });
+
       setItems(itemsRes.data.map((item: any) => ({
-        ...item,
+        product_id: item.product_id || 0,
         product_name: item.product_name || '',
-        actual_unit_price: (item.unit_price * (100 - item.tax_rate)) / 100
+        description: item.description || '',
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.unit_price) || 0,
+        actual_unit_price: Number(item.actual_unit_price) || Number(item.unit_price) || 0,
+        tax_rate: Number(item.tax_rate) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_price: Number(item.total_price) || 0
       })));
+
       setShowEstimateSelection(false);
+      setShowEstimateSidebar(false);
     } catch (error) {
       console.error('Error loading estimate data:', error);
       setError('Failed to load estimate data');
@@ -274,7 +290,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
-      discountAmount = Number(((subtotal * formData.discount_value) / 100).toFixed(2));
+      discountAmount = Number(((subtotal * Number(formData.discount_value)) / 100).toFixed(2));
     } else {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
@@ -615,10 +631,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                             value={item.product_name || ''}
                             onChange={(e) => {
                               updateItem(index, 'product_name', e.target.value);
-                              setActiveSuggestionIndex(index); // Set active item for suggestions
+                              setActiveSuggestionIndex(index);
                             }}
                             onFocus={() => {
-                              setActiveSuggestionIndex(index); // Show suggestions on focus
+                              setActiveSuggestionIndex(index);
                               const filtered = products.filter(product =>
                                 product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
                               );

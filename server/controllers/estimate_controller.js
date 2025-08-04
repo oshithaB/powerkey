@@ -41,7 +41,8 @@ const getEstimates = async (req, res) => {
                         LEFT JOIN 
                             employees emp ON e.employee_id = emp.id
                         WHERE 
-                            e.company_id = ? AND e.is_active = 1;
+                            e.company_id = ? AND e.is_active = 1
+                        ORDER BY e.created_at DESC;
                         `;
         const [estimates] = await db.query(query, [companyId]);
         res.json(estimates);

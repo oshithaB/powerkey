@@ -135,7 +135,7 @@ export default function EstimatesPage() {
 
 
   useEffect(() => {
-    if (Object.keys(lockedEstimates).length > 0) {
+    // if (Object.keys(lockedEstimates).length > 0) {
       // Handle locked estimates
       setEstimates(prevEstimates =>
         prevEstimates.map(estimate => {
@@ -153,13 +153,13 @@ export default function EstimatesPage() {
           };
         })
       );
-    } else {
-      setEstimates(prevEstimates => prevEstimates.map(estimate => ({
-        ...estimate,
-        is_locked: false,
-        locked_by: null
-      })));
-    }
+    // } else {
+    //   setEstimates(prevEstimates => prevEstimates.map(estimate => ({
+    //     ...estimate,
+    //     is_locked: false,
+    //     locked_by: null
+    //   })));
+    // }
 
   }, [lockedEstimates]);
 

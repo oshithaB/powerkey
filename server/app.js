@@ -13,7 +13,7 @@ const io = new Server(server, {
 (async () => {
   try {
     await initDatabase(); // Initialize the database
-    console.log("Database initialized successfully.");
+    // console.log("Database initialized successfully.");
   } catch (error) {
     console.error("Failed to initialize the database:", error);
   }
@@ -57,16 +57,15 @@ app.use("/api", estimateRoutes);
 app.use("/api", invoiceRoutes);
 app.use("/api", paymentMethodRoutes);
 
-const editingEstimates = {}; // { estimateId: userId }
+const editingEstimates = {}; // { estimateId: user }
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
-
-  socket.on("start_listening", () => {
+  socket.once("start_listening", () => {
     // Send current locked estimates
     socket.join("estimate_room");
-    console.log("Socket joined estimate_room");
+    console.log("Socket joined estimate_room", socket.id);
     socket.emit("locked_estimates", editingEstimates);
     console.log("Current locked estimates sent to client-socket:", editingEstimates);
   });
@@ -81,12 +80,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("stop_edit_estimate", ({ estimateId, user }) => {
-    if (editingEstimates[estimateId] === user) {
-      delete editingEstimates[estimateId];
-      io.to("estimate_room").emit("locked_estimates", editingEstimates);
-      console.log(`User ${user} stopped editing estimate ${estimateId}`);
-      console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
-    }
+    console.log(`stope_edit_estimate event received`);
+    delete editingEstimates[estimateId];
+    io.to("estimate_room").emit("locked_estimates", editingEstimates);
+    console.log(`User ${user} stopped editing estimate ${estimateId}`);
+    console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
+
   });
 
   socket.on("disconnect", () => {

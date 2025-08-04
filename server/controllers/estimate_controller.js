@@ -101,7 +101,7 @@ const getEstimatesByCustomer = async (req, res) => {
 
 const createEstimate = async (req, res) => {
     try {
-        console.log("Request body:", req.body);
+        // console.log("Request body:", req.body);
 
         const {
             estimate_number,

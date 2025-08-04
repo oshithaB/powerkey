@@ -181,8 +181,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = (item.unit_price * 100) / (100 + item.tax_rate);
+      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
+      item.tax_amount = Number((item.unit_price - item.actual_unit_price).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
   
@@ -541,7 +541,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate);
+                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate)).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);

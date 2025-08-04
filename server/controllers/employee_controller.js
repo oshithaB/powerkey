@@ -4,7 +4,7 @@ const createEmployee = async (req, res) => {
     try {
         const { name, email, address, phone, hire_date } = req.body;
 
-        console.log('Create employee request received:', req.body);
+        // console.log('Create employee request received:', req.body);
 
         // Validate required fields
         if (!name || name.trim() === '') {
@@ -19,7 +19,7 @@ const createEmployee = async (req, res) => {
             'SELECT * FROM employees WHERE email = ? AND is_active = 1', 
             [email]
         );
-        console.log('Existing employee check result:', existingEmployee);
+        // console.log('Existing employee check result:', existingEmployee);
 
         if (existingEmployee.length > 0) {
             return res.status(400).json({ success: false, message: 'Employee with this email already exists' });
@@ -30,7 +30,7 @@ const createEmployee = async (req, res) => {
             'INSERT INTO employees (name, email, address, phone, hire_date, is_active) VALUES (?, ?, ?, ?, ?, ?)',
             [name, email || null, address || null, phone || null, hire_date || null, true]
         );
-        console.log('New employee created:', result);
+        // console.log('New employee created:', result);
 
         const employeeData = {
             id: result.insertId,
@@ -57,9 +57,9 @@ const createEmployee = async (req, res) => {
 
 const getEmployees = async (req, res) => {
     try {
-        console.log('Get employees request received');
+        // console.log('Get employees request received');
         const [employees] = await db.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY created_at DESC');
-        console.log('Employees fetched:', employees);        
+        // console.log('Employees fetched:', employees);        
         return res.status(200).json(employees);
     } catch (error) {
         console.error('Error fetching employees:', error);
@@ -72,7 +72,7 @@ const updateEmployee = async (req, res) => {
         const { id } = req.params;
         const { name, email, phone, address, hire_date, is_active } = req.body;
 
-        console.log('Update employee request received for id:', id, req.body);
+        // console.log('Update employee request received for id:', id, req.body);
 
         // Validate required fields
         if (!name || name.trim() === '') {
@@ -120,7 +120,7 @@ const updateEmployee = async (req, res) => {
             created_at: existingEmployee[0].created_at
         };
 
-        console.log('Employee updated:', employeeData);
+        // console.log('Employee updated:', employeeData);
         return res.status(200).json({ 
             success: true, 
             message: 'Employee updated successfully',
@@ -136,7 +136,7 @@ const updateEmployee = async (req, res) => {
 const deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log('Delete employee request received for id:', id);
+        // console.log('Delete employee request received for id:', id);
 
         // Check if employee exists
         const [existingEmployee] = await db.query(
@@ -150,7 +150,7 @@ const deleteEmployee = async (req, res) => {
 
         // Delete employee
         await db.query('UPDATE employees SET is_active = 0 WHERE id = ?', [id]);
-        console.log('Employee deleted:', id);
+        // console.log('Employee deleted:', id);
 
         return res.status(200).json({ 
             success: true, 

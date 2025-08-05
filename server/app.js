@@ -61,11 +61,15 @@ const editingEstimates = {}; // { estimateId: user }
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+  socket.join("estimate_room");
+  console.log("Socket joined estimate_room", socket.id);
+  const estimateRoom = io.sockets.adapter.rooms.get("estimate_room");
+  const members = estimateRoom ? Array.from(estimateRoom) : [];
+  console.log("Members in estimate_room:", members);
 
-  socket.once("start_listening", () => {
+  socket.on("start_listening", () => {
     // Send current locked estimates
-    socket.join("estimate_room");
-    console.log("Socket joined estimate_room", socket.id);
+
     socket.emit("locked_estimates", editingEstimates);
     console.log("Current locked estimates sent to client-socket:", editingEstimates);
   });

@@ -85,9 +85,11 @@ export default function EstimatesPage() {
 
   const fetchEstimates = async () => {
     try {
+      console.log('Fetching requests for company estimates sent.');
       const response = await axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`);
       setEstimates(response.data);
       console.log('Fetched estimates:', response.data);
+      console.log(estimates);
     } catch (error) {
       console.error('Error fetching estimates:', error);
     } finally {
@@ -134,34 +136,35 @@ export default function EstimatesPage() {
 
 
 
-  useEffect(() => {
-    // if (Object.keys(lockedEstimates).length > 0) {
-      // Handle locked estimates
-      setEstimates(prevEstimates =>
-        prevEstimates.map(estimate => {
-          if (lockedEstimates[estimate.id]) {
-            return {
-              ...estimate,
-              is_locked: true,
-              locked_by: lockedEstimates[estimate.id] // Store the full User object
-            };
-          }
+  const convertEstimatesToLocked = () => {
+    if (estimates.length === 0) {
+      console.log('No estimates to update.');
+      return;
+    }
+    console.log('Updating estimates with locked status:', lockedEstimates);
+    setEstimates(prevEstimates =>
+      prevEstimates.map(estimate => {
+        if (lockedEstimates[estimate.id]) {
           return {
             ...estimate,
-            is_locked: false,
-            locked_by: null
+            is_locked: true,
+            locked_by: lockedEstimates[estimate.id] // Store the full User object
           };
-        })
-      );
-    // } else {
-    //   setEstimates(prevEstimates => prevEstimates.map(estimate => ({
-    //     ...estimate,
-    //     is_locked: false,
-    //     locked_by: null
-    //   })));
-    // }
+        }
+        return {
+          ...estimate,
+          is_locked: false,
+          locked_by: null
+        };
+      })
+    );
+  }
 
-  }, [lockedEstimates]);
+
+
+  useEffect(() => {
+    convertEstimatesToLocked();
+  }, [lockedEstimates, estimates]);
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {

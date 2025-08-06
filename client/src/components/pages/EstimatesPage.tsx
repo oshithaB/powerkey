@@ -99,6 +99,7 @@ export default function EstimatesPage() {
 
   const fetchData = async () => {
     try {
+      console.log('Fetching customers, employees, products, and tax rates for company sent.');
       const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
         axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
         axiosInstance.get(`/api/employees/`),
@@ -106,6 +107,7 @@ export default function EstimatesPage() {
         axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
       ]);
 
+      console.log('customers, employees, products, and tax rates fetched successfully.');
       setCustomers(customersRes.data);
       setEmployees(employeesRes.data);
       setProducts(productsRes.data);
@@ -141,24 +143,39 @@ export default function EstimatesPage() {
       console.log('No estimates to update.');
       return;
     }
+
     console.log('Updating estimates with locked status:', lockedEstimates);
-    setEstimates(prevEstimates =>
-      prevEstimates.map(estimate => {
+
+    setEstimates(prevEstimates => {
+      const updatedEstimates = prevEstimates.map(estimate => {
         if (lockedEstimates[estimate.id]) {
           return {
             ...estimate,
             is_locked: true,
-            locked_by: lockedEstimates[estimate.id] // Store the full User object
+            locked_by: lockedEstimates[estimate.id]
+          };
+        } else {
+          return {
+            ...estimate,
+            is_locked: false,
+            locked_by: null
           };
         }
-        return {
-          ...estimate,
-          is_locked: false,
-          locked_by: null
-        };
-      })
-    );
-  }
+      });
+
+      // Check if anything actually changed
+      const changed = updatedEstimates.some((est, index) => {
+        const prev = prevEstimates[index];
+        return (
+          est.is_locked !== prev.is_locked ||
+          JSON.stringify(est.locked_by) !== JSON.stringify(prev.locked_by)
+        );
+      });
+
+      return changed ? updatedEstimates : prevEstimates;
+    });
+  };
+
 
 
 

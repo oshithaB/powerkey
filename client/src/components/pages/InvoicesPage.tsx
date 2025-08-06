@@ -414,6 +414,15 @@ export default function InvoicesPage() {
                     <div className="text-sm text-gray-500">
                       Due: {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
                     </div>
+                    {invoice.status === 'overdue' && (
+                      <div className="text-sm text-red-600">
+                        {Math.floor(
+                          (new Date().getTime() - new Date(invoice.due_date).getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        )}{' '}
+                        days late
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">

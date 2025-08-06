@@ -302,10 +302,10 @@ export default function CustomersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${customer.credit_limit?.toLocaleString() || '0'}
+                    Rs. {customer.credit_limit?.toLocaleString() || '0'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${customer.current_balance?.toLocaleString() || '0'}
+                    Rs. {customer.current_balance?.toLocaleString() || '0'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">

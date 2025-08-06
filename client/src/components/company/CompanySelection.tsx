@@ -20,6 +20,14 @@ interface Company {
   notes: string;
 }
 
+// Define the TaxRate type
+interface TaxRate {
+  id: number;
+  name: string;
+  rate: number;
+  is_default: boolean;
+}
+
 export default function CompanySelection() {
   const { user, logout } = useAuth();
   const { companies, setCompanies, setSelectedCompany } = useCompany();
@@ -35,7 +43,8 @@ export default function CompanySelection() {
     is_taxable: 'Not Taxable',
     tax_number: '',
     notes: '',
-    terms_and_conditions: ''
+    terms_and_conditions: '',
+    tax_rates: [] as TaxRate[]
   });
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>('');
@@ -57,16 +66,24 @@ export default function CompanySelection() {
     }
   };
 
+  const fetchTaxRates = async (companyId: number) => {
+    try {
+      const response = await axiosInstance.get(`/api/tax-rates/${companyId}`);
+      console.log('Tax rates response:', response.data);
+      return response.data[0] || [];
+    } catch (error) {
+      console.error('Error fetching tax rates:', error);
+      return [];
+    }
+  };
+
   const handleCompanySelect = async (company: any) => {
     try {
       console.log('Selecting company:', company);
       
-      // Update the token with company information
       const response = await axiosInstance.get(`/api/selectCompany/${company.company_id}`);
       
       if (response.data.success) {
-        
-        // Map the company data to match the Company interface
         const mappedCompany: Company = {
           company_id: company.company_id,
           name: company.name,
@@ -90,7 +107,8 @@ export default function CompanySelection() {
     }
   };
 
-  const handleEditCompany = (company: any) => {
+  const handleEditCompany = async (company: any) => {
+    const taxRates = await fetchTaxRates(company.company_id);
     setEditingCompany(company);
     setFormData({
       name: company.name || '',
@@ -101,7 +119,8 @@ export default function CompanySelection() {
       is_taxable: company.is_taxable ? 'Taxable' : 'Not Taxable',
       tax_number: company.tax_number || '',
       notes: company.notes || '',
-      terms_and_conditions: company.terms_and_conditions || ''
+      terms_and_conditions: company.terms_and_conditions || '',
+      tax_rates: taxRates
     });
     setLogoPreview(company.company_logo ? `http://localhost:3000${company.company_logo}` : '');
     setShowEditModal(true);
@@ -111,7 +130,7 @@ export default function CompanySelection() {
     if (window.confirm('Are you sure you want to delete this company? This action cannot be undone.')) {
       try {
         await axiosInstance.delete(`/api/companies/${companyId}`);
-        fetchCompanies(); // Refresh the list
+        fetchCompanies();
         alert('Company deleted successfully');
       } catch (error: any) {
         console.error('Error deleting company:', error);
@@ -126,7 +145,11 @@ export default function CompanySelection() {
       const submitData = new FormData();
       
       Object.entries(formData).forEach(([key, value]) => {
-        submitData.append(key, value);
+        if (key === 'tax_rates') {
+          submitData.append(key, JSON.stringify(value));
+        } else {
+          submitData.append(key, value);
+        }
       });
 
       if (logo) {
@@ -143,7 +166,7 @@ export default function CompanySelection() {
       setEditingCompany(null);
       setLogo(null);
       setLogoPreview('');
-      fetchCompanies(); // Refresh the list
+      fetchCompanies();
       alert('Company updated successfully');
     } catch (error: any) {
       console.error('Error updating company:', error);
@@ -163,6 +186,26 @@ export default function CompanySelection() {
     }
   };
 
+  const handleTaxRateChange = (index: number, field: keyof TaxRate, value: string | number | boolean) => {
+    const updatedTaxRates = [...formData.tax_rates];
+    updatedTaxRates[index] = { ...updatedTaxRates[index], [field]: value };
+    setFormData({ ...formData, tax_rates: updatedTaxRates });
+  };
+
+  const addTaxRate = () => {
+    setFormData({
+      ...formData,
+      tax_rates: [...formData.tax_rates, { id: 0, name: '', rate: 0, is_default: false }]
+    });
+  };
+
+  const removeTaxRate = (index: number) => {
+    setFormData({
+      ...formData,
+      tax_rates: formData.tax_rates.filter((_, i) => i !== index)
+    });
+  };
+
   const resetEditForm = () => {
     setShowEditModal(false);
     setEditingCompany(null);
@@ -177,7 +220,8 @@ export default function CompanySelection() {
       is_taxable: 'Not Taxable',
       tax_number: '',
       notes: '',
-      terms_and_conditions: ''
+      terms_and_conditions: '',
+      tax_rates: []
     });
   };
 
@@ -211,7 +255,6 @@ export default function CompanySelection() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Create New Company Card */}
           <Link
             key="create-new-company"
             to="/create-company"
@@ -230,13 +273,11 @@ export default function CompanySelection() {
             </div>
           </Link>
 
-          {/* Existing Companies */}
           {companies.map((company) => (
             <div
               key={`company-${company.company_id}`}
               className="card hover:shadow-lg transition-shadow duration-200 relative group"
             >
-              {/* Action Buttons */}
               <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => {
@@ -337,7 +378,6 @@ export default function CompanySelection() {
         )}
       </div>
 
-      {/* Edit Company Modal */}
       {showEditModal && editingCompany && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
@@ -430,7 +470,15 @@ export default function CompanySelection() {
                   <select
                     className="input"
                     value={formData.is_taxable}
-                    onChange={(e) => setFormData({ ...formData, is_taxable: e.target.value })}
+                    onChange={(e) => {
+                      const isTaxable = e.target.value;
+                      setFormData({
+                        ...formData,
+                        is_taxable: isTaxable,
+                        tax_number: isTaxable === 'Not Taxable' ? '' : formData.tax_number,
+                        tax_rates: isTaxable === 'Not Taxable' ? [] : formData.tax_rates
+                      });
+                    }}
                   >
                     <option value="Not Taxable">Not Taxable</option>
                     <option value="Taxable">Taxable</option>
@@ -452,6 +500,54 @@ export default function CompanySelection() {
                   </div>
                 )}
               </div>
+
+              {formData.is_taxable === 'Taxable' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tax Rates
+                  </label>
+                  {formData.tax_rates.map((taxRate, index) => (
+                    <div key={index} className="flex items-center space-x-2 mb-2">
+                      <input
+                        type="text"
+                        className="input flex-1"
+                        value={taxRate.name}
+                        onChange={(e) => handleTaxRateChange(index, 'name', e.target.value)}
+                        placeholder="Tax name (e.g., VAT)"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input w-24"
+                        value={taxRate.rate}
+                        onChange={(e) => handleTaxRateChange(index, 'rate', parseFloat(e.target.value))}
+                        placeholder="Rate (%)"
+                      />
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-primary-600"
+                        checked={taxRate.is_default}
+                        onChange={(e) => handleTaxRateChange(index, 'is_default', e.target.checked)}
+                      />
+                      <label className="text-sm text-gray-600">Default</label>
+                      <button
+                        type="button"
+                        onClick={() => removeTaxRate(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addTaxRate}
+                    className="btn btn-secondary btn-sm mt-2"
+                  >
+                    Add Tax Rate
+                  </button>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

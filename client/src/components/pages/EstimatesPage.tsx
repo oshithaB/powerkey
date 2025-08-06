@@ -716,11 +716,11 @@ export default function EstimatesPage() {
                       Employee:{" "}
                       {printingEstimate.employee_name || "Not assigned"}
                     </p>
-                    <p>
+                    {/* <p>
                       Status:{" "}
                       {printingEstimate.status.charAt(0).toUpperCase() +
                         printingEstimate.status.slice(1)}
-                    </p>
+                    </p> */}
                   </div>
                 </div>
 
@@ -755,13 +755,13 @@ export default function EstimatesPage() {
                             {item.quantity}
                           </td>
                           <td className="px-4 py-2 text-right">
-                            ${Number(item.unit_price || 0).toFixed(2)}
+                            Rs. {Number(item.unit_price || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-2 text-right">
                             {item.tax_rate}%
                           </td>
                           <td className="px-4 py-2 text-right">
-                            ${Number(item.total_price || 0).toFixed(2)}
+                            Rs. {Number(item.total_price || 0).toFixed(2)}
                           </td>
                         </tr>
                       ))}

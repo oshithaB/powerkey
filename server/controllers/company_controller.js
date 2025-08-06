@@ -254,53 +254,96 @@ const updateCompany = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Company not found for update' });
         }
 
-        // Handle taxable status
-        if (fieldsToUpdate.is_taxable) {
-            fieldsToUpdate.is_taxable = fieldsToUpdate.is_taxable === 'Taxable' ? 1 : 0;
-            
-            // If changing to non-taxable, clear tax number
-            if (fieldsToUpdate.is_taxable === 0) {
-                fieldsToUpdate.tax_number = null;
+        // Start transaction
+        await db.query('START TRANSACTION');
+
+        try {
+            // Handle taxable status
+            if (fieldsToUpdate.is_taxable) {
+                fieldsToUpdate.is_taxable = fieldsToUpdate.is_taxable === 'Taxable' ? 1 : 0;
+                
+                // If changing to non-taxable, clear tax number and delete existing tax rates
+                if (fieldsToUpdate.is_taxable === 0) {
+                    fieldsToUpdate.tax_number = null;
+                    await db.query('DELETE FROM tax_rates WHERE company_id = ?', [companyId]);
+                    console.log(`Deleted tax rates for company: ${companyId}`);
+                } else if (fieldsToUpdate.is_taxable === 1 && updates.tax_rates) {
+                    // If changing to taxable and tax rates are provided, insert them
+                    let parsedTaxRates = [];
+                    try {
+                        parsedTaxRates = Array.isArray(updates.tax_rates)
+                            ? updates.tax_rates
+                            : JSON.parse(updates.tax_rates);
+                    } catch (err) {
+                        console.error('Failed to parse tax rates:', err);
+                    }
+
+                    // Delete existing tax rates before inserting new ones
+                    await db.query('DELETE FROM tax_rates WHERE company_id = ?', [companyId]);
+                    console.log(`Cleared existing tax rates for company: ${companyId}`);
+
+                    for (const taxRate of parsedTaxRates) {
+                        if (taxRate.name && taxRate.rate > 0) {
+                            await db.query(
+                                'INSERT INTO tax_rates (company_id, name, rate, is_default) VALUES (?, ?, ?, ?)',
+                                [companyId, taxRate.name, taxRate.rate, taxRate.is_default || false]
+                            );
+                        }
+                    }
+                    console.log(`Inserted ${parsedTaxRates.length} tax rates for company: ${companyId}`);
+                }
             }
-        }
 
-        // Check for registration number conflicts
-        if (fieldsToUpdate.registration_number) {
-            const [conflict] = await db.query(
-                'SELECT * FROM company WHERE registration_number = ? AND company_id != ?',
-                [fieldsToUpdate.registration_number, companyId]
-            );
+            // Check for registration number conflicts
+            if (fieldsToUpdate.registration_number) {
+                const [conflict] = await db.query(
+                    'SELECT * FROM company WHERE registration_number = ? AND company_id != ?',
+                    [fieldsToUpdate.registration_number, companyId]
+                );
 
-            if (conflict.length > 0) {
-                return res.status(400).json({ success: false, message: 'Company with this registration number already exists' });
+                if (conflict.length > 0) {
+                    await db.query('ROLLBACK');
+                    return res.status(400).json({ success: false, message: 'Company with this registration number already exists' });
+                }
             }
+
+            const setClauses = [];
+            const values = [];
+
+            for (const key in fieldsToUpdate) {
+                setClauses.push(`${key} = ?`);
+                values.push(fieldsToUpdate[key]);
+            }
+
+            if (setClauses.length === 0) {
+                await db.query('ROLLBACK');
+                return res.status(400).json({ success: false, message: 'No valid fields to update' });
+            }
+
+            values.push(companyId);
+
+            const updateQuery = `UPDATE company SET ${setClauses.join(', ')} WHERE company_id = ?`;
+            const [result] = await db.query(updateQuery, values);
+
+            if (result.affectedRows === 0) {
+                await db.query('ROLLBACK');
+                return res.status(400).json({ success: false, message: 'No changes made to the company' });
+            }
+
+            // Commit transaction
+            await db.query('COMMIT');
+
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Company updated successfully'
+            });
+
+        } catch (error) {
+            // Rollback transaction on error
+            await db.query('ROLLBACK');
+            console.error('Transaction error during company update:', error);
+            throw error;
         }
-
-        const setClauses = [];
-        const values = [];
-
-        for (const key in fieldsToUpdate) {
-            setClauses.push(`${key} = ?`);
-            values.push(fieldsToUpdate[key]);
-        }
-
-        if (setClauses.length === 0) {
-            return res.status(400).json({ success: false, message: 'No valid fields to update' });
-        }
-
-        values.push(companyId);
-
-        const updateQuery = `UPDATE company SET ${setClauses.join(', ')} WHERE company_id = ?`;
-        const [result] = await db.query(updateQuery, values);
-
-        if (result.affectedRows === 0) {
-            return res.status(400).json({ success: false, message: 'No changes made to the company' });
-        }
-
-        return res.status(200).json({ 
-            success: true, 
-            message: 'Company updated successfully'
-        });
 
     } catch (error) {
         console.error('Error updating company:', error);

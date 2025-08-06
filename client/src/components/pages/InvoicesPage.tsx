@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Edit, Trash2, FileText, Eye, DollarSign, Filter, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Eye, DollarSign, Filter, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
@@ -14,6 +14,8 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -41,12 +43,26 @@ interface Invoice {
   created_at: string;
 }
 
+interface InvoiceItem {
+  id?: number;
+  product_id: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  actual_unit_price: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_price: number;
+}
+
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const { selectedCompany } = useCompany();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [taxRates, setTaxRates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
@@ -59,6 +75,10 @@ export default function InvoicesPage() {
     dateFrom: '',
     dateTo: ''
   });
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
+  const [printItems, setPrintItems] = useState<InvoiceItem[]>([]);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!selectedCompany?.company_id) {
@@ -67,14 +87,12 @@ export default function InvoicesPage() {
       return;
     }
     fetchInvoices();
-    fetchCustomers();
-    fetchEmployees();
+    fetchData();
   }, [selectedCompany, navigate]);
 
   const fetchInvoices = async () => {
     try {
       const response = await axiosInstance.get(`/api/getInvoice/${selectedCompany?.company_id}`);
-      console.log('Fetched invoices:', response.data.map((inv: Invoice) => ({ id: inv.id, customer_id: inv.customer_id, customer_name: inv.customer_name })));
       setInvoices(response.data);
     } catch (error) {
       console.error('Error fetching invoices:', error);
@@ -83,28 +101,48 @@ export default function InvoicesPage() {
     }
   };
 
-  const fetchCustomers = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`);
-      setCustomers(response.data);
+      const [customersRes, employeesRes, productsRes, taxRatesRes] = await Promise.all([
+        axiosInstance.get(`/api/getCustomers/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/employees`),
+        axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`)
+      ]);
+      setCustomers(customersRes.data);
+      setEmployees(employeesRes.data);
+      setProducts(productsRes.data);
+      setTaxRates(taxRatesRes.data);
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
-  const fetchEmployees = async () => {
+  const fetchInvoiceItems = async (invoiceId: number) => {
     try {
-      const response = await axiosInstance.get(`/api/employees`);
-      setEmployees(response.data);
+      const response = await axiosInstance.get(`/api/getInvoiceItems/${selectedCompany?.company_id}/${invoiceId}`);
+      const items = Array.isArray(response.data) ? response.data : [];
+      return items.map(item => ({
+        id: item.id,
+        product_id: item.product_id || 0,
+        product_name: item.product_name || '',
+        description: item.description || '',
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.unit_price) || 0,
+        actual_unit_price: Number(item.actual_unit_price) || 0,
+        tax_rate: Number(item.tax_rate) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_price: Number(item.total_price) || 0
+      }));
     } catch (error) {
-      console.error('Error fetching employees:', error);
+      console.error('Error fetching invoice items:', error);
+      return [];
     }
   };
 
   const handleEdit = async (invoice: Invoice) => {
     try {
-      const response = await axiosInstance.get(`/api/getInvoiceItems/${selectedCompany?.company_id}/${invoice.id}`);
-      const items = response.data;
+      const items = await fetchInvoiceItems(invoice.id);
       navigate('/invoices/edit', { state: { invoice, items } });
     } catch (error) {
       console.error('Error fetching invoice items:', error);
@@ -132,8 +170,92 @@ export default function InvoicesPage() {
       alert(`Cannot proceed: Invalid or missing customer ID for invoice ${invoice.invoice_number}`);
       return;
     }
-    console.log('Navigating to receive payment for customer ID:', invoice.customer_id);
     navigate(`/invoices/receive-payment/${invoice.customer_id}`, { state: { invoice } });
+  };
+
+  const handlePrint = async (invoice: Invoice) => {
+    try {
+      setPrintingInvoice(invoice);
+      const fetchedItems = await fetchInvoiceItems(invoice.id);
+      setPrintItems(fetchedItems);
+      setShowPrintPreview(true);
+    } catch (error) {
+      console.error('Error preparing print preview:', error);
+      alert('Failed to load print preview');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      if (printRef.current) {
+        const logoUrl = selectedCompany?.company_logo ? `http://localhost:3000${selectedCompany.company_logo}` : null;
+        let logoImage: HTMLImageElement | null = null;
+        if (logoUrl) {
+          logoImage = new Image();
+          logoImage.crossOrigin = 'Anonymous';
+          logoImage.src = logoUrl;
+          await new Promise((resolve, reject) => {
+            logoImage.onload = resolve;
+            logoImage.onerror = reject;
+          });
+        }
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const maxContentHeight = pageHeight - 2 * margin;
+
+        const scale = 3;
+        const canvas = await html2canvas(printRef.current, {
+          scale,
+          useCORS: true,
+          logging: false,
+          windowWidth: printRef.current.scrollWidth,
+          windowHeight: printRef.current.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pageWidth - 2 * margin;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+        const totalPages = Math.ceil(imgHeight / maxContentHeight);
+
+        for (let i = 0; i < totalPages; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          const srcY = i * maxContentHeight * (canvas.width / imgWidth);
+          const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.width / imgWidth));
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = pageContentHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
+            const pageImgData = tempCanvas.toDataURL('image/png', 1.0);
+            pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
+          }
+        }
+
+        pdf.save(`invoice_${printingInvoice?.invoice_number}.pdf`);
+        setShowPrintPreview(false);
+        setPrintingInvoice(null);
+        setPrintItems([]);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Ensure the logo image is accessible.');
+    }
+  };
+
+  const formatDate = (isoDate: string | Date | null | undefined) => {
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0];
   };
 
   const getStatusColor = (status: string) => {
@@ -190,23 +312,22 @@ export default function InvoicesPage() {
     return matchesSearchTerm && matchesStatus && matchesCustomer && matchesDate;
   });
 
-  // Calculate chart data
   const overdueData = invoices
-  .filter(invoice => invoice.status === 'overdue')
-  .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
+    .filter(invoice => invoice.status === 'overdue')
+    .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
 
   const balanceDueData = invoices
-  .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft')
-  .reduce((acc, invoice) => {
-    const amount = invoice.status === 'partially_paid' 
-      ? (Number(invoice.balance_due) || 0) 
-      : (Number(invoice.total_amount) || 0);
-    return acc + amount;
-  }, 0);
+    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft')
+    .reduce((acc, invoice) => {
+      const amount = invoice.status === 'partially_paid' 
+        ? (Number(invoice.balance_due) || 0) 
+        : (Number(invoice.total_amount) || 0);
+      return acc + amount;
+    }, 0);
 
   const paidData = invoices
-  .filter(invoice => invoice.status === 'paid')
-  .reduce((acc, invoice) => acc + (Number(invoice.paid_amount) || 0), 0);
+    .filter(invoice => invoice.status === 'paid')
+    .reduce((acc, invoice) => acc + (Number(invoice.paid_amount) || 0), 0);
 
   const chartData = {
     labels: ['Overdue', 'Balance Due', 'Paid'],
@@ -384,13 +505,8 @@ export default function InvoicesPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-primary-600" />
-                        </div>
-                      </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
                           {invoice.invoice_number}
@@ -452,12 +568,14 @@ export default function InvoicesPage() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => handlePrint(invoice)}
                         className="text-blue-600 hover:text-blue-900"
                         title="View"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => handlePrint(invoice)}
                         className="text-gray-600 hover:text-gray-900"
                         title="Print"
                       >
@@ -486,6 +604,179 @@ export default function InvoicesPage() {
           </table>
         </div>
       </div>
+
+      {showPrintPreview && printingInvoice && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50"
+          style={{ marginTop: "-10px" }}
+        >
+          <div className="relative top-4 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Print Preview
+              </h3>
+              <button
+                onClick={() => {
+                  setShowPrintPreview(false);
+                  setPrintingInvoice(null);
+                  setPrintItems([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[70vh]">
+              <div
+                ref={printRef}
+                className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900"
+              >
+                <div className="flex justify-between items-start border-b pb-4 mb-4">
+                  <div>
+                    <h1 className="text-3xl font-bold">
+                      Invoice #{printingInvoice.invoice_number}
+                    </h1>
+                    <p className="text-sm text-gray-600">
+                      ID: {printingInvoice.id}
+                    </p>
+                  </div>
+                  {selectedCompany?.company_logo && (
+                    <img
+                      src={`http://localhost:3000${selectedCompany.company_logo}`}
+                      alt={`${selectedCompany.name} Logo`}
+                      className="h-16 w-auto max-w-[150px] object-contain"
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-20 mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold">Bill To</h3>
+                    <p>{printingInvoice.customer_name || 'Unknown Customer'}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Details</h3>
+                    <p>
+                      Invoice Date: {formatDate(printingInvoice.invoice_date) || 'N/A'}
+                    </p>
+                    <p>
+                      Due Date: {formatDate(printingInvoice.due_date) || 'N/A'}
+                    </p>
+                    <p>
+                      Employee: {printingInvoice.employee_name || 'Not assigned'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Items</h3>
+                  <table className="w-full border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Item #</th>
+                        <th className="px-4 py-2 text-left">Product</th>
+                        <th className="px-4 py-2 text-left">Description</th>
+                        <th className="px-4 py-2 text-right">Qty</th>
+                        <th className="px-4 py-2 text-right">Unit Price</th>
+                        <th className="px-4 py-2 text-right">Tax %</th>
+                        <th className="px-4 py-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {printItems.map((item, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="px-4 py-2">{index + 1}</td>
+                          <td className="px-4 py-2">
+                            {item.product_id
+                              ? products.find((p) => p.id === item.product_id)?.name || 'N/A'
+                              : 'N/A'}
+                          </td>
+                          <td className="px-4 py-2">{item.description || 'N/A'}</td>
+                          <td className="px-4 py-2 text-right">{item.quantity}</td>
+                          <td className="px-4 py-2 text-right">
+                            Rs. {Number(item.unit_price || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right">{item.tax_rate}%</td>
+                          <td className="px-4 py-2 text-right">
+                            Rs. {Number(item.total_price || 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    {printingInvoice.notes && (
+                      <div>
+                        <h3 className="text-lg font-semibold">Notes</h3>
+                        <p className="text-sm">{printingInvoice.notes}</p>
+                      </div>
+                    )}
+                    {printingInvoice.terms && (
+                      <div className="mt-4">
+                        <h3 className="text-lg font-semibold">Terms & Conditions</h3>
+                        <p className="text-sm">{printingInvoice.terms}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>Rs. {Number(printingInvoice.subtotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Discount ({printingInvoice.discount_type === 'percentage' ? '%' : '$'}):</span>
+                          <span>Rs. {Number(printingInvoice.discount_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tax:</span>
+                          <span>Rs. {Number(printingInvoice.tax_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-lg border-t pt-2">
+                          <span>Total:</span>
+                          <span>Rs. {Number(printingInvoice.total_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Paid:</span>
+                          <span>Rs. {Number(printingInvoice.paid_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold">
+                          <span>Balance Due:</span>
+                          <span>Rs. {Number(printingInvoice.balance_due || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                onClick={() => {
+                  setShowPrintPreview(false);
+                  setPrintingInvoice(null);
+                  setPrintItems([]);
+                }}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="btn btn-primary btn-md"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

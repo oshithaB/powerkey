@@ -81,6 +81,7 @@ const getEstimatesByCustomer = async (req, res) => {
                             e.notes,
                             e.terms,
                             e.shipping_address,
+                            e.shipping_cost,
                             e.billing_address,
                             e.ship_via,
                             e.shipping_date,
@@ -507,10 +508,10 @@ const convertEstimateToInvoice = async (req, res) => {
             INSERT INTO invoices (
                 company_id, customer_id, employee_id, estimate_id, invoice_number, 
                 invoice_date, due_date, discount_type, discount_value, discount_amount,
-                notes, terms, shipping_address, billing_address, ship_via, 
+                notes, terms, shipping_address, shipping_cost, billing_address, ship_via, 
                 shipping_date, tracking_number, subtotal, tax_amount, total_amount,
                 status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const invoiceValues = [
@@ -519,14 +520,15 @@ const convertEstimateToInvoice = async (req, res) => {
             estimateData.employee_id || null,
             estimateId,
             invoiceNumber,
-            new Date().toISOString().split('T')[0], // Current date as invoice_date
-            estimateData.expiry_date || null, // Use estimate expiry date as due date
+            new Date().toISOString().split('T')[0],
+            estimateData.expiry_date || null,
             estimateData.discount_type || 'fixed',
-            estimateData.discount_amount || 0.00, // Using discount_amount as discount_value
+            estimateData.discount_amount || 0.00,
             estimateData.discount_amount || 0.00,
             estimateData.notes || null,
             estimateData.terms || null,
             estimateData.shipping_address || null,
+            estimateData.shipping_cost || 0.00,
             estimateData.billing_address || null,
             estimateData.ship_via || null,
             estimateData.shipping_date || null,

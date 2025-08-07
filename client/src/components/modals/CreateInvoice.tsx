@@ -63,6 +63,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     due_date: '',
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
+    shipping_cost: 0,
     notes: '',
     terms: '',
     shipping_address: '',
@@ -87,7 +88,8 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const [formData, setFormData] = useState(invoice ? {
     ...initialFormData,
     ...invoice,
-    invoice_date: invoice.invoice_date.split('T')[0]
+    invoice_date: invoice.invoice_date.split('T')[0],
+    shipping_cost: invoice.shipping_cost || 0
   } : initialFormData);
 
   const [items, setItems] = useState<InvoiceItem[]>(invoice?.items || initialItems);
@@ -129,7 +131,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (!customerId) return;
     try {
       const response = await axiosInstance.get(`/api/getEstimatesByCustomer/${selectedCompany?.company_id}/${customerId}`);
-      console.log('Customer Estimates:', response.data);
       setCustomerEstimates(Array.isArray(response.data) ? response.data : []);
       if (response.data.length > 0) {
         setShowEstimateSelection(true);
@@ -210,6 +211,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         due_date: estimate.expiry_date ? estimate.expiry_date.split('T')[0] : '',
         discount_type: estimate.discount_type || 'fixed',
         discount_value: Number(estimate.discount_amount) || 0,
+        shipping_cost: Number(estimate.shipping_cost) || 0,
         notes: estimate.notes || '',
         terms: estimate.terms || '',
         shipping_address: estimate.shipping_address || '',
@@ -257,7 +259,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = (item.unit_price * (100 - item.tax_rate)) / 100;
+      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
 
@@ -287,6 +289,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const calculateTotals = () => {
     const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
     const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
+    const shippingCost = Number(formData.shipping_cost || 0);
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
@@ -295,9 +298,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
 
-    const total = Number((subtotal - discountAmount).toFixed(2));
+    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
 
-    return { subtotal, totalTax, discountAmount, total };
+    return { subtotal, totalTax, discountAmount, shippingCost, total };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -319,7 +322,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         throw new Error('At least one valid item is required');
       }
   
-      const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
   
       const submitData = {
         ...formData,
@@ -330,6 +333,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
         discount_amount: Number(discountAmount),
+        shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         items: items.map(item => ({
           ...item,
@@ -348,7 +352,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         response = await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
         response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
-        // Update estimate status and invoice_id if created from an estimate
         if (formData.estimate_id) {
           await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
             invoice_id: response.data.id,
@@ -374,7 +377,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     }
   };
 
-  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
   return (
     <motion.div
@@ -678,7 +681,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = (updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate);
+                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate)).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
@@ -842,6 +845,17 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                         />
                         <span className="w-20 text-right">Rs. {discountAmount.toFixed(2)}</span>
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Shipping Cost:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input w-24 text-right"
+                        value={formData.shipping_cost}
+                        onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>

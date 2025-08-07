@@ -2,6 +2,7 @@ const db = require('../DB/db');
 const asyncHandler = require('express-async-handler');
 
 // Create Invoice
+// Create Invoice
 const createInvoice = asyncHandler(async (req, res) => {
   const {
     company_id,
@@ -23,6 +24,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     subtotal,
     tax_amount,
     discount_amount,
+    shipping_cost, // Added
     total_amount,
     items,
     attachment
@@ -108,6 +110,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount: tax_amount || 0,
       discount_amount: discount_amount || 0,
+      shipping_cost: shipping_cost || 0, // Added
       total_amount: total_amount || 0,
       status: 'draft',
       created_at: new Date(),
@@ -178,6 +181,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount,
       discount_amount,
+      shipping_cost, // Added
       total_amount,
       status: 'draft',
       created_at: invoiceData.created_at.toISOString(),
@@ -198,6 +202,7 @@ const createInvoice = asyncHandler(async (req, res) => {
   }
 });
 
+// Update Invoice
 // Update Invoice
 const updateInvoice = asyncHandler(async (req, res) => {
   const {
@@ -220,12 +225,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
     subtotal,
     tax_amount,
     discount_amount,
+    shipping_cost, // Added
     total_amount,
     items,
     attachment
   } = req.body;
 
-  const invoiceId = req.params.invoiceId; // Changed from req.params.id to req.params.invoiceId
+  const invoiceId = req.params.invoiceId;
 
   // Validate required fields
   if (!invoice_number) {
@@ -320,6 +326,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount: tax_amount || 0,
       discount_amount: discount_amount || 0,
+      shipping_cost: shipping_cost || 0, // Added
       total_amount: total_amount || 0,
       status: 'draft',
       updated_at: new Date()
@@ -404,6 +411,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount,
       discount_amount,
+      shipping_cost, // Added
       total_amount,
       status: 'draft',
       created_at: existingInvoice[0].created_at?.toISOString() || new Date().toISOString(),
@@ -560,11 +568,6 @@ const getInvoices = async (req, res) => {
                      ORDER BY i.created_at DESC`;
       
       const [invoices] = await connection.query(query, [company_id]);
-
-      if (invoices.length === 0) {
-        await connection.commit();
-        return res.status(404).json({ message: "No invoices found for this company" });
-      }
 
       const currentDate = new Date();
 

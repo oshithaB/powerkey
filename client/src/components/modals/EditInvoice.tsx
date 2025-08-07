@@ -261,7 +261,7 @@ export default function EditInvoice() {
       discountAmount = Number(discountValue.toFixed(2));
     }
   
-    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
+    const total = Number((subtotal - discountAmount).toFixed(2));
   
     return { subtotal, totalTax, discountAmount, total };
   };

@@ -170,9 +170,10 @@ async function createTables(db) {
             subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             discount_type ENUM('percentage', 'fixed') NOT NULL,
             discount_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            shipping_cost DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-            status ENUM('pending', 'accepted', 'declined', 'closed') NOT NULL DEFAULT 'pending',
+            status ENUM('pending', 'accepted', 'declined', 'closed', 'converted') NOT NULL DEFAULT 'pending',
             is_active BOOLEAN DEFAULT TRUE,
             notes TEXT,
             terms TEXT,
@@ -190,7 +191,7 @@ async function createTables(db) {
             CONSTRAINT estimates_ibfk_1 FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
             CONSTRAINT estimates_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer(id),
             CONSTRAINT estimates_ibfk_3 FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
-        )`,
+        );`,
         `CREATE TABLE IF NOT EXISTS estimate_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
             estimate_id INT NOT NULL,
@@ -216,6 +217,7 @@ async function createTables(db) {
             due_date VARCHAR(255),
             discount_type ENUM('percentage', 'fixed') DEFAULT 'fixed',
             discount_value DECIMAL(10,2) DEFAULT 0.00,
+            shipping_cost DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             notes TEXT,
             terms TEXT,
             shipping_address TEXT,

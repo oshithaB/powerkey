@@ -295,7 +295,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
 
-    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
+    const total = Number((subtotal - discountAmount).toFixed(2));
 
     return { subtotal, totalTax, discountAmount, total };
   };

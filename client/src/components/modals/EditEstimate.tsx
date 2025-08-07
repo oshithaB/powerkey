@@ -51,6 +51,7 @@ interface Estimate {
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
   discount_amount: number;
+  shipping_cost: number;
   tax_amount: number;
   total_amount: number;
   status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
@@ -102,6 +103,7 @@ export default function EditEstimate() {
     expiry_date: estimate?.expiry_date ? estimate.expiry_date.split('T')[0] : '',
     discount_type: estimate?.discount_type || 'fixed' as 'percentage' | 'fixed',
     discount_value: estimate ? (estimate.discount_value || calculateDiscountValue(estimate)) : 0,
+    shipping_cost: estimate?.shipping_cost || 0,
     notes: estimate?.notes || '',
     terms: estimate?.terms || '',
     shipping_address: estimate?.shipping_address || '',
@@ -275,6 +277,7 @@ export default function EditEstimate() {
     const totalTax = items.length > 0 
       ? Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2))
       : 0;
+    const shippingCost = Number(formData.shipping_cost || 0);
     
     let discountAmount = 0;
     const discountValue = Number(formData.discount_value) || 0;
@@ -283,10 +286,10 @@ export default function EditEstimate() {
     } else {
       discountAmount = Number(discountValue.toFixed(2));
     }
-  
-    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
-  
-    return { subtotal, totalTax, discountAmount, total };
+
+    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
+
+    return { subtotal, totalTax, discountAmount, shippingCost, total };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -308,7 +311,7 @@ export default function EditEstimate() {
         throw new Error('At least one valid item is required');
       }
 
-      const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
       const submitData = {
         id: estimate.id,
@@ -323,6 +326,7 @@ export default function EditEstimate() {
         discount_type: formData.discount_type,
         discount_amount: Number(discountAmount),
         discount_value: Number(formData.discount_value),
+        shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         status: estimate.status || 'draft',
         is_active: estimate.is_active !== undefined ? estimate.is_active : true,
@@ -375,7 +379,7 @@ export default function EditEstimate() {
     }
   };
 
-  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
   return (
     <motion.div
@@ -769,6 +773,17 @@ export default function EditEstimate() {
                         />
                         <span className="w-20 text-right">Rs. {discountAmount.toFixed(2)}</span>
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Shipping Cost:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input w-24 text-right"
+                        value={formData.shipping_cost}
+                        onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>

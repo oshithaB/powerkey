@@ -679,6 +679,7 @@ export default function InvoicesPage() {
                         <th className="px-4 py-2 text-left">Description</th>
                         <th className="px-4 py-2 text-right">Qty</th>
                         <th className="px-4 py-2 text-right">Unit Price</th>
+                        <th className="px-4 py-2 text-right">Actual Unit Price</th>
                         <th className="px-4 py-2 text-right">Tax %</th>
                         <th className="px-4 py-2 text-right">Total</th>
                       </tr>
@@ -696,6 +697,9 @@ export default function InvoicesPage() {
                           <td className="px-4 py-2 text-right">{item.quantity}</td>
                           <td className="px-4 py-2 text-right">
                             Rs. {Number(item.unit_price || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            Rs. {Number(item.actual_unit_price || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-2 text-right">{item.tax_rate}%</td>
                           <td className="px-4 py-2 text-right">
@@ -730,8 +734,19 @@ export default function InvoicesPage() {
                           <span>Rs. {Number(printingInvoice.subtotal || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Discount ({printingInvoice.discount_type === 'percentage' ? '%' : '$'}):</span>
+                          <span>Discount ({printingInvoice.discount_type === 'percentage' ? '%' : 'Rs.'}):</span>
                           <span>Rs. {Number(printingInvoice.discount_amount || 0).toFixed(2)}</span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span>
+                            Shipping Cost
+                          </span>
+                          <span>
+                            Rs.{" "}
+                            {Number(printingInvoice.shipping_cost || 0).toFixed(
+                              2
+                            )}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span>Tax:</span>

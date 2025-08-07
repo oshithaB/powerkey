@@ -734,6 +734,7 @@ export default function EstimatesPage() {
                         <th className="px-4 py-2 text-left">Description</th>
                         <th className="px-4 py-2 text-right">Qty</th>
                         <th className="px-4 py-2 text-right">Unit Price</th>
+                        <th className="px-4 py-2 text-right">Actual Unit Price</th>
                         <th className="px-4 py-2 text-right">Tax %</th>
                         <th className="px-4 py-2 text-right">Total</th>
                       </tr>
@@ -756,6 +757,9 @@ export default function EstimatesPage() {
                           </td>
                           <td className="px-4 py-2 text-right">
                             Rs. {Number(item.unit_price || 0).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            Rs. {Number(item.actual_unit_price || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-2 text-right">
                             {item.tax_rate}%
@@ -801,7 +805,7 @@ export default function EstimatesPage() {
                             Discount (
                             {printingEstimate.discount_type === "percentage"
                               ? "%"
-                              : "$"}
+                              : "Rs."}
                             ):
                           </span>
                           <span>
@@ -809,6 +813,17 @@ export default function EstimatesPage() {
                             {Number(
                               printingEstimate.discount_amount || 0
                             ).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span>
+                            Shipping Cost
+                          </span>
+                          <span>
+                            Rs.{" "}
+                            {Number(printingEstimate.shipping_cost || 0).toFixed(
+                              2
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between">

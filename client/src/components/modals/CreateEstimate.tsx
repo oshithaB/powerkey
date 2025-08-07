@@ -60,6 +60,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     expiry_date: '',
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
+    shipping_cost: 0,
     notes: '',
     terms: '',
     shipping_address: '',
@@ -83,7 +84,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const [formData, setFormData] = useState(estimate ? {
     ...initialFormData,
     ...estimate,
-    estimate_date: estimate.estimate_date.split('T')[0]
+    estimate_date: estimate.estimate_date.split('T')[0],
+    shipping_cost: estimate.shipping_cost || 0
   } : initialFormData);
 
   const [items, setItems] = useState<EstimateItem[]>(estimate?.items || initialItems);
@@ -212,6 +214,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const calculateTotals = () => {
     const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
     const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
+    const shippingCost = Number(formData.shipping_cost || 0);
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
@@ -220,9 +223,9 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
 
-    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
+    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
 
-    return { subtotal, totalTax, discountAmount, total };
+    return { subtotal, totalTax, discountAmount, shippingCost, total };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -244,7 +247,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         throw new Error('At least one valid item is required');
       }
 
-      const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
       const submitData = {
         ...formData,
@@ -254,6 +257,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
         discount_amount: Number(discountAmount),
+        shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         items: items.map(item => ({
           ...item,
@@ -295,7 +299,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     }
   };
 
-  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
   return (
     <motion.div
@@ -689,6 +693,17 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                         />
                         <span className="w-20 text-right">Rs. {discountAmount.toFixed(2)}</span>
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Shipping Cost:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input w-24 text-right"
+                        value={formData.shipping_cost}
+                        onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>

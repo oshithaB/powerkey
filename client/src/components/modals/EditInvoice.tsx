@@ -60,6 +60,7 @@ interface Invoice {
   ship_via?: string;
   shipping_date?: string;
   tracking_number?: string;
+  shipping_cost?: number;
 }
 
 export default function EditInvoice() {
@@ -96,6 +97,7 @@ export default function EditInvoice() {
     due_date: invoice?.due_date ? invoice.due_date.split('T')[0] : '',
     discount_type: invoice?.discount_type || 'fixed' as 'percentage' | 'fixed',
     discount_value: invoice ? (invoice.discount_value || calculateDiscountValue(invoice)) : 0,
+    shipping_cost: invoice?.shipping_cost || 0,
     notes: invoice?.notes || '',
     terms: invoice?.terms || '',
     shipping_address: invoice?.shipping_address || '',
@@ -218,7 +220,7 @@ export default function EditInvoice() {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
       item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = Number(((item.unit_price * (100 - item.tax_rate)) / 100).toFixed(2));
+      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
 
@@ -252,6 +254,7 @@ export default function EditInvoice() {
     const totalTax = items.length > 0 
       ? Number(items.reduce((sum, item) => sum + Number(item.tax_amount), 0).toFixed(2))
       : 0;
+    const shippingCost = Number(formData.shipping_cost || 0);
     
     let discountAmount = 0;
     const discountValue = Number(formData.discount_value) || 0;
@@ -261,9 +264,9 @@ export default function EditInvoice() {
       discountAmount = Number(discountValue.toFixed(2));
     }
   
-    const total = Number((subtotal - discountAmount + totalTax).toFixed(2));
+    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
   
-    return { subtotal, totalTax, discountAmount, total };
+    return { subtotal, totalTax, discountAmount, shippingCost, total };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -288,7 +291,7 @@ export default function EditInvoice() {
         throw new Error('At least one valid item is required');
       }
   
-      const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
   
       const submitData = {
         invoice_number: formData.invoice_number,
@@ -302,6 +305,7 @@ export default function EditInvoice() {
         discount_type: formData.discount_type,
         discount_amount: Number(discountAmount),
         discount_value: Number(formData.discount_value),
+        shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         paid_amount: invoice?.paid_amount || 0,
         balance_due: Number(total - (invoice?.paid_amount || 0)),
@@ -357,7 +361,7 @@ export default function EditInvoice() {
     }
   };
 
-  const { subtotal, totalTax, discountAmount, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
   return (
     <motion.div
@@ -604,7 +608,7 @@ export default function EditInvoice() {
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
                                     updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
-                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * (100 - taxRate)) / 100).toFixed(2));
+                                    updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * 100) / (100 + taxRate)).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
@@ -768,6 +772,17 @@ export default function EditInvoice() {
                         />
                         <span className="w-20 text-right">Rs. {discountAmount.toFixed(2)}</span>
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Shipping Cost:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input w-24 text-right"
+                        value={formData.shipping_cost}
+                        onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
+                      />
                     </div>
                     <div className="flex justify-between">
                       <span>Tax:</span>

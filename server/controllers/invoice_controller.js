@@ -23,6 +23,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     subtotal,
     tax_amount,
     discount_amount,
+    shipping_cost,
     total_amount,
     items,
     attachment
@@ -108,6 +109,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount: tax_amount || 0,
       discount_amount: discount_amount || 0,
+      shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
       status: 'draft',
       created_at: new Date(),
@@ -178,6 +180,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount,
       discount_amount,
+      shipping_cost,
       total_amount,
       status: 'draft',
       created_at: invoiceData.created_at.toISOString(),
@@ -220,12 +223,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
     subtotal,
     tax_amount,
     discount_amount,
+    shipping_cost,
     total_amount,
     items,
     attachment
   } = req.body;
 
-  const invoiceId = req.params.invoiceId; // Changed from req.params.id to req.params.invoiceId
+  const invoiceId = req.params.invoiceId;
 
   // Validate required fields
   if (!invoice_number) {
@@ -320,6 +324,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount: tax_amount || 0,
       discount_amount: discount_amount || 0,
+      shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
       status: 'draft',
       updated_at: new Date()
@@ -330,6 +335,14 @@ const updateInvoice = asyncHandler(async (req, res) => {
       `UPDATE invoices SET ? WHERE id = ? AND company_id = ?`,
       [invoiceData, invoiceId, company_id]
     );
+
+    // Update estimate's shipping cost and total amount if estimate_id is provided
+    if (estimate_id) {
+      await connection.query(
+        `UPDATE estimates SET shipping_cost = ?, total_amount = ?, updated_at = ? WHERE id = ? AND company_id = ?`,
+        [shipping_cost, total_amount, new Date(), estimate_id, company_id]
+      );
+    }
 
     if (updateResult.affectedRows === 0) {
       await connection.rollback();
@@ -369,7 +382,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
     // Handle file attachment if provided
     if (req.file) {
-      // Optionally, delete existing attachments for this invoice to avoid duplicates
       await connection.query(
         `DELETE FROM invoice_attachments WHERE invoice_id = ?`,
         [invoiceId]
@@ -404,6 +416,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       subtotal,
       tax_amount,
       discount_amount,
+      shipping_cost,
       total_amount,
       status: 'draft',
       created_at: existingInvoice[0].created_at?.toISOString() || new Date().toISOString(),
@@ -424,75 +437,76 @@ const updateInvoice = asyncHandler(async (req, res) => {
   }
 });
 
-// delete invoice
+// Delete Invoice
 const deleteInvoice = async (req, res) => {
-    const { invoiceId } = req.params;
+  const { invoiceId } = req.params;
 
-    if (!invoiceId) {
-        return res.status(400).json({ error: "Invoice ID is required" });
+  if (!invoiceId) {
+    return res.status(400).json({ error: "Invoice ID is required" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Check if invoice exists
+    const [existingInvoice] = await connection.query(
+      `SELECT id FROM invoices WHERE id = ?`,
+      [invoiceId]
+    );
+
+    if (existingInvoice.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Invoice not found" });
     }
 
-    const connection = await db.getConnection();
-    try {
-        await connection.beginTransaction();
+    // Update the estimate status to pending and remove the invoice_id
+    await connection.query(
+      `UPDATE estimates SET status = 'pending', invoice_id = NULL WHERE invoice_id = ?`,
+      [invoiceId]
+    );
 
-        // Check if invoice exists
-        const [existingInvoice] = await connection.query(
-            `SELECT id FROM invoices WHERE id = ?`,
-            [invoiceId]
-        );
+    // Delete invoice items
+    await connection.query(
+      `DELETE FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
 
-        if (existingInvoice.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ error: "Invoice not found" });
-        }
+    // Delete invoice attachments
+    await connection.query(
+      `DELETE FROM invoice_attachments WHERE invoice_id = ?`,
+      [invoiceId]
+    );
 
-        // update the estimate status to pending and remove the invoice_id
-        await connection.query(
-            `UPDATE estimates SET status = 'pending', invoice_id = NULL WHERE invoice_id = ?`,
-            [invoiceId]
-        );
+    // Delete payments associated with the invoice
+    await connection.query(
+      `DELETE FROM payments WHERE invoice_id = ?`,
+      [invoiceId]
+    );
 
-        // Delete invoice items
-        await connection.query(
-            `DELETE FROM invoice_items WHERE invoice_id = ?`,
-            [invoiceId]
-        );
+    // Delete the invoice
+    const [deleteResult] = await connection.query(
+      `DELETE FROM invoices WHERE id = ?`,
+      [invoiceId]
+    );
 
-        // Delete invoice attachments
-        await connection.query(
-            `DELETE FROM invoice_attachments WHERE invoice_id = ?`,
-            [invoiceId]
-        );
-
-        // Delete payments associated with the invoice
-        await connection.query(
-          `DELETE FROM payments WHERE invoice_id = ?`,
-          [invoiceId]
-        );
-
-        // Delete the invoice
-        const [deleteResult] = await connection.query(
-            `DELETE FROM invoices WHERE id = ?`,
-            [invoiceId]
-        );
-
-        if (deleteResult.affectedRows === 0) {
-            await connection.rollback();
-            return res.status(400).json({ error: "Failed to delete invoice" });
-        }
-
-        await connection.commit();
-        res.status(200).json({ message: "Invoice deleted successfully" });
-    } catch (error) {
-        await connection.rollback();
-        console.error('Error deleting invoice:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    } finally {
-        connection.release();
+    if (deleteResult.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Failed to delete invoice" });
     }
-}
 
+    await connection.commit();
+    res.status(200).json({ message: "Invoice deleted successfully" });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error deleting invoice:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    connection.release();
+  }
+};
+
+// Get Invoice
 const getInvoice = async (req, res) => {
   const { id, company_id } = req.params;
 
@@ -501,7 +515,6 @@ const getInvoice = async (req, res) => {
   }
 
   try {
-    // Get invoice with customer and employee info
     const invoiceQuery = `
       SELECT i.*, c.name AS customer_name, c.phone AS customer_phone,
              e.name AS employee_name
@@ -518,7 +531,6 @@ const getInvoice = async (req, res) => {
 
     const invoice = invoiceRows[0];
 
-    // Get invoice items
     const itemsQuery = `
       SELECT ii.*, p.name AS product_name, p.price AS product_price
       FROM invoice_items ii
@@ -536,8 +548,6 @@ const getInvoice = async (req, res) => {
   }
 };
 
-module.exports = { getInvoice };
-
 // Get Invoices
 const getInvoices = async (req, res) => {
   try {
@@ -551,7 +561,6 @@ const getInvoices = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      // Fetch invoices
       const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
                      FROM invoices i
                      LEFT JOIN customer c ON i.customer_id = c.id
@@ -561,11 +570,6 @@ const getInvoices = async (req, res) => {
       
       const [invoices] = await connection.query(query, [company_id]);
 
-      if (invoices.length === 0) {
-        await connection.commit();
-        return res.status(404).json({ message: "No invoices found for this company" });
-      }
-
       const currentDate = new Date();
 
       for (const invoice of invoices) {
@@ -574,7 +578,6 @@ const getInvoices = async (req, res) => {
         const totalAmount = Number(invoice.total_amount) || 0;
         const balanceDue = totalAmount - paidAmount;
 
-        // Update overdue status if needed
         if (
           dueDate &&
           dueDate < currentDate &&
@@ -594,7 +597,6 @@ const getInvoices = async (req, res) => {
           invoice.updated_at = new Date().toISOString();
         }
 
-        // Fetch items for each invoice
         const [items] = await connection.query(
           `SELECT * FROM invoice_items WHERE invoice_id = ?`,
           [invoice.id]
@@ -606,7 +608,6 @@ const getInvoices = async (req, res) => {
           updated_at: item.updated_at ? new Date(item.updated_at).toISOString() : null
         }));
 
-        // Normalize date fields to ISO format
         invoice.invoice_date = invoice.invoice_date ? new Date(invoice.invoice_date).toISOString() : null;
         invoice.due_date = invoice.due_date ? new Date(invoice.due_date).toISOString() : null;
         invoice.shipping_date = invoice.shipping_date ? new Date(invoice.shipping_date).toISOString() : null;
@@ -629,38 +630,39 @@ const getInvoices = async (req, res) => {
   }
 };
 
+// Get Invoice By ID
 const getInvoiceById = async (req, res) => {
   try {
-      const { invoiceId } = req.params;
+    const { invoiceId } = req.params;
 
-      if (!invoiceId) {
-          return res.status(400).json({ error: "Invoice ID is required" });
-      }
+    if (!invoiceId) {
+      return res.status(400).json({ error: "Invoice ID is required" });
+    }
 
-      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
-                     FROM invoices i
-                     LEFT JOIN customer c ON i.customer_id = c.id
-                     LEFT JOIN employees e ON i.employee_id = e.id
-                     WHERE i.id = ?`;
-      
-      const [invoice] = await db.query(query, [invoiceId]);
+    const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+                   FROM invoices i
+                   LEFT JOIN customer c ON i.customer_id = c.id
+                   LEFT JOIN employees e ON i.employee_id = e.id
+                   WHERE i.id = ?`;
+    
+    const [invoice] = await db.query(query, [invoiceId]);
 
-      if (invoice.length === 0) {
-          return res.status(404).json({ message: "Invoice not found" });
-      }
+    if (invoice.length === 0) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
 
-      // Fetch items for the invoice
-      const itemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
-      const [items] = await db.query(itemsQuery, [invoiceId]);
-      invoice[0].items = items;
+    const itemsQuery = `SELECT * FROM invoice_items WHERE invoice_id = ?`;
+    const [items] = await db.query(itemsQuery, [invoiceId]);
+    invoice[0].items = items;
 
-      res.status(200).json(invoice[0]);
+    res.status(200).json(invoice[0]);
   } catch (error) {
-      console.error('Error fetching invoice:', error);
-      res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching invoice:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
 
+// Get Invoice Items
 const getInvoiceItems = async(req, res) => {
   try {
     const { invoiceId } = req.params;
@@ -677,13 +679,11 @@ const getInvoiceItems = async(req, res) => {
     }
 
     res.status(200).json(items);
-  }
-
-  catch (error) {
+  } catch (error) {
     console.error('Error fetching invoice items:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
 
 // Get Invoices By Customer
 const getInvoicesByCustomer = asyncHandler(async (req, res) => {
@@ -712,7 +712,6 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: "No invoices found for this customer" });
       }
 
-      // Update status to overdue if due date has passed
       const currentDate = new Date();
       for (const invoice of invoices) {
         const dueDate = new Date(invoice.due_date);
@@ -731,7 +730,6 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
           invoice.status = 'overdue';
         }
 
-        // Fetch items for each invoice
         const [items] = await connection.query(
           `SELECT * FROM invoice_items WHERE invoice_id = ?`,
           [invoice.id]
@@ -787,14 +785,12 @@ const recordPayment = asyncHandler(async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Verify total payment matches sum of invoice payments
     const totalInvoicePayments = invoice_payments.reduce((sum, { payment_amount }) => sum + Number(payment_amount), 0);
     if (Math.abs(totalInvoicePayments - payment_amount) > 0.01) {
       await connection.rollback();
       return res.status(400).json({ error: "Sum of invoice payments does not match total payment amount" });
     }
 
-    // Create payments table if it doesn't exist
     await connection.query(`
       CREATE TABLE IF NOT EXISTS payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -815,7 +811,6 @@ const recordPayment = asyncHandler(async (req, res) => {
 
     const currentDate = new Date();
 
-    // Record payments and update invoices
     for (const invoicePayment of invoice_payments) {
       const { invoice_id, payment_amount: invoicePaymentAmount } = invoicePayment;
 
@@ -824,7 +819,6 @@ const recordPayment = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: "Invalid invoice ID or payment amount" });
       }
 
-      // Verify invoice exists
       const [invoice] = await connection.query(
         `SELECT total_amount, paid_amount, due_date FROM invoices WHERE id = ? AND company_id = ? AND customer_id = ?`,
         [invoice_id, company_id, customerId]
@@ -846,7 +840,6 @@ const recordPayment = asyncHandler(async (req, res) => {
         status = 'partially_paid';
       }
 
-      // Check for overdue status if not paid
       const dueDate = new Date(invoice[0].due_date);
       if (
         status !== 'paid' &&
@@ -857,14 +850,12 @@ const recordPayment = asyncHandler(async (req, res) => {
         status = 'overdue';
       }
 
-      // Insert payment record
       await connection.query(
         `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, deposit_to, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, deposit_to, notes || null]
       );
 
-      // Update invoice
       await connection.query(
         `UPDATE invoices 
          SET paid_amount = ?, 
@@ -891,6 +882,7 @@ module.exports = {
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  getInvoice,
   getInvoices,
   getInvoiceById,
   getInvoiceItems,

@@ -548,22 +548,26 @@ const convertEstimateToInvoice = async (req, res) => {
 
         // Fetch estimate items
         const [estimateItems] = await db.query(
-            `SELECT * FROM estimate_items WHERE estimate_id = ?`,
+            `SELECT ei.*, prod.name AS product_name
+             FROM estimate_items ei
+             JOIN products prod ON ei.product_id = prod.id
+             WHERE ei.estimate_id = ?`,
             [estimateId]
         );
 
         // Insert invoice items
         const itemQuery = `
             INSERT INTO invoice_items (
-                invoice_id, product_id, description, quantity, unit_price, 
+                invoice_id, product_id, product_name, description, quantity, unit_price, 
                 actual_unit_price, tax_rate, tax_amount, total_price
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         for (const item of estimateItems) {
             const itemValues = [
                 invoiceResult.insertId,
                 item.product_id,
+                item.product_name,
                 item.description,
                 item.quantity,
                 item.unit_price,

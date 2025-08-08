@@ -199,13 +199,18 @@ export default function InvoicesPage() {
             logoImage.onerror = reject;
           });
         }
-
-        const pdf = new jsPDF('p', 'mm', 'a4');
+  
+        const pdf = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: 'a4',
+          compress: true
+        });
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
         const margin = 10;
         const maxContentHeight = pageHeight - 2 * margin;
-
+  
         const scale = 3;
         const canvas = await html2canvas(printRef.current, {
           scale,
@@ -218,28 +223,15 @@ export default function InvoicesPage() {
         const imgProps = pdf.getImageProperties(imgData);
         const imgWidth = pageWidth - 2 * margin;
         const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
         const totalPages = Math.ceil(imgHeight / maxContentHeight);
-
+        let position = 0;
+  
         for (let i = 0; i < totalPages; i++) {
-          if (i > 0) {
-            pdf.addPage();
-          }
-          const srcY = i * maxContentHeight * (canvas.width / imgWidth);
-          const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.width / imgWidth));
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = pageContentHeight;
-          const tempCtx = tempCanvas.getContext('2d');
-          if (tempCtx) {
-            tempCtx.imageSmoothingEnabled = true;
-            tempCtx.imageSmoothingQuality = 'high';
-            tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
-            const pageImgData = tempCanvas.toDataURL('image/png', 1.0);
-            pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
-          }
+          if (i > 0) pdf.addPage();
+          const height = (i === totalPages - 1) ? (imgHeight % maxContentHeight || maxContentHeight) : maxContentHeight;
+          pdf.addImage(imgData, 'PNG', margin, margin - (i * maxContentHeight), imgWidth, height, '', 'FAST');
         }
-
+  
         pdf.save(`invoice_${printingInvoice?.invoice_number}.pdf`);
         setShowPrintPreview(false);
         setPrintingInvoice(null);

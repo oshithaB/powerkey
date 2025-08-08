@@ -22,6 +22,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 interface Invoice {
   id: number;
   invoice_number: string;
+  head_note?: string | null;
   customer_id: number | null;
   customer_name?: string;
   employee_id: number;
@@ -199,18 +200,13 @@ export default function InvoicesPage() {
             logoImage.onerror = reject;
           });
         }
-  
-        const pdf = new jsPDF({
-          orientation: 'p',
-          unit: 'mm',
-          format: 'a4',
-          compress: true
-        });
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
         const margin = 10;
         const maxContentHeight = pageHeight - 2 * margin;
-  
+
         const scale = 3;
         const canvas = await html2canvas(printRef.current, {
           scale,
@@ -223,15 +219,28 @@ export default function InvoicesPage() {
         const imgProps = pdf.getImageProperties(imgData);
         const imgWidth = pageWidth - 2 * margin;
         const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
         const totalPages = Math.ceil(imgHeight / maxContentHeight);
-        let position = 0;
-  
+
         for (let i = 0; i < totalPages; i++) {
-          if (i > 0) pdf.addPage();
-          const height = (i === totalPages - 1) ? (imgHeight % maxContentHeight || maxContentHeight) : maxContentHeight;
-          pdf.addImage(imgData, 'PNG', margin, margin - (i * maxContentHeight), imgWidth, height, '', 'FAST');
+          if (i > 0) {
+            pdf.addPage();
+          }
+          const srcY = i * maxContentHeight * (canvas.width / imgWidth);
+          const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.width / imgWidth));
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = pageContentHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
+            const pageImgData = tempCanvas.toDataURL('image/png', 1.0);
+            pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
+          }
         }
-  
+
         pdf.save(`invoice_${printingInvoice?.invoice_number}.pdf`);
         setShowPrintPreview(false);
         setPrintingInvoice(null);
@@ -674,6 +683,12 @@ export default function InvoicesPage() {
                       Employee: {printingInvoice.employee_name || 'Not assigned'}
                     </p>
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-lg mb-5 bg-gray-100 p-4 rounded">
+                    {printingInvoice.head_note || "No head note available"}
+                  </p>
                 </div>
 
                 <div className="mb-6">

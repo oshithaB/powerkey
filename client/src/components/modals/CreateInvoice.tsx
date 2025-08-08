@@ -56,6 +56,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
 
   const initialFormData = {
     invoice_number: `INV-${Date.now()}`,
+    head_note: '',
     customer_id: '',
     employee_id: '',
     estimate_id: '',
@@ -330,6 +331,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         customer_id: parseInt(formData.customer_id) || null,
         employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
         estimate_id: formData.estimate_id ? parseInt(formData.estimate_id) : null,
+        head_note: formData.head_note || '',
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
         discount_amount: Number(discountAmount),
@@ -603,6 +605,19 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   placeholder="Tracking Number"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Head Note
+              </label>
+              <input
+                type="text"
+                className="input w-1/2"
+                value={formData.head_note || ''}
+                onChange={(e) => setFormData({ ...formData, head_note: e.target.value })}
+                placeholder="Head Note"
+              />
             </div>
 
             <div>

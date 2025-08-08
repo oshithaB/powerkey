@@ -18,6 +18,7 @@ const getEstimates = async (req, res) => {
                             emp.name AS employee_name,
                             e.estimate_date,
                             e.expiry_date,
+                            e.head_note,
                             e.subtotal,
                             e.discount_type,
                             e.discount_amount,
@@ -71,6 +72,7 @@ const getEstimatesByCustomer = async (req, res) => {
                             emp.name AS employee_name,
                             e.estimate_date,
                             e.expiry_date,
+                            e.head_note,
                             e.subtotal,
                             e.discount_type,
                             e.discount_amount,
@@ -111,6 +113,7 @@ const createEstimate = async (req, res) => {
         employee_id,
         estimate_date,
         expiry_date,
+        head_note,
         subtotal,
         discount_type,
         discount_amount,
@@ -179,11 +182,11 @@ const createEstimate = async (req, res) => {
   
       // Insert into estimates table
       const estimateQuery = `INSERT INTO estimates
-                      (estimate_number, company_id, customer_id, employee_id, estimate_date, expiry_date, 
+                      (estimate_number, company_id, customer_id, employee_id, estimate_date, expiry_date, head_note, 
                        subtotal, discount_type, discount_amount, shipping_cost, tax_amount, total_amount, 
                        status, is_active, notes, terms, shipping_address, billing_address, ship_via, 
                        shipping_date, tracking_number)
-                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?)`;
   
       const estimateValues = [
         estimate_number,
@@ -192,6 +195,7 @@ const createEstimate = async (req, res) => {
         employee_id || null,
         estimate_date,
         expiry_date || null,
+        head_note || null,
         subtotal,
         discount_type || 'fixed',
         discount_amount || 0,
@@ -251,6 +255,7 @@ const createEstimate = async (req, res) => {
         employee_id,
         estimate_date,
         expiry_date,
+        head_note,
         subtotal,
         discount_type,
         discount_amount,
@@ -291,6 +296,7 @@ const editEstimate = async (req, res) => {
         employee_id,
         estimate_date,
         expiry_date,
+        head_note,
         subtotal,
         discount_type,
         discount_amount,
@@ -335,7 +341,7 @@ const editEstimate = async (req, res) => {
       // Update estimate
       const updateEstimateQuery = `
         UPDATE estimates SET
-          estimate_number = ?, company_id = ?, customer_id = ?, employee_id = ?, estimate_date = ?, expiry_date = ?,
+          estimate_number = ?, company_id = ?, customer_id = ?, employee_id = ?, estimate_date = ?, expiry_date = ?, head_note = ?,
           subtotal = ?, discount_type = ?, discount_amount = ?, shipping_cost = ?, tax_amount = ?, total_amount = ?, 
           status = ?, is_active = ?, notes = ?, terms = ?, shipping_address = ?, billing_address = ?, 
           ship_via = ?, shipping_date = ?, tracking_number = ?
@@ -343,7 +349,7 @@ const editEstimate = async (req, res) => {
       `;
   
       const updateValues = [
-        estimate_number, company_id, customer_id, employee_id || null, estimate_date, expiry_date || null,
+        estimate_number, company_id, customer_id, employee_id || null, estimate_date, expiry_date || null, head_note || null,
         subtotal, discount_type || 'fixed', discount_amount || 0, shipping_cost || 0, tax_amount || 0, total_amount || 0, 
         status || 'pending', is_active !== undefined ? is_active : true, notes || null, terms || null, 
         shipping_address || null, billing_address || null, ship_via || null, shipping_date || null, tracking_number || null,
@@ -506,12 +512,12 @@ const convertEstimateToInvoice = async (req, res) => {
         // Create invoice
         const invoiceQuery = `
             INSERT INTO invoices (
-                company_id, customer_id, employee_id, estimate_id, invoice_number, 
+                company_id, customer_id, employee_id, estimate_id, invoice_number, head_note,
                 invoice_date, due_date, discount_type, discount_value, discount_amount,
                 notes, terms, shipping_address, shipping_cost, billing_address, ship_via, 
                 shipping_date, tracking_number, subtotal, tax_amount, total_amount,
                 status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const invoiceValues = [
@@ -520,6 +526,7 @@ const convertEstimateToInvoice = async (req, res) => {
             estimateData.employee_id || null,
             estimateId,
             invoiceNumber,
+            estimateData.head_note || null,
             new Date().toISOString().split('T')[0],
             estimateData.expiry_date || null,
             estimateData.discount_type || 'fixed',

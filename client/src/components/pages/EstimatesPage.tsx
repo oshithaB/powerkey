@@ -19,6 +19,8 @@ interface Estimate {
   employee_id: number;
   employee_name: string;
   estimate_date: string;
+  head_note?: string | null;
+  shipping_cost?: number | null;
   expiry_date?: string | null;
   subtotal: number;
   discount_type: 'percentage' | 'fixed';
@@ -722,6 +724,12 @@ export default function EstimatesPage() {
                         printingEstimate.status.slice(1)}
                     </p> */}
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-lg mb-5 bg-gray-100 p-4 rounded">
+                    {printingEstimate.head_note || "No head note available"}
+                  </p>
                 </div>
 
                 <div className="mb-6">

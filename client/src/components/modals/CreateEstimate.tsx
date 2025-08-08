@@ -58,6 +58,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     employee_id: '',
     estimate_date: new Date().toISOString().split('T')[0],
     expiry_date: '',
+    head_note: '',
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
     shipping_cost: 0,
@@ -467,6 +468,19 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   placeholder="Tracking Number"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Head Note
+              </label>
+              <input
+                type="text"
+                className="input w-1/2"
+                value={formData.head_note || ''}
+                onChange={(e) => setFormData({ ...formData, head_note: e.target.value })}
+                placeholder="Enter head note"
+              />
             </div>
 
             <div>

@@ -37,6 +37,7 @@ interface TaxRate {
 interface Invoice {
   id: number;
   invoice_number: string;
+  head_note?: string | null;
   customer_id: number;
   customer_name?: string;
   billing_address?: string;
@@ -91,6 +92,7 @@ export default function EditInvoice() {
 
   const initialFormData = {
     invoice_number: invoice?.invoice_number || `INV-${Date.now()}`,
+    head_note: invoice?.head_note || '',
     customer_id: invoice?.customer_id?.toString() || '',
     employee_id: invoice?.employee_id?.toString() || '',
     invoice_date: invoice ? invoice.invoice_date.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -161,7 +163,8 @@ export default function EditInvoice() {
       setFormData(prev => ({
         ...prev,
         notes: invoice?.notes || selectedCompany.notes || '',
-        terms: invoice?.terms || selectedCompany.terms_and_conditions || ''
+        terms: invoice?.terms || selectedCompany.terms_and_conditions || '',
+        head_note: invoice?.head_note || ''
       }));
     }
   }, [selectedCompany, invoice]);
@@ -295,6 +298,7 @@ export default function EditInvoice() {
   
       const submitData = {
         invoice_number: formData.invoice_number,
+        head_note: formData.head_note || null,
         company_id: selectedCompany?.company_id,
         customer_id: parseInt(formData.customer_id) || null,
         employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
@@ -530,6 +534,19 @@ export default function EditInvoice() {
                   placeholder="Tracking Number"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Head Note
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={formData.head_note || ''}
+                onChange={(e) => setFormData({ ...formData, head_note: e.target.value })}
+                placeholder="Enter head note"
+              />
             </div>
 
             <div>

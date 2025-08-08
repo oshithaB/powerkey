@@ -47,6 +47,7 @@ interface Estimate {
   employee_name: string;
   estimate_date: string;
   expiry_date?: string | null;
+  head_note?: string | null;
   subtotal: number;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
@@ -101,6 +102,7 @@ export default function EditEstimate() {
     employee_id: estimate?.employee_id?.toString() || '',
     estimate_date: estimate ? estimate.estimate_date.split('T')[0] : new Date().toISOString().split('T')[0],
     expiry_date: estimate?.expiry_date ? estimate.expiry_date.split('T')[0] : '',
+    head_note: estimate?.head_note || '',
     discount_type: estimate?.discount_type || 'fixed' as 'percentage' | 'fixed',
     discount_value: estimate ? (estimate.discount_value || calculateDiscountValue(estimate)) : 0,
     shipping_cost: estimate?.shipping_cost || 0,
@@ -167,6 +169,7 @@ export default function EditEstimate() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     console.log('Socket in edit estimate:', socket);
     console.log('User in edit estimate:', user);
+    console.log('Estimate in edit estimate:', estimate);
 
     socket.emit('start_edit_estimate', { estimateId: estimate.id, user });
     console.log('Socket in edit estimate emit start_edit_estimate', { estimateId: estimate.id, user });
@@ -183,7 +186,8 @@ export default function EditEstimate() {
       setFormData(prev => ({
         ...prev,
         notes: estimate?.notes || selectedCompany.notes || '',
-        terms: estimate?.terms || selectedCompany.terms_and_conditions || ''
+        terms: estimate?.terms || selectedCompany.terms_and_conditions || '',
+        head_note: estimate?.head_note,
       }));
     }
   }, [selectedCompany, estimate]);
@@ -324,6 +328,7 @@ export default function EditEstimate() {
         subtotal: Number(subtotal),
         tax_amount: Number(totalTax),
         discount_type: formData.discount_type,
+        head_note: formData.head_note || null,
         discount_amount: Number(discountAmount),
         discount_value: Number(formData.discount_value),
         shipping_cost: Number(shippingCost),
@@ -547,6 +552,19 @@ export default function EditEstimate() {
                   placeholder="Tracking Number"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Head Note
+              </label>
+              <input
+                type='text'
+                className='input'
+                value={formData.head_note || ''}
+                onChange={(e) => setFormData({ ...formData, head_note: e.target.value })}
+                placeholder='Please Enter Head Note'
+              />
             </div>
 
             <div>

@@ -22,6 +22,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 interface Invoice {
   id: number;
   invoice_number: string;
+  head_note?: string | null;
   customer_id: number | null;
   customer_name?: string;
   employee_id: number;
@@ -682,6 +683,12 @@ export default function InvoicesPage() {
                       Employee: {printingInvoice.employee_name || 'Not assigned'}
                     </p>
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-lg mb-5 bg-gray-100 p-4 rounded">
+                    {printingInvoice.head_note || "No head note available"}
+                  </p>
                 </div>
 
                 <div className="mb-6">

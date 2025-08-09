@@ -124,8 +124,8 @@ export default function EstimatesPage() {
     console.log('Socket in estimate page:', socket);
     if (!socket) return;
 
-    socket.emit('start_listening');
-    console.log('Socket in estimate page emit start_listening');
+    socket.emit('start_listening_estimates');
+    console.log('Socket in estimate page emit start_listening_estimates');
 
     socket.on('locked_estimates', (locked_estimates) => {
       setLockedEstimates(locked_estimates);
@@ -178,9 +178,6 @@ export default function EstimatesPage() {
     });
   };
 
-
-
-
   useEffect(() => {
     convertEstimatesToLocked();
   }, [lockedEstimates, estimates]);
@@ -206,11 +203,6 @@ export default function EstimatesPage() {
       return [];
     }
   };
-
-  // const handleEdit = async (estimate: Estimate) => {
-  //   const fetchedItems = await fetchEstimateItems(estimate.id);
-  //   navigate(`/estimates/edit/${estimate.id}`, { state: { estimate, items: fetchedItems } });
-  // };
 
   const handleEdit = async (estimate: Estimate) => {
     const fetchedItems = await fetchEstimateItems(estimate.id);

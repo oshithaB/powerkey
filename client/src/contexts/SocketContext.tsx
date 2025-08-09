@@ -14,6 +14,9 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const socketRef = useRef<Socket | null>(null);
+  const renderCount = useRef(0);
+  console.log('socketRef = ', socketRef.current);
+  console.log('Render count of socketProvider:', renderCount.current++);
 
   useEffect(() => {
     socketRef.current = io('http://localhost:3000', {

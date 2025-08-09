@@ -362,10 +362,10 @@ async function createTables(db) {
     const users = [
         {
             role_id: 1, // admin
-            full_name: '',
-            username: '',
-            email: '',
-            password: ''
+            full_name: 'Aruna Kaldera',
+            username: 'Ansk02',
+            email: 'aruna.kaldera@example.com',
+            password: 'aK@123456'
         },
         {
             role_id: 2, // sales

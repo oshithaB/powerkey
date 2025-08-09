@@ -318,7 +318,7 @@ export default function InvoicesPage() {
     .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
 
   const balanceDueData = invoices
-    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft')
+    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft' || invoice.status === 'sent')
     .reduce((acc, invoice) => {
       const amount = invoice.status === 'partially_paid' 
         ? (Number(invoice.balance_due) || 0) 

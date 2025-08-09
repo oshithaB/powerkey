@@ -385,10 +385,10 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      Sale: ${Number(product.unit_price).toFixed(2)}
+                      Sale: Rs. {Number(product.unit_price).toFixed(2)}
                     </div>
                     <div className="text-sm text-gray-500">
-                      Cost: ${Number(product.cost_price).toFixed(2)}
+                      Cost: Rs. {Number(product.cost_price).toFixed(2)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

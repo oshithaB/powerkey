@@ -321,33 +321,6 @@ async function createTables(db) {
         //     CONSTRAINT order_items_ibfk_1 FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
         //     CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
         // )`
-        // `CREATE TABLE IF NOT EXISTS invoices (
-        //     id int NOT NULL AUTO_INCREMENT,
-        //     company_id int NOT NULL,
-        //     invoice_number varchar(100),
-        //     customer_id int,
-        //     employee_id int,
-        //     estimate_id int,
-        //     invoice_date date NOT NULL,
-        //     due_date date,
-        //     subtotal decimal(15,2) DEFAULT 0,
-        //     discount_type enum('percentage','fixed') DEFAULT 'fixed',
-        //     discount_value decimal(15,2) DEFAULT 0,
-        //     discount_amount decimal(15,2) DEFAULT 0,
-        //     tax_amount decimal(15,2) DEFAULT 0,
-        //     total_amount decimal(15,2) DEFAULT 0,
-        //     paid_amount decimal(15,2) DEFAULT 0,
-        //     balance_due decimal(15,2) DEFAULT 0,
-        //     status enum('draft','sent','paid','partially_paid','overdue','cancelled') DEFAULT 'draft',
-        //     notes text,
-        //     terms text,
-        //     created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        //     PRIMARY KEY (id),
-        //     KEY company_id (company_id),
-        //     KEY customer_id (customer_id),
-        //     CONSTRAINT invoices_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id),
-        //     CONSTRAINT invoices_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customers (id)
-        // )`,
         // `CREATE TABLE IF NOT EXISTS categories (
         //     id INT AUTO_INCREMENT PRIMARY KEY,
         //     name VARCHAR(100) NOT NULL UNIQUE,

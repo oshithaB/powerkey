@@ -106,7 +106,8 @@ export default function EditInvoice() {
     billing_address: invoice?.billing_address || '',
     ship_via: invoice?.ship_via || '',
     shipping_date: invoice?.shipping_date ? invoice.shipping_date.split('T')[0] : '',
-    tracking_number: invoice?.tracking_number || ''
+    tracking_number: invoice?.tracking_number || '',
+    status: invoice?.status,
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -268,8 +269,9 @@ export default function EditInvoice() {
     }
   
     const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
+    const balanceDue = Number((total - Number(invoice?.paid_amount || 0)).toFixed(2));
   
-    return { subtotal, totalTax, discountAmount, shippingCost, total };
+    return { subtotal, totalTax, discountAmount, shippingCost, total, balanceDue };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,7 +296,7 @@ export default function EditInvoice() {
         throw new Error('At least one valid item is required');
       }
   
-      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, total, balanceDue } = calculateTotals();
   
       const submitData = {
         invoice_number: formData.invoice_number,
@@ -312,8 +314,8 @@ export default function EditInvoice() {
         shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         paid_amount: invoice?.paid_amount || 0,
-        balance_due: Number(total - (invoice?.paid_amount || 0)),
-        status: invoice?.status || 'draft',
+        balance_due: Number(balanceDue),
+        status: formData.status,
         notes: formData.notes || null,
         terms: formData.terms || null,
         shipping_address: formData.shipping_address || null,
@@ -365,7 +367,7 @@ export default function EditInvoice() {
     }
   };
 
-  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, total, balanceDue } = calculateTotals();
 
   return (
     <motion.div
@@ -533,6 +535,21 @@ export default function EditInvoice() {
                   onChange={(e) => setFormData({ ...formData, tracking_number: e.target.value })}
                   placeholder="Tracking Number"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  className="input"
+                  value={formData.status || ''}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                >
+                  <option value="">Select Status</option>
+                  <option value="sent">Sent</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
               </div>
             </div>
 
@@ -805,9 +822,19 @@ export default function EditInvoice() {
                       <span>Tax:</span>
                       <span>Rs. {totalTax.toFixed(2)}</span>
                     </div>
+                    
                     <div className="flex justify-between font-bold text-lg border-t pt-2">
                       <span>Total:</span>
                       <span>Rs. {total.toFixed(2)}</span>
+                    </div>
+                    <hr />
+                    <div className="flex justify-between text-green-500">
+                      <span>Paid Amount:</span>
+                      <span>Rs. {Number(invoice?.paid_amount || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-500">
+                      <span>Balance Due:</span>
+                      <span>Rs. {balanceDue.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

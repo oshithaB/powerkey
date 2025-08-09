@@ -25,6 +25,11 @@ interface Invoice {
   head_note?: string | null;
   customer_id: number | null;
   customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  customer_billing_address?: string;
+  customer_shipping_address?: string;
+  customer_tax_number?: string | null;
   employee_id: number;
   employee_name?: string;
   estimate_id?: number;
@@ -318,7 +323,7 @@ export default function InvoicesPage() {
     .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
 
   const balanceDueData = invoices
-    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft')
+    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft' || invoice.status === 'sent')
     .reduce((acc, invoice) => {
       const amount = invoice.status === 'partially_paid' 
         ? (Number(invoice.balance_due) || 0) 
@@ -634,29 +639,36 @@ export default function InvoicesPage() {
                 className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900"
               >
                 <div className="flex justify-between items-start border-b pb-4 mb-4">
-                  <div>
-                    <h1 className="text-3xl font-bold">
-                      Invoice #{printingInvoice.invoice_number}
-                    </h1>
-                    <p className="text-sm text-gray-600">
-                      ID: {printingInvoice.id}
-                    </p>
+                <div>
+                  <h1 className="text-3xl font-bold">
+                    Invoice #{printingInvoice.invoice_number}
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    ID: {printingInvoice.id}
+                  </p>
+
+                  {/* Tax Info Row */}
+                  <div className="flex items-center gap-6 mt-2">
+                    {/* Taxed Invoice Badge */}
                     {!!selectedCompany?.is_taxable && (
                       <span
-                        style={{
-                          display: 'inline-flex',
-                          padding: '2px 8px',
-                          marginTop: '8px',
-                          fontSize: '18px',
-                          fontWeight: '600',
-                          color: 'red'
-                        }}
+                        className="px-3 py-1 text-lg font-semibold text-red-600"
                       >
                         Taxed Invoice
                       </span>
                     )}
 
+                    {/* Customer Tax Number */}
+                    <p className="text-sm text-gray-700">
+                      Customer Tax No: {printingInvoice.customer_tax_number || 'N/A'}
+                    </p>
+
+                    {/* Company Tax Number */}
+                    <p className="text-sm text-gray-700">
+                      Company Tax No: {selectedCompany?.tax_number || 'N/A'}
+                    </p>
                   </div>
+                </div>
                   {selectedCompany?.company_logo && (
                     <img
                       src={`http://localhost:3000${selectedCompany.company_logo}`}
@@ -666,10 +678,14 @@ export default function InvoicesPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-20 mb-6">
+                <div className="grid grid-cols-2 gap-20 mb-6">
                   <div>
                     <h3 className="text-lg font-semibold">Bill To</h3>
-                    <p>{printingInvoice.customer_name || 'Unknown Customer'}</p>
+                    <p>Customer: {printingInvoice.customer_name || 'Unknown Customer'}</p>
+                    <p>Address: {printingInvoice.billing_address || 'N/A'}</p>
+                    <p>Phone: {printingInvoice.customer_phone || 'N/A'}</p>
+                    <p>Email: {printingInvoice.customer_email || 'N/A'}</p>
+
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Details</h3>
@@ -678,9 +694,6 @@ export default function InvoicesPage() {
                     </p>
                     <p>
                       Due Date: {formatDate(printingInvoice.due_date) || 'N/A'}
-                    </p>
-                    <p>
-                      Employee: {printingInvoice.employee_name || 'Not assigned'}
                     </p>
                   </div>
                 </div>

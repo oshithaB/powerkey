@@ -27,6 +27,7 @@ interface Invoice {
   invoice_number: string;
   customer_id: number;
   customer_name?: string;
+  customer_credit_limit? : number | String,
   company_id: number;
   employee_id: number;
   employee_name?: string;
@@ -363,6 +364,14 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       return;
     }
   
+    const creditLimit = Number(state?.invoice?.customer_credit_limit) || 0;
+    const payingAmount = Number(payment.payment_amount) || 0;
+  
+    if (payingAmount > creditLimit) {
+      alert('The payment amount exceeds the customer\'s credit limit.');
+      return;
+    }
+  
     try {
       await axiosInstance.post(`/api/recordPayment/${selectedCompany.company_id}/${customerId}`, {
         payment_amount: payment.payment_amount,
@@ -427,9 +436,16 @@ const InvoiceReceivePaymentModal: React.FC = () => {
           </div>
 
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              Customer: {state?.invoice?.customer_name || 'Unknown Customer'}
-            </h3>
+            <div className='flex items-center space-x-2 mb-2 gap-x-40'>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                Customer: {state?.invoice?.customer_name || 'Unknown Customer'}
+              </h3>
+
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                Credit Limit: {state?.invoice?.customer_credit_limit ? `Rs. ${formatAmount(state?.invoice?.customer_credit_limit)}` : 'N/A'}
+              </h3>
+            </div>
+            
             <h4 className="text-md font-semibold text-gray-600 mb-2">Invoices</h4>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Search by Invoice Number</label>

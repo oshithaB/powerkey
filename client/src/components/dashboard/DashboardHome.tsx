@@ -40,7 +40,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
     },
     {
       name: 'Total Overdues',
-      value: metrics.overdue || 0,
+      value: `Rs. ${(metrics.overdue || 0).toLocaleString()}`,
       icon: FileText,
       color: 'bg-red-500',
       href: '/dashboard/invoices'

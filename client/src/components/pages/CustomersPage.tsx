@@ -764,7 +764,6 @@ export default function CustomersPage() {
                       className="input"
                       value={formData.as_of_date}
                       onChange={(e) => setFormData({ ...formData, as_of_date: e.target.value })}
-                      required
                     />
                   </div>
                 </div>

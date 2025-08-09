@@ -571,7 +571,8 @@ const getInvoices = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS               customer_tax_number, c.credit_limit AS customer_credit_limit,
+                     e.name AS employee_name
                      FROM invoices i
                      LEFT JOIN customer c ON i.customer_id = c.id
                      LEFT JOIN employees e ON i.employee_id = e.id
@@ -708,7 +709,7 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const query = `SELECT i.*, c.name AS customer_name, e.name AS employee_name
+      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS               customer_tax_number, c.credit_limit AS customer_credit_limit, e.name AS employee_name
                      FROM invoices i
                      LEFT JOIN customer c ON i.customer_id = c.id
                      LEFT JOIN employees e ON i.employee_id = e.id
@@ -864,6 +865,14 @@ const recordPayment = asyncHandler(async (req, res) => {
         `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, deposit_to, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, deposit_to, notes || null]
+      );
+
+      // Update customer credit limit (credit limit is reduced by the payment amount)
+      await connection.query(
+        `UPDATE customer 
+         SET credit_limit = credit_limit - ?
+         WHERE id = ? AND company_id = ?`,
+        [invoicePaymentAmount, customerId, company_id]
       );
 
       await connection.query(

@@ -147,8 +147,8 @@ const getDashboardData = async (req, res) => {
 
         // Get basic metrics
         const [customers] = await db.query('SELECT COUNT(*) as count FROM customer WHERE company_id = ?', [companyId]);
-        const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ?', [companyId]);
-        const [invoices] = await db.query('SELECT COUNT(*) as count FROM invoices WHERE company_id = ?', [companyId]);
+        const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ? AND quantity_on_hand <= reorder_level', [companyId]);
+        const [overdue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status = "overdue"', [companyId]);
         const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);
 
         // Get recent invoices
@@ -170,7 +170,7 @@ const getDashboardData = async (req, res) => {
             metrics: {
                 customers: customers[0]?.count || 0,
                 products: products[0]?.count || 0,
-                invoices: invoices[0]?.count || 0,
+                overdue: overdue[0]?.total || 0,
                 totalRevenue: revenue[0]?.total || 0
             },
             recentInvoices: recentInvoices || []

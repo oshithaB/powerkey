@@ -6,6 +6,7 @@ import {
   FileText, 
   DollarSign, 
   TrendingUp, 
+  Workflow,
   TrendingDown,
   ArrowUpRight,
   Calendar,
@@ -31,17 +32,17 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
       href: '/dashboard/customers'
     },
     {
-      name: 'Total Products',
+      name: 'Low stock Products',
       value: metrics.products || 0,
-      icon: Package,
+      icon: Workflow,
       color: 'bg-green-500',
       href: '/dashboard/products'
     },
     {
-      name: 'Total Invoices',
-      value: metrics.invoices || 0,
+      name: 'Total Overdues',
+      value: metrics.overdue || 0,
       icon: FileText,
-      color: 'bg-purple-500',
+      color: 'bg-red-500',
       href: '/dashboard/invoices'
     },
     {
@@ -223,10 +224,10 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
             
             <div className="text-center">
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mx-auto mb-3">
-                <Package className="h-6 w-6 text-purple-600" />
+                <Workflow className="h-6 w-6 text-purple-600" />
               </div>
               <p className="text-2xl font-bold text-gray-900">{metrics.products || 0}</p>
-              <p className="text-sm text-gray-600">Products in Stock</p>
+              <p className="text-sm text-gray-600">Low stock Products</p>
             </div>
           </div>
         </div>

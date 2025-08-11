@@ -585,101 +585,115 @@ export default function InvoicesPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInvoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.invoice_number}
+                <React.Fragment key={invoice.id}>
+                  {invoice.is_locked ? (
+                    <tr className="bg-gray-100">
+                      <td
+                        colSpan={7}
+                        className="px-6 py-4 text-center text-sm text-gray-500"
+                      >
+                        This invoice is currently being edited by{" "}
+                        {invoice.locked_by?.fullname || "another user"}.
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={invoice.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {invoice.invoice_number}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              #{invoice.id}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {invoice.customer_name || 'Unknown Customer'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {invoice.employee_name || 'Unknown Employee'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {format(new Date(invoice.invoice_date), 'MMM dd, yyyy')}
                         </div>
                         <div className="text-sm text-gray-500">
-                          #{invoice.id}
+                          Due: {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
                         </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {invoice.customer_name || 'Unknown Customer'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {invoice.employee_name || 'Unknown Employee'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {format(new Date(invoice.invoice_date), 'MMM dd, yyyy')}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Due: {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
-                    </div>
-                    {invoice.status === 'overdue' && (
-                      <div className="text-sm text-red-600">
-                        {Math.floor(
-                          (new Date().getTime() - new Date(invoice.due_date).getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        )}{' '}
-                        days late
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      Rs. {invoice.total_amount?.toLocaleString() || '0.00'}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Paid: Rs. {invoice.paid_amount?.toLocaleString() || '0.00'}
-                    </div>
-                    {invoice.balance_due > 0 && (
-                      <div className="text-sm text-red-600">
-                        Due: Rs. {invoice.balance_due?.toLocaleString() || '0.00'}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
-                      {invoice.status.replace('_', ' ').charAt(0).toUpperCase() + invoice.status.replace('_', ' ').slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(invoice)}
-                        className="text-primary-600 hover:text-primary-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePrint(invoice)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePrint(invoice)}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Print"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleAddPayment(invoice)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Add Payment"
-                        disabled={!invoice.customer_id}
-                      >
-                        <DollarSign className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(invoice.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        {invoice.status === 'overdue' && (
+                          <div className="text-sm text-red-600">
+                            {Math.floor(
+                              (new Date().getTime() - new Date(invoice.due_date).getTime()) /
+                                (1000 * 60 * 60 * 24)
+                            )}{' '}
+                            days late
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          Rs. {invoice.total_amount?.toLocaleString() || '0.00'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Paid: Rs. {invoice.paid_amount?.toLocaleString() || '0.00'}
+                        </div>
+                        {invoice.balance_due > 0 && (
+                          <div className="text-sm text-red-600">
+                            Due: Rs. {invoice.balance_due?.toLocaleString() || '0.00'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
+                          {invoice.status.replace('_', ' ').charAt(0).toUpperCase() + invoice.status.replace('_', ' ').slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(invoice)}
+                            className="text-primary-600 hover:text-primary-900"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handlePrint(invoice)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handlePrint(invoice)}
+                            className="text-gray-600 hover:text-gray-900"
+                            title="Print"
+                          >
+                            <Printer className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleAddPayment(invoice)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Add Payment"
+                            disabled={!invoice.customer_id}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(invoice.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

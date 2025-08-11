@@ -117,10 +117,16 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const estimateId = socket.estimateId;
     const user = socket.user;
+    const invoiceId = socket.invoiceId;
 
     if (estimateId && user && editingEstimates[estimateId] === user) {
       delete editingEstimates[estimateId];
       io.to("common_room").emit("locked_estimates", editingEstimates);
+    }
+
+    if (invoiceId && user && editingInvoices[invoiceId] === user) {
+      delete editingInvoices[invoiceId];
+      io.to("common_room").emit("locked_invoices", editingInvoices);
     }
 
     socket.leave("common_room");

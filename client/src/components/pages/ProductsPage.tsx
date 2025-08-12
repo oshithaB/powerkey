@@ -20,6 +20,7 @@ interface Product {
   cost_price: number;
   quantity_on_hand: number;
   reorder_level: number;
+  commission: number;
   is_active: boolean;
   created_at: string;
 }
@@ -65,6 +66,7 @@ export default function ProductsPage() {
     cost_price: 0,
     quantity_on_hand: 0,
     reorder_level: 0,
+    commission: 0,
   });
   const [categoryFormData, setCategoryFormData] = useState({
     name: '',
@@ -141,6 +143,7 @@ export default function ProductsPage() {
       data.append('cost_price', productFormData.cost_price.toString());
       data.append('quantity_on_hand', productFormData.quantity_on_hand.toString());
       data.append('reorder_level', productFormData.reorder_level.toString());
+      data.append('commission', productFormData.commission.toString());
 
       if (editingProduct) {
         await axiosInstance.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
@@ -193,6 +196,7 @@ export default function ProductsPage() {
       cost_price: product.cost_price || 0,
       quantity_on_hand: product.quantity_on_hand || 0,
       reorder_level: product.reorder_level || 0,
+      commission: product.commission || 0.00,
     });
     setImageFile(null);
     setShowProductModal(true);
@@ -209,7 +213,7 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`/api/products/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/products/${selectedCompany?.company_id}/${id}`);
         fetchProducts();
       } catch (error) {
         console.error('Error deleting product:', error);
@@ -241,6 +245,7 @@ export default function ProductsPage() {
       cost_price: 0,
       quantity_on_hand: 0,
       reorder_level: 0,
+      commission: 0.00,
     });
     setImageFile(null);
     setEditingProduct(null);
@@ -337,7 +342,7 @@ export default function ProductsPage() {
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vendor
+                  Commission
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Pricing
@@ -381,7 +386,7 @@ export default function ProductsPage() {
                     {product.category_name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.vendor_name || '-'}
+                    {product.commission ? `Rs. ${Number(product.commission).toFixed(2)}` : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -596,6 +601,18 @@ export default function ProductsPage() {
                       value={productFormData.reorder_level}
                       onChange={(e) =>
                         setProductFormData({ ...productFormData, reorder_level: parseInt(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Commission</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      value={productFormData.commission || 0}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, commission: parseFloat(e.target.value) || 0 })
                       }
                     />
                   </div>

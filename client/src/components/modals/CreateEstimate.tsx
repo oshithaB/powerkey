@@ -389,24 +389,6 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Created By
-                </label>
-                <select
-                  className="input"
-                  value={formData.employee_id}
-                  onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sales Person
                 </label>
                 <select

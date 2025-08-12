@@ -491,7 +491,7 @@ export default function EstimatesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEstimates.map((estimate, index) => (
+              {filteredEstimates.map((estimate) => (
                 <React.Fragment key={estimate.id}>
                   {estimate.is_locked ? (
                     <tr className="bg-gray-100">

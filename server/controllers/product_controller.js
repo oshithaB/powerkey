@@ -79,10 +79,12 @@ const createProduct = async (req, res) => {
                 unit_price,
                 cost_price,
                 quantity_on_hand,
-                reorder_level
+                reorder_level,
+                commission
             } = req.body;
             const image = req.file ? `/Product_Uploads/${req.file.filename}` : null;
 
+            // Input validations
             if (!company_id) {
                 return res.status(400).json({ success: false, message: 'Company ID is required' });
             }
@@ -91,6 +93,28 @@ const createProduct = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Product name is required' });
             }
 
+            // Validate commission (assuming it's a percentage between 0 and 100)
+            let validatedCommission = null;
+            if (commission !== undefined && commission !== null) {
+                const commissionValue = parseFloat(commission);
+                if (isNaN(commissionValue) || commissionValue < 0 || commissionValue > 100) {
+                    return res.status(400).json({ success: false, message: 'Commission must be a number between 0 and 100' });
+                }
+                validatedCommission = commissionValue;
+            }
+
+            // Validate numeric fields
+            const validatedUnitPrice = unit_price ? parseFloat(unit_price) : 0;
+            const validatedCostPrice = cost_price ? parseFloat(cost_price) : 0;
+            const validatedQuantity = quantity_on_hand ? parseInt(quantity_on_hand) : 0;
+            const validatedReorderLevel = reorder_level ? parseInt(reorder_level) : 0;
+
+            if (isNaN(validatedUnitPrice) || isNaN(validatedCostPrice) || 
+                isNaN(validatedQuantity) || isNaN(validatedReorderLevel)) {
+                return res.status(400).json({ success: false, message: 'Invalid numeric values provided' });
+            }
+
+            // Check for existing SKU
             if (sku) {
                 const [existingProduct] = await db.query(
                     'SELECT * FROM products WHERE company_id = ? AND sku = ?',
@@ -102,6 +126,7 @@ const createProduct = async (req, res) => {
                 }
             }
 
+            // Validate referenced IDs
             if (category_id) {
                 const [category] = await db.query('SELECT id FROM product_categories WHERE id = ? AND company_id = ?', [category_id, company_id]);
                 if (category.length === 0) {
@@ -123,6 +148,7 @@ const createProduct = async (req, res) => {
                 }
             }
 
+            // Generate SKU if not provided
             let productSku = sku;
             if (!productSku) {
                 const [lastProduct] = await db.query(
@@ -145,12 +171,23 @@ const createProduct = async (req, res) => {
                 `INSERT INTO products (
                     company_id, sku, name, image, description, category_id, 
                     preferred_vendor_id, added_employee_id, unit_price, cost_price, 
-                    quantity_on_hand, reorder_level, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    quantity_on_hand, reorder_level, commission, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    company_id, productSku, name, image, description || null, category_id || null,
-                    preferred_vendor_id || null, added_employee_id || null, unit_price || 0, cost_price || 0,
-                    quantity_on_hand || 0, reorder_level || 0, true
+                    company_id, 
+                    productSku, 
+                    name, 
+                    image, 
+                    description || null, 
+                    category_id || null,
+                    preferred_vendor_id || null, 
+                    added_employee_id || null, 
+                    validatedUnitPrice, 
+                    validatedCostPrice,
+                    validatedQuantity, 
+                    validatedReorderLevel, 
+                    validatedCommission, 
+                    true
                 ]
             );
 
@@ -164,10 +201,11 @@ const createProduct = async (req, res) => {
                 category_id: category_id ? parseInt(category_id) : null,
                 preferred_vendor_id: preferred_vendor_id ? parseInt(preferred_vendor_id) : null,
                 added_employee_id: added_employee_id ? parseInt(added_employee_id) : null,
-                unit_price: parseFloat(unit_price) || 0,
-                cost_price: parseFloat(cost_price) || 0,
-                quantity_on_hand: parseInt(quantity_on_hand) || 0,
-                reorder_level: parseInt(reorder_level) || 0,
+                unit_price: validatedUnitPrice,
+                cost_price: validatedCostPrice,
+                quantity_on_hand: validatedQuantity,
+                reorder_level: validatedReorderLevel,
+                commission: validatedCommission,
                 is_active: true,
                 created_at: new Date()
             };
@@ -213,7 +251,7 @@ const updateProduct = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Company ID and Product ID are required' });
             }
 
-            const [existingProduct] = await db.query(
+            const [ existingProduct] = await db.query(
                 'SELECT * FROM products WHERE id = ? AND company_id = ?',
                 [product_id, company_id]
             );
@@ -257,7 +295,7 @@ const updateProduct = async (req, res) => {
             const allowedFields = [
                 'sku', 'name', 'image', 'description', 'category_id', 
                 'preferred_vendor_id', 'added_employee_id', 'unit_price', 
-                'cost_price', 'quantity_on_hand', 'reorder_level', 'is_active'
+                'cost_price', 'quantity_on_hand', 'reorder_level', 'commission', 'is_active'
             ];
 
             const fieldsToUpdate = {};
@@ -320,25 +358,8 @@ const deleteProduct = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
 
-        // const [invoiceItemCount] = await db.query(
-        //     'SELECT COUNT(*) as count FROM invoice_items WHERE product_id = ?',
-        //     [product_id]
-        // );
-
-        // const [estimateItemCount] = await db.query(
-        //     'SELECT COUNT(*) as count FROM estimate_items WHERE product_id = ?',
-        //     [product_id]
-        // );
-
-        // if (invoiceItemCount[0]?.count > 0 || estimateItemCount[0]?.count > 0) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: 'Cannot delete product that is used in invoices or estimates'
-        //     });
-        // }
-
         const [result] = await db.query(
-            'UPDATE products SET is_active = 0 WHERE id = ? AND company_id = ?',
+            'DELETE FROM products WHERE id = ? AND company_id = ?',
             [product_id, company_id]
         );
 
@@ -350,8 +371,9 @@ const deleteProduct = async (req, res) => {
             success: true,
             message: 'Product deleted successfully'
         });
+    }
 
-    } catch (error) {
+    catch (error) {
         console.error('Error deleting product:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });
     }

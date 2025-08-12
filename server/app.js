@@ -58,20 +58,26 @@ app.use("/api", invoiceRoutes);
 app.use("/api", paymentMethodRoutes);
 
 const editingEstimates = {}; // { estimateId: user }
+const editingInvoices = {}; // { invoiceId: user }
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
-  socket.join("estimate_room");
-  console.log("Socket joined estimate_room", socket.id);
-  const estimateRoom = io.sockets.adapter.rooms.get("estimate_room");
-  const members = estimateRoom ? Array.from(estimateRoom) : [];
-  console.log("Members in estimate_room:", members);
+  socket.join("common_room");
+  console.log("Socket joined common_room", socket.id);
+  const commonRoom = io.sockets.adapter.rooms.get("common_room");
+  const members = commonRoom ? Array.from(commonRoom) : [];
+  console.log("Members in common_room:", members);
 
-  socket.on("start_listening", () => {
+  socket.on("start_listening_estimates", () => {
     // Send current locked estimates
-
     socket.emit("locked_estimates", editingEstimates);
     console.log("Current locked estimates sent to client-socket:", editingEstimates);
+  });
+
+  socket.on("start_listening_invoices", () => {
+    // Send current locked invoices
+    socket.emit("locked_invoices", editingInvoices);
+    console.log("Current locked invoices sent to client-socket:", editingInvoices);
   });
 
   socket.on("start_edit_estimate", ({ estimateId, user }) => {
@@ -79,17 +85,33 @@ io.on("connection", (socket) => {
     socket.user = user; // Store user in socket
     console.log(`User ${user} started editing estimate ${estimateId}`);
     editingEstimates[estimateId] = user;
-    io.to("estimate_room").emit("locked_estimates", editingEstimates);
-    console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
+    io.to("common_room").emit("locked_estimates", editingEstimates);
+    console.log("Sending updated locked estimates to all clients in common_room:", editingEstimates);
   });
 
   socket.on("stop_edit_estimate", ({ estimateId, user }) => {
     console.log(`stope_edit_estimate event received`);
     delete editingEstimates[estimateId];
-    io.to("estimate_room").emit("locked_estimates", editingEstimates);
+    io.to("common_room").emit("locked_estimates", editingEstimates);
     console.log(`User ${user} stopped editing estimate ${estimateId}`);
-    console.log("Sending updated locked estimates to all clients in estimate_room:", editingEstimates);
+    console.log("Sending updated locked estimates to all clients in common_room:", editingEstimates);
+  });
 
+  socket.on("start_edit_invoice", ({ invoiceId, user }) => {
+    socket.invoiceId = invoiceId; // Store invoiceId in socket
+    socket.user = user; // Store user in socket
+    console.log(`User ${user} started editing invoice ${invoiceId}`);
+    editingInvoices[invoiceId] = user;
+    io.to("common_room").emit("locked_invoices", editingInvoices);
+    console.log("Sending updated locked invoices to all clients in common_room:", editingInvoices);
+  });
+
+  socket.on("stop_edit_invoice", ({ invoiceId, user }) => {
+    console.log(`stop_edit_invoice event received`);
+    delete editingInvoices[invoiceId];
+    io.to("common_room").emit("locked_invoices", editingInvoices);
+    console.log(`User ${user} stopped editing invoice ${invoiceId}`);
+    console.log("Sending updated locked invoices to all clients in common_room:", editingInvoices);
   });
 
   socket.on("disconnect", () => {
@@ -98,10 +120,10 @@ io.on("connection", (socket) => {
 
     if (estimateId && user && editingEstimates[estimateId] === user) {
       delete editingEstimates[estimateId];
-      io.to("estimate_room").emit("locked_estimates", editingEstimates);
+      io.to("common_room").emit("locked_estimates", editingEstimates);
     }
 
-    socket.leave("estimate_room");
+    socket.leave("common_room");
   });
 });
 

@@ -4,6 +4,7 @@ import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface InvoiceItem {
   id?: number;
@@ -77,6 +78,7 @@ export default function EditInvoice() {
   const navigate = useNavigate();
   const location = useLocation();
   const { invoice, items: initialItems } = location.state || {};
+  const socketRef = useSocket();
 
   const calculateDiscountValue = (invoice: Invoice) => {
     if (!invoice || !invoice.discount_amount || invoice.discount_amount === 0) {
@@ -157,6 +159,23 @@ export default function EditInvoice() {
       setError('Failed to fetch data');
     }
   };
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    console.log('Socket in edit invoice:', socket);
+    console.log('User in edit invoice:', user);
+    console.log('Invoice in edit invoice:', invoice);
+
+    socket.emit('start_edit_invoice', { invoiceId: invoice.id, user });
+    console.log('Socket in edit invoice emit start_edit_invoice', { invoiceId: invoice.id, user });
+
+    return () => {
+      socket.emit('stop_edit_invoice', { invoiceId: invoice.id, user });
+      console.log('Socket in edit invoice emit stop_edit_invoice', { invoiceId: invoice.id, user });
+    };
+  }, [invoice.id]);
 
   useEffect(() => {
     if (selectedCompany) {

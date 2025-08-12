@@ -122,7 +122,9 @@ function App() {
                 path="/invoices/edit"
                 element={
                   <ProtectedRoute>
-                    <EditInvoice />
+                    <SocketProvider>
+                      <EditInvoice />
+                    </SocketProvider>
                   </ProtectedRoute>
                 }
               />

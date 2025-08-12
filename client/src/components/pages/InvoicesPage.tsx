@@ -16,6 +16,7 @@ import {
 } from 'chart.js';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useSocket } from '../../contexts/SocketContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -47,6 +48,8 @@ interface Invoice {
   notes: string;
   terms: string;
   created_at: string;
+  is_locked?: boolean;
+  locked_by?: User | null;
 }
 
 interface InvoiceItem {
@@ -59,6 +62,14 @@ interface InvoiceItem {
   tax_rate: number;
   tax_amount: number;
   total_price: number;
+}
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  fullname: string;
+  role: string;
 }
 
 export default function InvoicesPage() {
@@ -85,6 +96,8 @@ export default function InvoicesPage() {
   const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
   const [printItems, setPrintItems] = useState<InvoiceItem[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
+  const socketRef = useSocket();
+  const [lockedInvoices, setLockedInvoices] = useState<{ [key: number]: User }>({});
 
   useEffect(() => {
     if (!selectedCompany?.company_id) {
@@ -123,6 +136,68 @@ export default function InvoicesPage() {
       console.error('Error fetching data:', error);
     }
   };
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    console.log('Socket in invoice page:', socket);
+    if (!socket) return;
+
+    socket.emit('start_listening_invoices');
+    console.log('Socket in invoice page emit start_listening_invoices');
+
+    socket.on('locked_invoices', (locked_invoices) => {
+      setLockedInvoices(locked_invoices);
+      console.log('Received locked invoices:', locked_invoices);
+    });
+
+    return () => {
+      socket.off('locked_invoices');
+    };
+
+  }, []);
+
+
+  const convertInvoicesToLocked = () => {
+    if (invoices.length === 0) {
+      console.log('No invoices to update.');
+      return;
+    }
+
+    console.log('Updating invoices with locked status:', lockedInvoices);
+
+    setInvoices(prevInvoices => {
+      const updatedInvoices = prevInvoices.map(invoice => {
+        if (lockedInvoices[invoice.id]) {
+          return {
+            ...invoice,
+            is_locked: true,
+            locked_by: lockedInvoices[invoice.id]
+          };
+        } else {
+          return {
+            ...invoice,
+            is_locked: false,
+            locked_by: null
+          };
+        }
+      });
+
+      // Check if anything actually changed
+      const changed = updatedInvoices.some((inv, index) => {
+        const prev = prevInvoices[index];
+        return (
+          inv.is_locked !== prev.is_locked ||
+          JSON.stringify(inv.locked_by) !== JSON.stringify(prev.locked_by)
+        );
+      });
+
+      return changed ? updatedInvoices : prevInvoices;
+    });
+  };
+  
+  useEffect(() => {
+    convertInvoicesToLocked();
+  }, [lockedInvoices, invoices]);
 
   const fetchInvoiceItems = async (invoiceId: number) => {
     try {

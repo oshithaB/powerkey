@@ -54,6 +54,8 @@ export default function ProductsPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [vendorFilter, setVendorFilter] = useState('');
+    const [vendorSuggestions, setVendorSuggestions] = useState<Vendor[]>([]);
   const [productFormData, setProductFormData] = useState({
     sku: '',
     name: '',
@@ -81,6 +83,17 @@ export default function ProductsPage() {
       fetchEmployees();
     }
   }, [selectedCompany]);
+
+  useEffect(() => {
+    if (vendorFilter) {
+      const filteredVendors = vendors.filter((vendor) =>
+        vendor.name.toLowerCase().includes(vendorFilter.toLowerCase())
+      );
+      setVendorSuggestions(filteredVendors);
+    } else {
+      setVendorSuggestions([]);
+    }
+  }, [vendorFilter, vendors]);
 
   const fetchProducts = async () => {
     try {
@@ -522,19 +535,39 @@ export default function ProductsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Vendor</label>
-                    <select
-                      className="input"
-                      value={productFormData.preferred_vendor_id}
-                      onChange={(e) => setProductFormData({ ...productFormData, preferred_vendor_id: e.target.value })}
-                    >
-                      <option value="">Select Vendor</option>
-                      {vendors.map((vendor) => (
-                        <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                          {vendor.name}
-                        </option>
-                      ))}
-                    </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vendor
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="input pr-3 w-full"
+                      value={vendorFilter}
+                      onChange={(e) => {
+                        setVendorFilter(e.target.value);
+                        if (!e.target.value) setVendorSuggestions([]);
+                      }}
+                      onFocus={() => setVendorSuggestions(vendors)}
+                      placeholder="Search vendors..."
+                      onBlur={() => setVendorSuggestions([])}
+                    />
+                    {vendorSuggestions.length > 0 && (
+                      <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
+                        {vendorSuggestions.map((vendor) => (
+                          <li
+                            key={vendor.vendor_id}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            onMouseDown={() => {
+                              setVendorFilter(vendor.name);
+                              setVendorSuggestions([]);
+                            }}
+                          >
+                            {vendor.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   </div>
 
                   <div>

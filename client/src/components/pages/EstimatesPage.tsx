@@ -425,39 +425,43 @@ export default function EstimatesPage() {
 
         {/* Customer Filter */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Customer
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              className="input pr-3 w-full"
-              value={customerFilter}
-              onChange={(e) => {
-                setCustomerFilter(e.target.value);
-                if (!e.target.value) setCustomerSuggestions([]); // Clear suggestions if input is empty
-              }}
-              placeholder="Search customers..."
-              onBlur={() => setCustomerSuggestions([])} // Clear suggestions when input loses focus
-            />
-            {customerSuggestions.length > 0 && (
-              <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
-                {customerSuggestions.map((customer) => (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Customer
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            className="input pr-3 w-full"
+            value={customerFilter}
+            onChange={(e) => {
+              setCustomerFilter(e.target.value);
+              setCustomerSuggestions(customers);
+            }}
+            onFocus={() => setCustomerSuggestions(customers)}
+            placeholder="Search customers..."
+            onBlur={() => setTimeout(() => setCustomerSuggestions([]), 100)}
+          />
+          {customerSuggestions.length > 0 && (
+            <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
+              {customerSuggestions
+                .filter((customer) =>
+                  customer.name.toLowerCase().includes(customerFilter.toLowerCase())
+                )
+                .map((customer) => (
                   <li
                     key={customer.id}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                     onMouseDown={() => {
-                      // Use onMouseDown instead of onClick for better reliability
                       setCustomerFilter(customer.name);
-                      setCustomerSuggestions([]); // Clear suggestions immediately
+                      setCustomerSuggestions([]);
                     }}
                   >
                     {customer.name}
                   </li>
                 ))}
-              </ul>
-            )}
-          </div>
+            </ul>
+          )}
+        </div>
         </div>
       </div>
 

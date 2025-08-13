@@ -76,6 +76,8 @@ export default function EditEstimate() {
   const [error, setError] = useState<string | null>(null);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
   const { estimate, items: initialItems } = location.state || {};
@@ -430,19 +432,54 @@ export default function EditEstimate() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer *
                 </label>
-                <select
-                  className="input"
-                  value={formData.customer_id}
-                  onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
-                  required
-                >
-                  <option value="">Select Customer</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="input w-full"
+                    value={customerFilter || customers.find(customer => customer.id === parseInt(formData.customer_id))?.name || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCustomerFilter(value);
+                      setFormData({ ...formData, customer_id: '' }); // Clear customer_id while typing
+                      const filtered = customers.filter(customer =>
+                        customer.name.toLowerCase().includes(value.toLowerCase())
+                      );
+                      setCustomerSuggestions(filtered.length > 0 ? filtered : customers);
+                    }}
+                    onFocus={() => {
+                      setCustomerSuggestions(customers); // Show all customers on focus
+                      setCustomerFilter(''); // Clear filter on focus to allow typing
+                    }}
+                    placeholder="Search customers..."
+                    onBlur={() => setTimeout(() => {
+                      setCustomerSuggestions([]);
+                      setCustomerFilter(''); // Reset filter on blur
+                    }, 100)} // Clear suggestions after a short delay
+                    required
+                  />
+                  {customerSuggestions.length > 0 && (
+                    <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full mt-1">
+                      {customerSuggestions.map((customer) => (
+                        <li
+                          key={customer.id}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={() => {
+                            setFormData({
+                              ...formData,
+                              customer_id: customer.id.toString(),
+                              shipping_address: customer.shipping_address || '',
+                              billing_address: customer.billing_address || customer.shipping_address || ''
+                            });
+                            setCustomerFilter(customer.name); // Set filter to selected customer name
+                            setCustomerSuggestions([]); // Clear suggestions immediately
+                          }}
+                        >
+                          {customer.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
 
               <div>

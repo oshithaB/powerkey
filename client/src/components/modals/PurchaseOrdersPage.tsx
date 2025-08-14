@@ -13,7 +13,7 @@ interface Order {
   email?: string;
   order_no: string;
   order_date: string;
-  category_id: number | null;
+  category: string;
   class: number | null;
   customer_id: number | null;
   shipping_address?: string;
@@ -46,10 +46,10 @@ interface Vendor {
   address: string;
 }
 
-interface Category {
-  id: number;
-  name: string;
-}
+// interface Category {
+//   id: number;
+//   name: string;
+// }
 
 interface Employee {
   id: number;
@@ -69,17 +69,17 @@ export default function PurchaseOrdersPage() {
     shipping_address: '',
     order_no: '',
     order_date: new Date().toISOString().split('T')[0],
-    category_id: null,
+    category: '',
     class: null,
     location: '',
     ship_via: '',
     total_amount: null,
-    status: 'draft',
+    status: 'open',
     created_at: new Date().toISOString(),
   });
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // const [categories, setCategories] = useState<Category[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [orderCount, setOrderCount] = useState(0);
   const [vendorFilter, setVendorFilter] = useState('');
@@ -91,7 +91,7 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     if (selectedCompany) {
       fetchVendors();
-      fetchCategories();
+      // fetchCategories();
       fetchEmployees();
       fetchOrderCount();
       fetchProducts();
@@ -143,14 +143,14 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const response = await axiosInstance.get(`/api/getCategories/${selectedCompany?.company_id}`);
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
+  // const fetchCategories = async () => {
+  //   try {
+  //     const response = await axiosInstance.get(`/api/getCategories/${selectedCompany?.company_id}`);
+  //     setCategories(response.data);
+  //   } catch (error) {
+  //     console.error('Error fetching categories:', error);
+  //   }
+  // };
 
   const fetchEmployees = async () => {
     try {
@@ -251,11 +251,11 @@ export default function PurchaseOrdersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const hasEditingItem = orderItems.some(item => item.isEditing);
-      if (hasEditingItem) {
-        alert('Please save or cancel the new item before submitting the order.');
-        return;
-      }
+      // const hasEditingItem = orderItems.some(item => item.isEditing);
+      // if (hasEditingItem) {
+      //   alert('Please save or cancel the new item before submitting the order.');
+      //   return;
+      // }
       const orderData = {
         ...order,
         total_amount: calculateTotal(),
@@ -386,8 +386,8 @@ export default function PurchaseOrdersPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Category</label>
                 <select
-                  name="category_id"
-                  value={order.category_id || ''}
+                  name="category"
+                  value={order.category || ''}
                   onChange={handleOrderChange}
                   className="input"
                 >

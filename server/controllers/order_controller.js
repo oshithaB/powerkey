@@ -5,10 +5,9 @@ const getOrders = async (req, res) => {
     const { companyId } = req.params;
     try {
         const [orders] = await db.execute(
-            `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, c.name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via
+            `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via
              FROM orders o
              LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
-             LEFT JOIN categories c ON o.category_id = c.id
              WHERE o.company_id = ?`,
             [companyId]
         );
@@ -20,7 +19,7 @@ const getOrders = async (req, res) => {
 };
 
 // Fetch all order items for a company
-const getOrderItems = async (req, res) => {
+const getOrderItems = async (req, res) => { 
     const { companyId } = req.params;
     try {
         const [orderItems] = await db.execute(
@@ -57,14 +56,31 @@ const createOrder = async (req, res) => {
     const { companyId } = req.params;
     const {
         vendor_id, mailling_address, email, customer_id, shipping_address, order_no, order_date,
-        category_id, class: orderClass, location, ship_via, total_amount, status
+        category, class: orderClass, location, ship_via, total_amount, status
     } = req.body;
+
+    console.log('Creating order:', {
+        companyId,
+        vendor_id,
+        mailling_address,
+        email,
+        customer_id,
+        shipping_address,
+        order_no,
+        order_date,
+        category,
+        orderClass,
+        location,
+        ship_via,
+        total_amount,
+        status
+    });
 
     try {
         const [result] = await db.execute(
             `INSERT INTO orders (
                 company_id, vendor_id, mailling_address, email, customer_id, shipping_address,
-                order_no, order_date, category_id, class, location, ship_via, total_amount, status
+                order_no, order_date, category_name, class, location, ship_via, total_amount, status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 companyId,
@@ -75,7 +91,7 @@ const createOrder = async (req, res) => {
                 shipping_address || null,
                 order_no,
                 order_date,
-                category_id || null,
+                category || null,
                 orderClass || null,
                 location || null,
                 ship_via || null,

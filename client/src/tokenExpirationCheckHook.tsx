@@ -23,6 +23,7 @@ export default function useTokenExpirationCheck( ) {
       if (payload.exp && payload.exp < currentTime) {
         // Token expired
         localStorage.clear();
+        sessionStorage.removeItem('selectedCompany');
         delete axiosInstance.defaults.headers.common['Authorization'];
         navigate('/login');
 
@@ -32,6 +33,7 @@ export default function useTokenExpirationCheck( ) {
     } catch (error) {
       // Invalid token or parse error
       localStorage.clear();
+      sessionStorage.removeItem('selectedCompany');
       delete axiosInstance.defaults.headers.common['Authorization'];
       navigate('/login');
       console.error('Invalid token, redirecting to login', error);

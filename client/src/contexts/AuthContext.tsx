@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const userData = localStorage.getItem('user');
-    const companyData = localStorage.getItem('selectedCompany');
+    const companyData = sessionStorage.getItem('selectedCompany');
 
     if (token) {
       const payload = JSON.parse(atob(token.split('.')[1]));
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('user');
         }
         if (companyData) {
-          localStorage.removeItem('selectedCompany');
+          sessionStorage.removeItem('selectedCompany');
         }
         delete axiosInstance.defaults.headers.common['Authorization'];
         setUser(null);
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    localStorage.removeItem('selectedCompany');
+    sessionStorage.removeItem('selectedCompany');
     delete axiosInstance.defaults.headers.common['Authorization'];
     setUser(null);
   };

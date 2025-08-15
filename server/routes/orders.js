@@ -15,6 +15,7 @@ router.delete('/orders/:companyId/:orderId', orderController.deleteOrder);
 router.get('/order-items/:companyId', orderController.getOrderItems);
 router.post('/order-items/:companyId', orderController.createOrderItem);
 router.delete('/order-items/:companyId/:orderId', orderController.deleteOrderItems);
+router.get('/stats/:companyId', orderController.getPurchaseStats);
 
 // Vendor routes
 router.get('/vendors/:companyId', vendorController.getVendors);

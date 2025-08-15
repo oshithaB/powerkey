@@ -239,6 +239,46 @@ const deleteOrderItems = async (req, res) => {
     }
 };
 
+// Get purchase statistics for a company
+const getPurchaseStats = async (req, res) => {
+    const { companyId } = req.params;
+    try {
+        // Query for Total Purchases (sum of total_amount)
+        const [totalPurchasesResult] = await db.execute(
+            'SELECT SUM(total_amount) as total_purchases FROM orders WHERE company_id = ?',
+            [companyId]
+        );
+
+        // Query for Purchase Orders count
+        const [purchaseOrdersResult] = await db.execute(
+            'SELECT COUNT(*) as count FROM orders WHERE company_id = ?',
+            [companyId]
+        );
+
+        // Query for Vendors count (distinct vendors)
+        const [vendorsResult] = await db.execute(
+            'SELECT COUNT(DISTINCT vendor_id) as count FROM orders WHERE company_id = ? AND vendor_id IS NOT NULL',
+            [companyId]
+        );
+
+        // Query for Average Cost (average of total_amount for non-zero orders)
+        const [avgCostResult] = await db.execute(
+            'SELECT AVG(total_amount) as avg_cost FROM orders WHERE company_id = ? AND total_amount > 0',
+            [companyId]
+        );
+
+        res.json({
+            totalPurchases: totalPurchasesResult[0].total_purchases || 0,
+            purchaseOrders: purchaseOrdersResult[0].count || 0,
+            vendors: vendorsResult[0].count || 0,
+            avgCost: avgCostResult[0].avg_cost || 0
+        });
+    } catch (error) {
+        console.error('Error fetching purchase stats:', error);
+        res.status(500).json({ message: 'Failed to fetch purchase statistics' });
+    }
+};
+
 module.exports = {
     getOrders,
     getOrder,
@@ -249,4 +289,5 @@ module.exports = {
     createOrderItem,
     deleteOrder,
     deleteOrderItems,
+    getPurchaseStats
 };

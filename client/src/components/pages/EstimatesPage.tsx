@@ -223,15 +223,9 @@ export default function EstimatesPage() {
     }
   };
 
-  const handleConvertToInvoice = async (estimateId: number) => {
+  const handleConvertToInvoice = (estimate: Estimate) => {
     if (window.confirm('Convert this estimate to an invoice?')) {
-      try {
-        const response = await axiosInstance.post(`/api/convertEstimateToInvoice/${selectedCompany?.company_id}/${estimateId}`);
-        alert('Estimate converted to invoice successfully!');
-        fetchEstimates();
-      } catch (error: any) {
-        alert(error.response?.data?.error || 'Failed to convert estimate');
-      }
+      navigate('/invoices/create', { state: { estimateId: estimate.id } });
     }
   };
 
@@ -258,8 +252,12 @@ export default function EstimatesPage() {
           logoImage.crossOrigin = 'Anonymous';
           logoImage.src = logoUrl;
           await new Promise((resolve, reject) => {
-            logoImage.onload = resolve;
-            logoImage.onerror = reject;
+            if (logoImage) {
+              logoImage.onload = resolve;
+            }
+            if (logoImage) {
+              logoImage.onerror = reject;
+            }
           });
         }
   
@@ -592,7 +590,7 @@ export default function EstimatesPage() {
                           {estimate.status !== "converted" && (
                             <button
                               onClick={() =>
-                                handleConvertToInvoice(estimate.id)
+                                handleConvertToInvoice(estimate)
                               }
                               className="text-green-600 hover:text-green-900"
                               title="Convert to Invoice"

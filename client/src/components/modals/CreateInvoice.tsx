@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2, FileCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 interface InvoiceModalProps {
@@ -40,6 +40,7 @@ interface TaxRate {
 
 export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const { selectedCompany } = useCompany();
+  const location = useLocation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [company, setCompany] = useState<any>();
   const [employees, setEmployees] = useState<any[]>([]);
@@ -157,6 +158,12 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   }, [selectedCompany, invoice]);
 
   useEffect(() => {
+    if (selectedCompany && location.state?.estimateId) {
+      loadEstimateData(location.state.estimateId.toString());
+    }
+  }, [selectedCompany, location.state]);
+
+  useEffect(() => {
     const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
     if (selectedCustomer) {
       setFormData(prev => ({
@@ -195,7 +202,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (!estimateId) return;
     try {
       const [estimateRes, itemsRes] = await Promise.all([
-        axiosInstance.get(`/api/getEstimatesByCustomer/${selectedCompany?.company_id}/${formData.customer_id}`),
+        axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`),
         axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`)
       ]);
 

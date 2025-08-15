@@ -5,8 +5,9 @@ const getOrders = async (req, res) => {
     const { companyId } = req.params;
     try {
         const [orders] = await db.execute(
-            `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via
+            `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via, e.name AS employee_name
              FROM orders o
+             LEFT JOIN employees e ON o.class = e.id
              LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
              WHERE o.company_id = ?`,
             [companyId]
@@ -17,6 +18,28 @@ const getOrders = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch orders' });
     }
 };
+
+// Fetch a specific order
+const getOrder = async (req, res) => {
+    const { companyId, orderId } = req.params;
+    try {
+      const [order] = await db.execute(
+        `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via, e.name AS employee_name, o.vendor_id
+         FROM orders o
+         LEFT JOIN employees e ON o.class = e.id
+         LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
+         WHERE o.company_id = ? AND o.id = ?`,
+        [companyId, orderId]
+      );
+      if (order.length === 0) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+      res.json(order[0]);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      res.status(500).json({ message: 'Failed to fetch order' });
+    }
+  };
 
 // Fetch all order items for a company
 const getOrderItems = async (req, res) => { 
@@ -59,23 +82,6 @@ const createOrder = async (req, res) => {
         category, class: orderClass, location, ship_via, total_amount, status
     } = req.body;
 
-    console.log('Creating order:', {
-        companyId,
-        vendor_id,
-        mailling_address,
-        email,
-        customer_id,
-        shipping_address,
-        order_no,
-        order_date,
-        category,
-        orderClass,
-        location,
-        ship_via,
-        total_amount,
-        status
-    });
-
     try {
         const [result] = await db.execute(
             `INSERT INTO orders (
@@ -106,13 +112,60 @@ const createOrder = async (req, res) => {
     }
 };
 
+// Update an existing order
+const updateOrder = async (req, res) => {
+    const { companyId, orderId } = req.params;
+    const {
+        vendor_id, mailling_address, email, customer_id, shipping_address, order_no, order_date,
+        category, class: orderClass, location, ship_via, total_amount, status
+    } = req.body;
+
+    try {
+        const [order] = await db.execute(
+            'SELECT id FROM orders WHERE id = ? AND company_id = ?',
+            [orderId, companyId]
+        );
+        if (order.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        await db.execute(
+            `UPDATE orders SET
+                vendor_id = ?, mailling_address = ?, email = ?, customer_id = ?, shipping_address = ?,
+                order_no = ?, order_date = ?, category_name = ?, class = ?, location = ?, ship_via = ?,
+                total_amount = ?, status = ?
+             WHERE id = ? AND company_id = ?`,
+            [
+                vendor_id || null,
+                mailling_address || null,
+                email || null,
+                customer_id || null,
+                shipping_address || null,
+                order_no,
+                order_date,
+                category || null,
+                orderClass || null,
+                location || null,
+                ship_via || null,
+                total_amount || 0,
+                status || 'open',
+                orderId,
+                companyId
+            ]
+        );
+        res.json({ message: 'Order updated successfully' });
+    } catch (error) {
+        console.error('Error updating order:', error);
+        res.status(500).json({ message: 'Failed to update order' });
+    }
+};
+
 // Create a new order item
 const createOrderItem = async (req, res) => {
     const { companyId } = req.params;
     const { order_id, product_id, name, sku, description, qty, rate, amount, class: itemClass, received, closed } = req.body;
 
     try {
-        // Verify the order belongs to the company
         const [order] = await db.execute(
             'SELECT id FROM orders WHERE id = ? AND company_id = ?',
             [order_id, companyId]
@@ -150,7 +203,6 @@ const createOrderItem = async (req, res) => {
 const deleteOrder = async (req, res) => {
     const { companyId, orderId } = req.params;
     try {
-        // Verify the order belongs to the company
         const [order] = await db.execute(
             'SELECT id FROM orders WHERE id = ? AND company_id = ?',
             [orderId, companyId]
@@ -159,7 +211,6 @@ const deleteOrder = async (req, res) => {
             return res.status(404).json({ message: 'Order not found' });
         }
 
-        // Delete the order (order_items will be deleted automatically due to ON DELETE CASCADE)
         await db.execute('DELETE FROM orders WHERE id = ?', [orderId]);
         res.json({ message: 'Order deleted successfully' });
     } catch (error) {
@@ -168,11 +219,34 @@ const deleteOrder = async (req, res) => {
     }
 };
 
+// Delete order items for an order
+const deleteOrderItems = async (req, res) => {
+    const { companyId, orderId } = req.params;
+    try {
+        const [order] = await db.execute(
+            'SELECT id FROM orders WHERE id = ? AND company_id = ?',
+            [orderId, companyId]
+        );
+        if (order.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        await db.execute('DELETE FROM order_items WHERE order_id = ?', [orderId]);
+        res.json({ message: 'Order items deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting order items:', error);
+        res.status(500).json({ message: 'Failed to delete order items' });
+    }
+};
+
 module.exports = {
     getOrders,
+    getOrder,
     getOrderItems,
     getOrderCount,
     createOrder,
+    updateOrder,
     createOrderItem,
     deleteOrder,
+    deleteOrderItems,
 };

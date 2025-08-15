@@ -7,11 +7,13 @@ import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 interface Order {
   id: number;
   supplier: string;
+  employee_name: string;
   order_no: string;
   order_date: string;
   category: string;
   class: string;
   location: string;
+  mailling_address: string;
   total_amount: number | null | string;
   status: string;
   company_id: number;
@@ -177,13 +179,13 @@ export default function OrdersPage() {
                                         {order.category || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.class || '-'}
+                                        {order.employee_name || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.location || '-'}
+                                        {order.mailling_address || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.total_amount != null && !isNaN(Number(order.total_amount)) ? `$${Number(order.total_amount).toFixed(2)}` : '-'}
+                                        {order.total_amount != null && !isNaN(Number(order.total_amount)) ? `Rs. ${Number(order.total_amount).toFixed(2)}` : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                         {order.status || '-'}
@@ -191,7 +193,7 @@ export default function OrdersPage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex space-x-2">
                                             <button
-                                                onClick={() => navigate(`/purchase-orders/${order.id}`)}
+                                                onClick={() => navigate(`/purchase-orders/edit/${order.id}`)}
                                                 className="text-primary-600 hover:text-primary-900"
                                             >
                                                 <Edit className="h-4 w-4" />

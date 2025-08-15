@@ -5,14 +5,16 @@ const vendorController = require('../controllers/vendor_controller');
 const employeeController = require('../controllers/employee_controller');
 const customerController = require('../controllers/customer_controller');
 
-
 // Order routes
 router.get('/orders/count/:companyId', orderController.getOrderCount);
 router.get('/getOrders/:companyId', orderController.getOrders);
+router.get('/orders/:companyId/:orderId', orderController.getOrder);
 router.post('/orders/:companyId', orderController.createOrder);
+router.put('/orders/:companyId/:orderId', orderController.updateOrder);
+router.delete('/orders/:companyId/:orderId', orderController.deleteOrder);
 router.get('/order-items/:companyId', orderController.getOrderItems);
 router.post('/order-items/:companyId', orderController.createOrderItem);
-router.delete('/orders/:companyId/:orderId', orderController.deleteOrder);
+router.delete('/order-items/:companyId/:orderId', orderController.deleteOrderItems);
 
 // Vendor routes
 router.get('/vendors/:companyId', vendorController.getVendors);

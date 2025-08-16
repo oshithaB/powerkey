@@ -27,6 +27,7 @@ interface Customer {
   name: string;
   shipping_address?: string;
   billing_address?: string;
+  credit_limit: number;
 }
 
 interface TaxRate {
@@ -333,6 +334,12 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       }
   
       const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
+  
+      // Check customer's credit limit
+      const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
+      if (selectedCustomer && selectedCustomer.credit_limit < total) {
+        throw new Error("Invoice total exceeds customer's credit limit");
+      }
   
       const submitData = {
         ...formData,

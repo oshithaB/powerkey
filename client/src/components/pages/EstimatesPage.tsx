@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, FileText, Eye, Printer, X } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -575,13 +574,6 @@ export default function EstimatesPage() {
                           </button>
                           <button
                             onClick={() => handlePrint(estimate)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handlePrint(estimate)}
                             className="text-gray-600 hover:text-gray-900"
                             title="Print"
                           >
@@ -736,7 +728,7 @@ export default function EstimatesPage() {
                         <th className="px-4 py-2 text-left">Description</th>
                         <th className="px-4 py-2 text-right">Qty</th>
                         <th className="px-4 py-2 text-right">Unit Price</th>
-                        <th className="px-4 py-2 text-right">Actual Unit Price</th>
+                        {/* <th className="px-4 py-2 text-right">Actual Unit Price</th> */}
                         <th className="px-4 py-2 text-right">Tax %</th>
                         <th className="px-4 py-2 text-right">Total</th>
                       </tr>
@@ -757,9 +749,9 @@ export default function EstimatesPage() {
                           <td className="px-4 py-2 text-right">
                             {item.quantity}
                           </td>
-                          <td className="px-4 py-2 text-right">
+                          {/* <td className="px-4 py-2 text-right">
                             Rs. {Number(item.unit_price || 0).toFixed(2)}
-                          </td>
+                          </td> */}
                           <td className="px-4 py-2 text-right">
                             Rs. {Number(item.actual_unit_price || 0).toFixed(2)}
                           </td>

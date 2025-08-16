@@ -271,7 +271,7 @@ export default function PurchaseOrdersPage() {
         });
       }
 
-      navigate('/dashboard/orders');
+      navigate('/dashboard/purchases');
     } catch (error: any) {
       console.error('Error saving order:', error);
       alert(error.response?.data?.message || 'Failed to save order');

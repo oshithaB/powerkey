@@ -294,7 +294,7 @@ export default function EditOrdersPage() {
         });
       }
 
-      navigate('/dashboard/orders');
+      navigate('/dashboard/purchases');
     } catch (error: any) {
       console.error('Error updating order:', error);
       alert(error.response?.data?.message || 'Failed to update order');

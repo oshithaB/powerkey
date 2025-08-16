@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Edit, Trash2, FileText, Eye, DollarSign, Filter, Printer, X } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, DollarSign, Filter, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
@@ -44,6 +44,7 @@ interface Invoice {
   total_amount: number;
   paid_amount: number;
   balance_due: number;
+  shipping_cost?: number;
   status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
   notes: string;
   terms: string;
@@ -276,8 +277,12 @@ export default function InvoicesPage() {
           logoImage.crossOrigin = 'Anonymous';
           logoImage.src = logoUrl;
           await new Promise((resolve, reject) => {
-            logoImage.onload = resolve;
-            logoImage.onerror = reject;
+            if (logoImage) {
+              logoImage.onload = resolve;
+            }
+            if (logoImage) {
+              logoImage.onerror = reject;
+            }
           });
         }
 
@@ -662,13 +667,6 @@ export default function InvoicesPage() {
                           </button>
                           <button
                             onClick={() => handlePrint(invoice)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handlePrint(invoice)}
                             className="text-gray-600 hover:text-gray-900"
                             title="Print"
                           >
@@ -771,7 +769,7 @@ export default function InvoicesPage() {
                   <div>
                     <h3 className="text-lg font-semibold">Bill To</h3>
                     <p>Customer: {printingInvoice.customer_name || 'Unknown Customer'}</p>
-                    <p>Address: {printingInvoice.billing_address || 'N/A'}</p>
+                    <p>Address: {printingInvoice.customer_billing_address || 'N/A'}</p>
                     <p>Phone: {printingInvoice.customer_phone || 'N/A'}</p>
                     <p>Email: {printingInvoice.customer_email || 'N/A'}</p>
 

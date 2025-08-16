@@ -79,11 +79,42 @@ const createInvoice = asyncHandler(async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Check customer's credit limit
+    const [customer] = await connection.query(
+      `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
+      [customer_id, company_id]
+    );
+
+    if (!customer.length || customer[0].credit_limit < total_amount) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
+    }
+
     // Check for duplicate invoice number
     const [duplicateInvoice] = await connection.query(
       `SELECT id FROM invoices WHERE invoice_number = ? AND company_id = ?`,
       [invoice_number, company_id]
     );
+
+    // Reduce the total_amount by the customer's credit limit
+    if (customer[0].credit_limit < total_amount) {
+      const creditLimit = customer[0].credit_limit;
+      total_amount -= creditLimit;
+      await connection.query(
+        `UPDATE customer SET credit_limit = 0 WHERE id = ? AND company_id = ?`,
+        [customer_id, company_id]
+      );
+      // If total_amount is still greater than 0, it means the invoice exceeds the credit limit
+      if (total_amount > 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
+      }
+    } else {
+      await connection.query(
+        `UPDATE customer SET credit_limit = credit_limit - ? WHERE id = ? AND company_id = ?`,
+        [total_amount, customer_id, company_id]
+      );
+    }
 
     if (duplicateInvoice.length > 0) {
       await connection.rollback();

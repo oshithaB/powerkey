@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, X } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -35,6 +35,24 @@ interface Category {
 interface Vendor {
   vendor_id: number;
   name: string;
+  vendor_company_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+  tax_number?: string;
+  vehicle_number?: string;
+  fax_number?: string;
+  website?: string;
+  default_expense_category?: string;
+  billing_rate?: number;
+  terms?: string;
+  account_number?: string;
+  balance?: number;
+  as_of_date?: string;
 }
 
 interface Employee {
@@ -52,10 +70,13 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const [vendorFilter, setVendorFilter] = useState('');
-    const [vendorSuggestions, setVendorSuggestions] = useState<Vendor[]>([]);
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [vendorSuggestions, setVendorSuggestions] = useState<Vendor[]>([]);
+  const [selectedVendorId, setSelectedVendorId] = useState('');
+  
   const [productFormData, setProductFormData] = useState({
     sku: '',
     name: '',
@@ -70,10 +91,35 @@ export default function ProductsPage() {
     reorder_level: 0,
     commission: 0,
   });
+  
   const [categoryFormData, setCategoryFormData] = useState({
     name: '',
   });
+  
+  const [vendorFormData, setVendorFormData] = useState({
+    name: '',
+    company_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    country: '',
+    tax_number: '',
+    fax_number: '',
+    vehicle_number: '',
+    website: '',
+    default_expense_category: '',
+    billing_rate: 0,
+    terms: '',
+    account_number: '',
+    balance: 0,
+    as_of_date: ''
+  });
+  
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [vendorError, setVendorError] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
@@ -85,7 +131,7 @@ export default function ProductsPage() {
   }, [selectedCompany]);
 
   useEffect(() => {
-    if (vendorFilter) {
+    if (vendorFilter && vendorFilter !== 'add_new_vendor') {
       const filteredVendors = vendors.filter((vendor) =>
         vendor.name.toLowerCase().includes(vendorFilter.toLowerCase())
       );
@@ -94,6 +140,13 @@ export default function ProductsPage() {
       setVendorSuggestions([]);
     }
   }, [vendorFilter, vendors]);
+
+  useEffect(() => {
+    if (!vendorFormData.as_of_date) {
+      const today = new Date().toISOString().split('T')[0];
+      setVendorFormData((prev) => ({ ...prev, as_of_date: today }));
+    }
+  }, [showVendorModal]);
 
   const fetchProducts = async () => {
     try {
@@ -133,6 +186,47 @@ export default function ProductsPage() {
     }
   };
 
+  const handleVendorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isNaN(vendorFormData.balance) || isNaN(vendorFormData.billing_rate)) {
+      setVendorError('Please enter valid numbers for balance and billing rate.');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...vendorFormData,
+        vendor_company_name: vendorFormData.company_name,
+        taxes: vendorFormData.default_expense_category,
+        expense_rates: vendorFormData.billing_rate,
+        asOfDate: vendorFormData.as_of_date
+      };
+
+      const response = await axiosInstance.post(`/api/createVendors/${selectedCompany?.company_id}`, payload);
+      
+      // Refresh vendors list
+      await fetchVendors();
+      
+      // Set the newly created vendor as selected
+      if (response.data && response.data.vendor_id) {
+        setSelectedVendorId(response.data.vendor_id.toString());
+        setProductFormData({ 
+          ...productFormData, 
+          preferred_vendor_id: response.data.vendor_id.toString() 
+        });
+        setVendorFilter(vendorFormData.name);
+      }
+      
+      setShowVendorModal(false);
+      resetVendorForm();
+      setVendorError(null);
+    } catch (error: any) {
+      console.error('Error saving vendor:', error);
+      setVendorError(error.response?.data?.message || 'Failed to save vendor');
+    }
+  };
+
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -146,8 +240,8 @@ export default function ProductsPage() {
       if (productFormData.category_id) {
         data.append('category_id', productFormData.category_id);
       }
-      if (productFormData.preferred_vendor_id) {
-        data.append('preferred_vendor_id', productFormData.preferred_vendor_id);
+      if (selectedVendorId) {
+        data.append('preferred_vendor_id', selectedVendorId);
       }
       if (productFormData.added_employee_id) {
         data.append('added_employee_id', productFormData.added_employee_id);
@@ -195,6 +289,21 @@ export default function ProductsPage() {
     }
   };
 
+  const handleVendorSelection = (vendor: Vendor) => {
+    setVendorFilter(vendor.name);
+    setSelectedVendorId(vendor.vendor_id.toString());
+    setProductFormData({ 
+      ...productFormData, 
+      preferred_vendor_id: vendor.vendor_id.toString() 
+    });
+    setVendorSuggestions([]);
+  };
+
+  const handleAddNewVendor = () => {
+    setShowVendorModal(true);
+    setVendorSuggestions([]);
+  };
+
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setProductFormData({
@@ -211,6 +320,16 @@ export default function ProductsPage() {
       reorder_level: product.reorder_level || 0,
       commission: product.commission || 0.00,
     });
+    
+    // Set vendor filter and selected vendor for editing
+    if (product.preferred_vendor_id) {
+      const vendor = vendors.find(v => v.vendor_id === product.preferred_vendor_id);
+      if (vendor) {
+        setVendorFilter(vendor.name);
+        setSelectedVendorId(vendor.vendor_id.toString());
+      }
+    }
+    
     setImageFile(null);
     setShowProductModal(true);
   };
@@ -262,6 +381,9 @@ export default function ProductsPage() {
     });
     setImageFile(null);
     setEditingProduct(null);
+    setVendorFilter('');
+    setSelectedVendorId('');
+    setVendorSuggestions([]);
   };
 
   const resetCategoryForm = () => {
@@ -269,6 +391,32 @@ export default function ProductsPage() {
       name: '',
     });
     setEditingCategory(null);
+  };
+
+  const resetVendorForm = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setVendorFormData({
+      company_name: '',
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zip_code: '',
+      country: '',
+      tax_number: '',
+      fax_number: '',
+      vehicle_number: '',
+      website: '',
+      default_expense_category: '',
+      billing_rate: 0,
+      terms: '',
+      account_number: '',
+      balance: 0,
+      as_of_date: today
+    });
+    setVendorError(null);
   };
 
   const filteredProducts = products.filter(
@@ -455,6 +603,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
+      {/* Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
@@ -535,39 +684,52 @@ export default function ProductsPage() {
                   </div>
 
                   <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vendor
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="input pr-3 w-full"
-                      value={vendorFilter}
-                      onChange={(e) => {
-                        setVendorFilter(e.target.value);
-                        if (!e.target.value) setVendorSuggestions([]);
-                      }}
-                      onFocus={() => setVendorSuggestions(vendors)}
-                      placeholder="Search vendors..."
-                      onBlur={() => setVendorSuggestions([])}
-                    />
-                    {vendorSuggestions.length > 0 && (
-                      <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
-                        {vendorSuggestions.map((vendor) => (
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vendor
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="input pr-3 w-full"
+                        value={vendorFilter}
+                        onChange={(e) => {
+                          setVendorFilter(e.target.value);
+                          if (!e.target.value) {
+                            setVendorSuggestions([]);
+                            setSelectedVendorId('');
+                            setProductFormData({ ...productFormData, preferred_vendor_id: '' });
+                          }
+                        }}
+                        onFocus={() => {
+                          if (vendors.length > 0) {
+                            const suggestions = [...vendors];
+                            setVendorSuggestions(suggestions);
+                          }
+                        }}
+                        placeholder="Search vendors..."
+                        onBlur={() => setTimeout(() => setVendorSuggestions([]), 200)}
+                      />
+                      {vendorSuggestions.length > 0 && (
+                        <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
                           <li
-                            key={vendor.vendor_id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                            onMouseDown={() => {
-                              setVendorFilter(vendor.name);
-                              setVendorSuggestions([]);
-                            }}
+                            className="px-4 py-2 hover:bg-blue-100 cursor-pointer border-b text-blue-600 font-medium"
+                            onMouseDown={handleAddNewVendor}
                           >
-                            {vendor.name}
+                            <Plus className="h-4 w-4 inline mr-2" />
+                            Add New Vendor
                           </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                          {vendorSuggestions.map((vendor) => (
+                            <li
+                              key={vendor.vendor_id}
+                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                              onMouseDown={() => handleVendorSelection(vendor)}
+                            >
+                              {vendor.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -637,18 +799,19 @@ export default function ProductsPage() {
                       }
                     />
                   </div>
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>Commission</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input"
-                      value={productFormData.commission || 0}
-                      onChange={(e) =>
-                        setProductFormData({ ...productFormData, commission: parseFloat(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-1'>Commission</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={productFormData.commission || 0}
+                    onChange={(e) =>
+                      setProductFormData({ ...productFormData, commission: parseFloat(e.target.value) || 0 })
+                    }
+                  />
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
@@ -669,6 +832,7 @@ export default function ProductsPage() {
         </div>
       )}
 
+      {/* Category Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
           <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
@@ -697,12 +861,6 @@ export default function ProductsPage() {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Category Name
                           </th>
-                          {/* <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th> */}
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -711,31 +869,6 @@ export default function ProductsPage() {
                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                               {category.name}
                             </td>
-                            {/* <td className="px-4 py-2 whitespace-nowrap">
-                              <span
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  category.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {category.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handleEditCategory(category)}
-                                  className="text-primary-600 hover:text-primary-900"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCategory(category.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td> */}
                           </tr>
                         ))}
                       </tbody>
@@ -752,6 +885,337 @@ export default function ProductsPage() {
                   </button>
                   <button type="submit" className="btn btn-primary btn-md">
                     {editingCategory ? 'Update' : 'Create'} Category
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vendor Modal */}
+      {showVendorModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Add New Vendor
+                </h3>
+                <button
+                  onClick={() => setShowVendorModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              {vendorError && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                  {vendorError}
+                </div>
+              )}
+              <form onSubmit={handleVendorSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="input"
+                      placeholder="Enter Name"
+                      value={vendorFormData.name}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Company Name
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Company Name"
+                      value={vendorFormData.company_name}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, company_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      className="input"
+                      placeholder="Enter Email"
+                      value={vendorFormData.email}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="input"
+                      placeholder="Enter Phone Number"
+                      value={vendorFormData.phone}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.tax_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, tax_number: e.target.value })}
+                      placeholder="Enter Tax Number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Address"
+                      value={vendorFormData.address}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, address: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Fax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.fax_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, fax_number: e.target.value })}
+                      placeholder="Enter Fax Number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      className="input"
+                      value={vendorFormData.website || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, website: e.target.value })}
+                      placeholder="Enter Website URL"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vehicle Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.vehicle_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, vehicle_number: e.target.value })}
+                      placeholder="Enter Vehicle Number"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter City"
+                      value={vendorFormData.city}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, city: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter State"
+                      value={vendorFormData.state}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, state: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ZIP Code
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter ZIP Code"
+                      value={vendorFormData.zip_code}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, zip_code: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Country"
+                      value={vendorFormData.country}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, country: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr />
+
+                <h4 className="text-lg font-medium text-gray-900 mb-2">
+                  Additional Information
+                </h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default expense category
+                  </label>
+                  <select
+                    className="input"
+                    value={vendorFormData.default_expense_category}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, default_expense_category: e.target.value })}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="amorization expense">Amortization Expense</option>
+                    <option value="bad debts">Bad Debts</option>
+                    <option value="bank charges">Bank Charges</option>
+                    <option value="commissions and fees">Commissions and Fees</option>
+                    <option value="dues and subscriptions">Dues and Subscriptions</option>
+                    <option value="equipment rental">Equipment Rental</option>
+                    <option value="income tax expense">Income Tax Expense</option>
+                    <option value="insurance-disability">Insurance - Disability</option>
+                    <option value="insurance-general">Insurance - General</option>
+                    <option value="insurance-liability">Insurance - Liability</option>
+                    <option value="interest expense">Interest Expense</option>
+                    <option value="legal and professional fees">Legal and Professional Fees</option>
+                    <option value="loss on discontinued operations">Loss on Discontinued Operations</option>
+                    <option value="management compensation">Management Compensation</option>
+                    <option value="meals and entertainment">Meals and Entertainment</option>
+                    <option value="office expenses">Office Expenses</option>
+                    <option value="other expenses">Other Expenses</option>
+                    <option value="payroll expenses">Payroll Expenses</option>
+                    <option value="purchases">Purchases</option>
+                    <option value="rent or lease payments">Rent or Lease Payments</option>
+                    <option value="repairs and maintenance">Repairs and Maintenance</option>
+                    <option value="salary">Salary</option>
+                    <option value="shipping and delivery">Shipping and Delivery</option>
+                    <option value="stationery and printing">Stationery and Printing</option>
+                    <option value="supplies">Supplies</option>
+                    <option value="travel expenses - general and admin">Travel Expenses - General and Admin Expenses</option>
+                    <option value="travel expenses - selling">Travel Expenses - Selling Expenses</option>
+                    <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
+                    <option value="uncategorized expense">Uncategorized Expense</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="wage expense">Wage Expense</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Billing Rate
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Billing Rate (/hr)"
+                      value={vendorFormData.billing_rate}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setVendorFormData({ ...vendorFormData, billing_rate: isNaN(val) ? 0 : val });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Terms
+                    </label>
+                    <select
+                      className="input"
+                      value={vendorFormData.terms || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, terms: e.target.value })}
+                    >
+                      <option value="">Select Terms</option>
+                      <option value="due_on_receipt">Due on Receipt</option>
+                      <option value="net_15">Net 15</option>
+                      <option value="net_30">Net 30</option>
+                      <option value="net_60">Net 60</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Account Number"
+                      value={vendorFormData.account_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, account_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Opening Balance
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Balance"
+                      value={vendorFormData.balance}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setVendorFormData({ ...vendorFormData, balance: isNaN(val) ? 0 : val });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      As of Date
+                    </label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={vendorFormData.as_of_date || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, as_of_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowVendorModal(false)}
+                    className="btn btn-secondary btn-md"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-md"
+                  >
+                    Create Vendor
                   </button>
                 </div>
               </form>

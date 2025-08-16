@@ -9,7 +9,8 @@ const getOrders = async (req, res) => {
              FROM orders o
              LEFT JOIN employees e ON o.class = e.id
              LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
-             WHERE o.company_id = ?`,
+             WHERE o.company_id = ?
+             ORDER BY o.created_at DESC`,
             [companyId]
         );
         res.json(orders);

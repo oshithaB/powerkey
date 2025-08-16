@@ -52,6 +52,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const [customerFilter, setCustomerFilter] = useState('');
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
   const navigate = useNavigate();
 
   const initialFormData = {
@@ -72,6 +73,35 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     shipping_date: '',
     tracking_number: ''
   };
+
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    email: '',
+    is_taxable: false,
+    tax_number: '',
+    phone: '',
+    vehicle_number: '',
+    credit_limit: 0,
+    current_balance: 0,
+    billing_address: '',
+    billing_city: '',
+    billing_province: '',
+    billing_postal_code: '',
+    billing_country: '',
+    shipping_same_as_billing: true,
+    shipping_address: '',
+    shipping_city: '',
+    shipping_province: '',
+    shipping_postal_code: '',
+    shipping_country: '',
+    primary_payment_method: '',
+    terms: '',
+    delivery_option: '',
+    invoice_language: '',
+    sales_tax_registration: '',
+    opening_balance: 0,
+    as_of_date: ''
+  });
 
   const initialItems = [{
     product_id: 0,
@@ -304,6 +334,96 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
 
+  const handleNewCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const submitData = {
+        ...newCustomerForm,
+        company_id: selectedCompany?.company_id,
+        shipping_address: newCustomerForm.shipping_same_as_billing ? newCustomerForm.billing_address : newCustomerForm.shipping_address,
+        shipping_city: newCustomerForm.shipping_same_as_billing ? newCustomerForm.billing_city : newCustomerForm.shipping_city,
+        shipping_province: newCustomerForm.shipping_same_as_billing ? newCustomerForm.billing_province : newCustomerForm.shipping_province,
+        shipping_postal_code: newCustomerForm.shipping_same_as_billing ? newCustomerForm.billing_postal_code : newCustomerForm.shipping_postal_code,
+        shipping_country: newCustomerForm.shipping_same_as_billing ? newCustomerForm.billing_country : newCustomerForm.shipping_country,
+        opening_balance: parseFloat(newCustomerForm.opening_balance.toString()) || 0,
+        credit_limit: parseFloat(newCustomerForm.credit_limit.toString()) || 0,
+        current_balance: parseFloat(newCustomerForm.current_balance.toString()) || 0,
+      };
+  
+      console.log('Submitting customer data:', submitData);
+      const response = await axiosInstance.post(`/api/createCustomers/${selectedCompany?.company_id}`, submitData);
+      console.log('API response:', response.data);
+  
+      const newCustomer = response.data.customer;
+      if (!newCustomer || !newCustomer.id) {
+        throw new Error('Invalid customer data returned from server');
+      }
+  
+      setCustomers((prev) => [...prev, newCustomer]);
+      setFormData({
+        ...formData,
+        customer_id: newCustomer.id.toString(),
+        shipping_address: newCustomer.shipping_address || '',
+        billing_address: newCustomer.billing_address || newCustomer.shipping_address || '',
+      });
+      setCustomerFilter(newCustomer.name);
+      setShowCustomerModal(false);
+      setNewCustomerForm({
+        name: '',
+        email: '',
+        is_taxable: false,
+        tax_number: '',
+        phone: '',
+        vehicle_number: '',
+        credit_limit: 0,
+        current_balance: 0,
+        billing_address: '',
+        billing_city: '',
+        billing_province: '',
+        billing_postal_code: '',
+        billing_country: '',
+        shipping_same_as_billing: true,
+        shipping_address: '',
+        shipping_city: '',
+        shipping_province: '',
+        shipping_postal_code: '',
+        shipping_country: '',
+        primary_payment_method: '',
+        terms: '',
+        delivery_option: '',
+        invoice_language: '',
+        sales_tax_registration: '',
+        opening_balance: 0,
+        as_of_date: '',
+      });
+    } catch (error: any) {
+      console.error('Error creating customer:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create customer';
+      setError(errorMessage);
+      if (errorMessage.includes('Email already in use')) {
+        alert('Customer with this email already exists.');
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderAddress = (address: {
+    address: string;
+    city: string;
+    province: string;
+    postal_code: string;
+    country: string;
+  }) => {
+    return Object.values(address)
+      .filter(Boolean)
+      .join(', ');
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 100 }}
@@ -356,25 +476,34 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                     onChange={(e) => {
                       const value = e.target.value;
                       setCustomerFilter(value);
-                      setFormData({ ...formData, customer_id: '' }); // Clear customer_id while typing
+                      setFormData({ ...formData, customer_id: '' });
                       const filtered = customers.filter(customer =>
                         customer.name.toLowerCase().includes(value.toLowerCase())
                       );
                       setCustomerSuggestions(filtered.length > 0 ? filtered : customers);
                     }}
                     onFocus={() => {
-                      setCustomerSuggestions(customers); // Show all customers on focus
-                      setCustomerFilter(''); // Clear filter on focus to allow typing
+                      setCustomerSuggestions(customers);
+                      setCustomerFilter('');
                     }}
                     placeholder="Search customers..."
                     onBlur={() => setTimeout(() => {
                       setCustomerSuggestions([]);
-                      setCustomerFilter(''); // Reset filter on blur
-                    }, 100)} // Clear suggestions after a short delay
+                      setCustomerFilter('');
+                    }, 100)}
                     required
                   />
                   {customerSuggestions.length > 0 && (
                     <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full mt-1">
+                      <li
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                        onMouseDown={() => {
+                          setShowCustomerModal(true);
+                          setCustomerSuggestions([]);
+                        }}
+                      >
+                        + New Customer
+                      </li>
                       {customerSuggestions.map((customer) => (
                         <li
                           key={customer.id}
@@ -386,8 +515,8 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                               shipping_address: customer.shipping_address || '',
                               billing_address: customer.billing_address || customer.shipping_address || ''
                             });
-                            setCustomerFilter(customer.name); // Set filter to selected customer name
-                            setCustomerSuggestions([]); // Clear suggestions immediately
+                            setCustomerFilter(customer.name);
+                            setCustomerSuggestions([]);
                           }}
                         >
                           {customer.name}
@@ -786,6 +915,417 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
               </button>
             </div>
           </form>
+
+          {showCustomerModal && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+              <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+                <div className="mt-3">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Customer</h3>
+                  <form onSubmit={handleNewCustomerSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input
+                          type="text"
+                          required
+                          className="input"
+                          placeholder="Enter Customer Name"
+                          value={newCustomerForm.name}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input
+                          type="email"
+                          className="input"
+                          placeholder="Enter Email"
+                          value={newCustomerForm.email}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Is Taxable</label>
+                        <select
+                          className="input"
+                          value={newCustomerForm.is_taxable ? 'Yes' : 'No'}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, is_taxable: e.target.value === 'Yes' })}
+                        >
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tax Number</label>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Enter Tax Number"
+                          value={newCustomerForm.tax_number}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, tax_number: e.target.value })}
+                          disabled={!newCustomerForm.is_taxable}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input
+                          type="tel"
+                          className="input"
+                          placeholder="Enter Phone Number"
+                          value={newCustomerForm.phone}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Number</label>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Enter Vehicle Number"
+                          value={newCustomerForm.vehicle_number}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, vehicle_number: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Credit Limit</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input"
+                          value={newCustomerForm.credit_limit}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, credit_limit: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Balance</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input"
+                          value={newCustomerForm.current_balance}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, current_balance: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                    <hr />
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Addresses - Billing</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="billing_address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <input
+                          type="text"
+                          id="billing_address"
+                          className="input"
+                          placeholder="Enter Billing Address"
+                          value={newCustomerForm.billing_address}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, billing_address: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="billing_city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                        <input
+                          type="text"
+                          id="billing_city"
+                          className="input"
+                          placeholder="Enter City"
+                          value={newCustomerForm.billing_city}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, billing_city: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="billing_province" className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                        <select
+                          id="billing_province"
+                          className="input"
+                          value={newCustomerForm.billing_province}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, billing_province: e.target.value })}
+                          required
+                        >
+                          <option value="">Select Province</option>
+                          <option value="Central">Central Province</option>
+                          <option value="Eastern">Eastern Province</option>
+                          <option value="Northern">Northern Province</option>
+                          <option value="Southern">Southern Province</option>
+                          <option value="Western">Western Province</option>
+                          <option value="North Western">North Western Province</option>
+                          <option value="North Central">North Central Province</option>
+                          <option value="Uva">Uva Province</option>
+                          <option value="Sabaragamuwa">Sabaragamuwa Province</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="billing_postal_code" className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                        <input
+                          type="text"
+                          id="billing_postal_code"
+                          className="input"
+                          placeholder="Enter Postal Code"
+                          value={newCustomerForm.billing_postal_code}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, billing_postal_code: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="billing_country" className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <input
+                          type="text"
+                          id="billing_country"
+                          className="input"
+                          placeholder="Enter Country"
+                          value={newCustomerForm.billing_country}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, billing_country: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <p className="mt-3">
+                        <strong>Entered Billing Address:</strong>{' '}
+                        {renderAddress({
+                          address: newCustomerForm.billing_address,
+                          city: newCustomerForm.billing_city,
+                          province: newCustomerForm.billing_province,
+                          postal_code: newCustomerForm.billing_postal_code,
+                          country: newCustomerForm.billing_country
+                        })}
+                      </p>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Addresses - Shipping</h3>
+                    <div className="col-12 mb-4">
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id="sameAsBilling"
+                          checked={newCustomerForm.shipping_same_as_billing}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_same_as_billing: e.target.checked })}
+                        />
+                        <label className="form-check-label" htmlFor="sameAsBilling">
+                          Shipping address same as billing address
+                        </label>
+                      </div>
+                    </div>
+                    {!newCustomerForm.shipping_same_as_billing && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="shipping_address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                          <input
+                            type="text"
+                            id="shipping_address"
+                            className="input"
+                            placeholder="Enter Shipping Address"
+                            value={newCustomerForm.shipping_address}
+                            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_address: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="shipping_city" className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                          <input
+                            type="text"
+                            id="shipping_city"
+                            className="input"
+                            placeholder="Enter City"
+                            value={newCustomerForm.shipping_city}
+                            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_city: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="shipping_province" className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                          <select
+                            id="shipping_province"
+                            className="input"
+                            value={newCustomerForm.shipping_province}
+                            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_province: e.target.value })}
+                          >
+                            <option value="">Select Province</option>
+                            <option value="Central">Central Province</option>
+                            <option value="Eastern">Eastern Province</option>
+                            <option value="Northern">Northern Province</option>
+                            <option value="Southern">Southern Province</option>
+                            <option value="Western">Western Province</option>
+                            <option value="North Western">North Western Province</option>
+                            <option value="North Central">North Central Province</option>
+                            <option value="Uva">Uva Province</option>
+                            <option value="Sabaragamuwa">Sabaragamuwa Province</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="shipping_postal_code" className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                          <input
+                            type="text"
+                            id="shipping_postal_code"
+                            className="input"
+                            placeholder="Enter Postal Code"
+                            value={newCustomerForm.shipping_postal_code}
+                            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_postal_code: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="shipping_country" className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                          <input
+                            type="text"
+                            id="shipping_country"
+                            className="input"
+                            placeholder="Enter Country"
+                            value={newCustomerForm.shipping_country}
+                            onChange={(e) => setNewCustomerForm({ ...newCustomerForm, shipping_country: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {!newCustomerForm.shipping_same_as_billing && (
+                      <div className="col-12">
+                        <p className="mt-3">
+                          <strong>Entered Shipping Address:</strong>{' '}
+                          {renderAddress({
+                            address: newCustomerForm.shipping_address,
+                            city: newCustomerForm.shipping_city,
+                            province: newCustomerForm.shipping_province,
+                            postal_code: newCustomerForm.shipping_postal_code,
+                            country: newCustomerForm.shipping_country
+                          })}
+                        </p>
+                      </div>
+                    )}
+                    <hr />
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Payments</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="primary_payment_method" className="block text-sm font-medium text-gray-700 mb-1">Primary Payment Method</label>
+                        <select
+                          id="primary_payment_method"
+                          className="input"
+                          value={newCustomerForm.primary_payment_method}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, primary_payment_method: e.target.value })}
+                          required
+                        >
+                          <option value="">Select Payment Method</option>
+                          <option value="cash">Cash</option>
+                          <option value="cashdeposit">Cash Deposit</option>
+                          <option value="cheque">Cheque</option>
+                          <option value="creditcard">Credit Card</option>
+                          <option value="creditnote">Credit Note</option>
+                          <option value="debitcard">Debit Card</option>
+                          <option value="directdebit">Direct Debit</option>
+                          <option value="other">Other</option>
+                          <option value="salesreturn">Sales Return</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="terms" className="block text-sm font-medium text-gray-700 mb-1">Terms</label>
+                        <select
+                          id="terms"
+                          className="input"
+                          value={newCustomerForm.terms}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, terms: e.target.value })}
+                          required
+                        >
+                          <option value="">Select Terms</option>
+                          <option value="dueonreceipt">Due on Receipt</option>
+                          <option value="net15">Net 15</option>
+                          <option value="net30">Net 30</option>
+                          <option value="net60">Net 60</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="delivery_option" className="block text-sm font-medium text-gray-700 mb-1">Delivery Option</label>
+                        <select
+                          id="delivery_option"
+                          className="input"
+                          value={newCustomerForm.delivery_option}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, delivery_option: e.target.value })}
+                          required
+                        >
+                          <option value="">Select Delivery Option</option>
+                          <option value="printLater">Print Later</option>
+                          <option value="sendLater">Send Later</option>
+                          <option value="none">None</option>
+                          <option value="useCompanyDefault">Use Company Default</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="invoice_language" className="block text-sm font-medium text-gray-700 mb-1">Invoice Language</label>
+                        <select
+                          id="invoice_language"
+                          className="input"
+                          value={newCustomerForm.invoice_language}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, invoice_language: e.target.value })}
+                          required
+                        >
+                          <option value="">Select Language</option>
+                          <option value="english">English</option>
+                          <option value="spanish">Spanish</option>
+                          <option value="french">French</option>
+                          <option value="italian">Italian</option>
+                          <option value="chinese">Chinese (Traditional)</option>
+                          <option value="portuguese">Portuguese (Brazil)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <hr />
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Info</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="sales_tax_registration" className="block text-sm font-medium text-gray-700 mb-1">Sales Tax Registration</label>
+                        <input
+                          type="text"
+                          id="sales_tax_registration"
+                          className="input"
+                          placeholder="Enter Sales Tax Registration"
+                          value={newCustomerForm.sales_tax_registration}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, sales_tax_registration: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="opening_balance" className="block text-sm font-medium text-gray-700 mb-1">Opening Balance</label>
+                        <input
+                          type="number"
+                          id="opening_balance"
+                          className="input"
+                          placeholder="Enter Opening Balance"
+                          value={newCustomerForm.opening_balance}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, opening_balance: parseFloat(e.target.value) || 0 })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="as_of_date" className="block text-sm font-medium text-gray-700 mb-1">As of Date</label>
+                        <input
+                          type="date"
+                          id="as_of_date"
+                          className="input"
+                          value={newCustomerForm.as_of_date}
+                          onChange={(e) => setNewCustomerForm({ ...newCustomerForm, as_of_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerModal(false)}
+                        className="btn btn-secondary btn-md"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-md"
+                      >
+                        Create Customer
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

@@ -22,7 +22,7 @@ axiosInstance.interceptors.request.use(
         if (payload.exp < currentTime) {
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
-            localStorage.removeItem('selectedCompany');
+            sessionStorage.removeItem('selectedCompany');
             delete axiosInstance.defaults.headers.common['Authorization'];
             window.location.href = '/login';
             alert('Your session has expired. Please log in again.');

@@ -37,7 +37,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([]);
 
   useEffect(() => {
-    const savedCompany = localStorage.getItem('selectedCompany');
+    const savedCompany = sessionStorage.getItem('selectedCompany');
     if (savedCompany) {
       setSelectedCompanyState(JSON.parse(savedCompany));
     }
@@ -46,9 +46,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const setSelectedCompany = (company: Company | null) => {
     setSelectedCompanyState(company);
     if (company) {
-      localStorage.setItem('selectedCompany', JSON.stringify(company));
+      sessionStorage.setItem('selectedCompany', JSON.stringify(company));
     } else {
-      localStorage.removeItem('selectedCompany');
+      sessionStorage.removeItem('selectedCompany');
     }
   };
 

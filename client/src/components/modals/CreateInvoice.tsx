@@ -530,7 +530,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
             <h3 className="text-lg font-medium text-gray-900">
               {invoice ? 'Edit Invoice' : 'Create New Invoice'}
             </h3>
-            <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
+            <button 
+              onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })} 
+              className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -1065,7 +1067,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })}
                 className="btn btn-secondary btn-md"
               >
                 Cancel

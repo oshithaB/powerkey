@@ -374,7 +374,7 @@ export default function EditEstimate() {
         }
       ]);
 
-      navigate('/dashboard/estimates', { replace: true });
+      navigate("/dashboard/sales", { state: { activeTab: 'estimates' } })
       alert('Estimate updated successfully');
     } catch (error: any) {
       console.error('Error updating estimate:', error);
@@ -401,7 +401,9 @@ export default function EditEstimate() {
             <h3 className="text-lg font-medium text-gray-900">
               Edit Estimate #{estimate?.estimate_number}
             </h3>
-            <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
+            <button 
+            onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'estimates' } })}
+            className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -856,7 +858,7 @@ export default function EditEstimate() {
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'estimates' } })}
                 className="btn btn-secondary btn-md"
               >
                 Cancel

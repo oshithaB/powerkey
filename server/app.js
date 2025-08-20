@@ -1,9 +1,11 @@
 const express = require("express");
-const app = express();
 const initDatabase = require("./DB/initdb");
 const cors = require("cors");
-
+const cron = require("node-cron");
+const db = require("./DB/db");
 const http = require('http');
+
+const app = express();
 const { Server } = require('socket.io');
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -18,6 +20,28 @@ const io = new Server(server, {
     console.error("Failed to initialize the database:", error);
   }
 })();
+
+// Cron job to close expired estimates every 5 minutes
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const [result] = await db.execute(`
+      UPDATE estimates
+      SET status = 'closed'
+      WHERE status = 'pending' 
+        AND expiry_date IS NOT NULL 
+        AND STR_TO_DATE(expiry_date, '%Y-%m-%d') < NOW()
+    `);
+
+    console.log(`Expired estimates updated: ${result.affectedRows}`);
+
+    // Emit event to all connected clients
+    if (result.affectedRows > 0 && io) {
+      io.to("common_room").emit("expired_estimates_closed", { message: "Some estimates expired" });
+    }
+  } catch (err) {
+    console.error("Error updating expired estimates:", err);
+  }
+});
 
 const authRoutes = require("./routes/auth");
 const companyRoutes = require("./routes/company");

@@ -437,7 +437,10 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
             <h3 className="text-lg font-medium text-gray-900">
               Create New Estimate
             </h3>
-            <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
+            <button
+              onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'estimates' } })}
+              className="text-gray-400 hover:text-gray-600"
+            >
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -901,7 +904,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'estimates' } })}
                 className="btn btn-secondary btn-md"
               >
                 Cancel

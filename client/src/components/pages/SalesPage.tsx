@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShoppingCart, TrendingUp, DollarSign, Users } from 'lucide-react';
 import EstimatesPage from './EstimatesPage';
 import InvoicesPage from './InvoicesPage';
+import { useLocation } from 'react-router-dom';
 
 export default function SalesPage() {
   const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   return (
     <div className="space-y-6">

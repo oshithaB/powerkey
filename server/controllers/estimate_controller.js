@@ -8,6 +8,15 @@ const getEstimates = async (req, res) => {
             return res.status(400).json({ error: "Company ID is required" });
         }
 
+        await db.query(`
+            UPDATE estimates
+            SET status = 'closed'
+            WHERE company_id = ? 
+              AND status = 'pending' 
+              AND expiry_date IS NOT NULL 
+              AND expiry_date < NOW()
+        `, [companyId]);
+
         const query = `SELECT 
                             e.id,
                             e.estimate_number,
@@ -61,6 +70,15 @@ const getEstimatesByCustomer = async (req, res) => {
         if (!customerId) {
             return res.status(400).json({ error: "Customer ID is required" });
         }
+
+        await db.query(`
+            UPDATE estimates
+            SET status = 'closed'
+            WHERE customer_id = ?
+              AND status = 'pending'
+              AND expiry_date IS NOT NULL
+              AND expiry_date < NOW()
+        `, [customerId]);
 
         const query = `SELECT 
                             e.id,

@@ -13,7 +13,8 @@ const {
     deleteInvoice,
     getInvoiceById,
     getInvoicesByCustomer,
-    recordPayment
+    recordPayment,
+    checkCustomerEligibility
 } = require('../controllers/invoice_controller');
 
 // Configure multer for file uploads
@@ -97,6 +98,12 @@ router.post(
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     recordPayment
+);
+
+router.post(
+    '/checkCustomerEligibility',
+    verifyToken,
+    checkCustomerEligibility
 );
 
 module.exports = router;

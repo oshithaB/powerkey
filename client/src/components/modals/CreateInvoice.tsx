@@ -25,6 +25,7 @@ interface InvoiceItem {
 interface Customer {
   id: number;
   name: string;
+  terms: string;
   shipping_address?: string;
   billing_address?: string;
   credit_limit: number;
@@ -66,7 +67,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     employee_id: '',
     estimate_id: '',
     invoice_date: new Date().toISOString().split('T')[0],
-    due_date: '',
+    due_date: new Date().toISOString().split('T')[0],
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
     shipping_cost: 0,
@@ -166,8 +167,11 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (!customerId) return;
     try {
       const response = await axiosInstance.get(`/api/getEstimatesByCustomer/${selectedCompany?.company_id}/${customerId}`);
-      setCustomerEstimates(Array.isArray(response.data) ? response.data : []);
-      if (response.data.length > 0) {
+      const pendingEstimates = Array.isArray(response.data)
+        ? response.data.filter((estimate: any) => estimate.status === 'pending')
+        : [];
+      setCustomerEstimates(pendingEstimates);
+      if (pendingEstimates.length > 0) {
         setShowEstimateSelection(true);
       }
     } catch (error) {
@@ -194,13 +198,74 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     }
   }, [selectedCompany, location.state]);
 
+  const loadEstimateData = async (estimateId: string) => {
+    if (!estimateId) return;
+    try {
+      const [estimateRes, itemsRes] = await Promise.all([
+        axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`)
+      ]);
+
+      const estimate = estimateRes.data.find((e: any) => e.id === parseInt(estimateId));
+      if (!estimate) {
+        throw new Error('Selected estimate not found');
+      }
+
+      setFormData({
+        ...formData,
+        invoice_number: `INV-${estimate.estimate_number}-${Date.now()}`,
+        estimate_id: estimateId,
+        customer_id: estimate.customer_id.toString(),
+        employee_id: estimate.employee_id ? estimate.employee_id.toString() : '',
+        invoice_date: new Date().toISOString().split('T')[0],
+        due_date: new Date().toISOString().split('T')[0],
+        discount_type: estimate.discount_type || 'fixed',
+        discount_value: Number(estimate.discount_amount) || 0,
+        shipping_cost: Number(estimate.shipping_cost) || 0,
+        notes: estimate.notes || '',
+        terms: estimate.terms || '',
+        shipping_address: estimate.shipping_address || '',
+        billing_address: estimate.billing_address || '',
+        ship_via: estimate.ship_via || '',
+        shipping_date: estimate.shipping_date ? estimate.shipping_date.split('T')[0] : '',
+        tracking_number: estimate.tracking_number || ''
+      });
+
+      setItems(itemsRes.data.map((item: any) => ({
+        product_id: item.product_id || 0,
+        product_name: item.product_name || '',
+        description: item.description || '',
+        quantity: Number(item.quantity) || 1,
+        unit_price: Number(item.unit_price) || 0,
+        actual_unit_price: Number(item.actual_unit_price) || Number(item.unit_price) || 0,
+        tax_rate: Number(item.tax_rate) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_price: Number(item.total_price) || 0
+      })));
+
+      // setShowEstimateSelection(false);
+      // setShowEstimateSidebar(false);
+    } catch (error) {
+      console.error('Error loading estimate data:', error);
+      setError('Failed to load estimate data');
+    }
+  };
+
   useEffect(() => {
     const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
     if (selectedCustomer) {
       setFormData(prev => ({
         ...prev,
         shipping_address: selectedCustomer.shipping_address || '',
-        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || ''
+        billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || '',
+        due_date:
+          selectedCustomer.terms === 'net15'
+            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            : selectedCustomer.terms === 'net30'
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            : selectedCustomer.terms === 'net60'
+            ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            : prev.due_date,
       }));
       if (!invoice && formData.customer_id) {
         fetchCustomerEstimates(formData.customer_id);
@@ -229,58 +294,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     }
   }, [items, products, activeSuggestionIndex]);
 
-  const loadEstimateData = async (estimateId: string) => {
-    if (!estimateId) return;
-    try {
-      const [estimateRes, itemsRes] = await Promise.all([
-        axiosInstance.get(`/api/getEstimates/${selectedCompany?.company_id}`),
-        axiosInstance.get(`/api/estimatesItems/${selectedCompany?.company_id}/${estimateId}`)
-      ]);
-
-      const estimate = estimateRes.data.find((e: any) => e.id === parseInt(estimateId));
-      if (!estimate) {
-        throw new Error('Selected estimate not found');
-      }
-
-      setFormData({
-        ...formData,
-        invoice_number: `INV-${estimate.estimate_number}-${Date.now()}`,
-        estimate_id: estimateId,
-        customer_id: estimate.customer_id.toString(),
-        employee_id: estimate.employee_id ? estimate.employee_id.toString() : '',
-        invoice_date: new Date().toISOString().split('T')[0],
-        due_date: estimate.expiry_date ? estimate.expiry_date.split('T')[0] : '',
-        discount_type: estimate.discount_type || 'fixed',
-        discount_value: Number(estimate.discount_amount) || 0,
-        shipping_cost: Number(estimate.shipping_cost) || 0,
-        notes: estimate.notes || '',
-        terms: estimate.terms || '',
-        shipping_address: estimate.shipping_address || '',
-        billing_address: estimate.billing_address || '',
-        ship_via: estimate.ship_via || '',
-        shipping_date: estimate.shipping_date ? estimate.shipping_date.split('T')[0] : '',
-        tracking_number: estimate.tracking_number || ''
-      });
-
-      setItems(itemsRes.data.map((item: any) => ({
-        product_id: item.product_id || 0,
-        product_name: item.product_name || '',
-        description: item.description || '',
-        quantity: Number(item.quantity) || 1,
-        unit_price: Number(item.unit_price) || 0,
-        actual_unit_price: Number(item.actual_unit_price) || Number(item.unit_price) || 0,
-        tax_rate: Number(item.tax_rate) || 0,
-        tax_amount: Number(item.tax_amount) || 0,
-        total_price: Number(item.total_price) || 0
-      })));
-
-      setShowEstimateSelection(false);
-      setShowEstimateSidebar(false);
-    } catch (error) {
-      console.error('Error loading estimate data:', error);
-      setError('Failed to load estimate data');
-    }
-  };
 
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const updatedItems = [...items];
@@ -366,10 +379,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
   
       // Check customer's credit limit
-      const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
-      if (selectedCustomer && selectedCustomer.credit_limit < total) {
-        throw new Error("Invoice total exceeds customer's credit limit");
-      }
+      // const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
+      // if (selectedCustomer && selectedCustomer.credit_limit < total) {
+      //   throw new Error("Invoice total exceeds customer's credit limit");
+      // }
   
       const submitData = {
         ...formData,
@@ -399,6 +412,23 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       if (invoice) {
         response = await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
+        const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
+        console.log('User role:', userRole);
+        if (userRole !== 'admin') {
+          const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`,
+            {
+              company_id: selectedCompany?.company_id,
+              customer_id: formData.customer_id
+            }
+          );
+          console.log('Eligibility response:', eligibilityRes.data);
+          if (!eligibilityRes.data.eligible) {
+            console.log('Customer is not eligible to create invoice');
+            throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
+          }
+          console.log('Customer is eligible to create invoice');
+        }
+        // Only send createInvoice request if eligible
         response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
         if (formData.estimate_id) {
           await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
@@ -420,7 +450,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to save invoice';
       setError(errorMessage);
       alert(errorMessage);
-    } finally {
+    } finally { 
       setLoading(false);
     }
   };
@@ -562,31 +592,36 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </button>
                 </div>
                 <div className="space-y-4">
-                  {customerEstimates.map((estimate) => (
-                    <div
-                      key={estimate.id}
-                      className="p-4 bg-gray-50 border border-gray-200 rounded-lg"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{estimate.estimate_number}</span> <br />
-                          <span className="text-gray-500">Customer Name: {estimate.customer_name}</span> <br />
-                          <span className="text-gray-500">Estimate Date: {new Date(estimate.estimate_date).toLocaleDateString()}</span> <br />
-                          <span className="text-gray-500">Total: Rs. {estimate.total_amount}</span> <br />
-                          <span className="text-gray-500">Status: ({estimate.status})</span>
+                  {customerEstimates.map((estimate) => {
+                    const isSelected = formData.estimate_id?.toString() === estimate.id.toString();
+                    return (
+                      <div
+                        key={estimate.id}
+                        className={`p-4 border border-gray-200 rounded-lg ${isSelected ? 'bg-blue-50' : 'bg-gray-50'}`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="font-medium">{estimate.estimate_number}</span> <br />
+                            <span className="text-gray-500">Customer Name: {estimate.customer_name}</span> <br />
+                            <span className="text-gray-500">Estimate Date: {new Date(estimate.estimate_date).toLocaleDateString()}</span> <br />
+                            <span className="text-gray-500">Total: Rs. {estimate.total_amount}</span> <br />
+                            <span className="text-gray-500">Status: ({estimate.status})</span>
+                          </div>
+                          {!isSelected && (
+                            <button
+                              onClick={() => {
+                                loadEstimateData(estimate.id.toString());
+                                setShowEstimateSidebar(true);
+                              }}
+                              className="btn btn-primary btn-sm"
+                            >
+                              Add
+                            </button>
+                          )}
                         </div>
-                        <button
-                          onClick={() => {
-                            loadEstimateData(estimate.id.toString());
-                            setShowEstimateSidebar(false);
-                          }}
-                          className="btn btn-primary btn-sm"
-                        >
-                          Add
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <button
                   onClick={() => setShowEstimateSidebar(false)}
@@ -734,7 +769,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                 />
               </div>
 
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Due Date
                 </label>
@@ -744,7 +779,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                 />
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

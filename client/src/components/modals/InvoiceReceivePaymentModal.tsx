@@ -87,7 +87,7 @@ const CreateModal: React.FC<CreateModalProps> = ({
   const handleCreate = async () => {
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      alert(`${label} name is required.`);
+      // alert(${label} name is required.);
       return;
     }
     if (existingMethods.includes(trimmedName.toLowerCase())) {
@@ -175,7 +175,9 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       }
 
       try {
-        const response = await axiosInstance.get(`/api/getInvoicesByCustomer/${selectedCompany.company_id}/${customerId}`);
+        const response = await axiosInstance.get(
+          `/api/getInvoicesByCustomer/${selectedCompany.company_id}/${customerId}`
+        );
         setInvoices(response.data);
       } catch (error: any) {
         setError('Failed to fetch invoices. Please try again later.');
@@ -192,7 +194,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       if (!selectedCompany?.company_id) return;
       setPaymentMethodsLoading(true);
       try {
-        const response = await axiosInstance.get(`/api/getPaymentMethods`);
+        const response = await axiosInstance.get('/api/getPaymentMethods');
         const methods = response.data.map((method: { name: string }) => method.name);
         setPaymentMethods(methods);
         if (methods.length > 0 && !payment.payment_method) {
@@ -211,7 +213,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       if (!selectedCompany?.company_id) return;
       setDepositPurposesLoading(true);
       try {
-        const response = await axiosInstance.get(`/api/getDepositPurposes`);
+        const response = await axiosInstance.get('/api/getDepositPurposes');
         const purposes = response.data.map((purpose: { name: string }) => purpose.name);
         setDepositPurposes(purposes);
         if (purposes.length > 0 && !payment.deposit_to) {
@@ -373,15 +375,18 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   
     try {
-      await axiosInstance.post(`/api/recordPayment/${selectedCompany.company_id}/${customerId}`, {
-        payment_amount: payment.payment_amount,
-        payment_date: payment.payment_date,
-        payment_method: payment.payment_method,
-        deposit_to: payment.deposit_to,
-        notes: payment.notes,
-        customer_id: customerId,
-        invoice_payments: invoicePayments,
-      });
+      await axiosInstance.post(
+        `/api/recordPayment/${selectedCompany.company_id}/${customerId}`,
+        {
+          payment_amount: payment.payment_amount,
+          payment_date: payment.payment_date,
+          payment_method: payment.payment_method,
+          deposit_to: payment.deposit_to,
+          notes: payment.notes,
+          customer_id: customerId,
+          invoice_payments: invoicePayments,
+        }
+      );
       alert('Payment recorded successfully');
       navigate('/dashboard/invoices');
     } catch (error) {
@@ -607,7 +612,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   <option value="create_new">Create New</option>
                   {paymentMethods.map((method) => (
                     <option key={method} value={method}>
-                      {method.replace('_', ' ').charAt(0).toUpperCase() + method.replace('_', ' ').slice(1)}
+                      {method.replace('', ' ').charAt(0).toUpperCase() + method.replace('', ' ').slice(1)}
                     </option>
                   ))}
                 </select>
@@ -630,7 +635,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   <option value="create_new">Create New</option>
                   {depositPurposes.map((purpose) => (
                     <option key={purpose} value={purpose}>
-                      {purpose.replace('_', ' ').charAt(0).toUpperCase() + purpose.replace('_', ' ').slice(1)}
+                      {purpose.replace('', ' ').charAt(0).toUpperCase() + purpose.replace('', ' ').slice(1)}
                     </option>
                   ))}
                 </select>

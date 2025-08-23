@@ -351,7 +351,7 @@ async function createTables(db) {
         await db.execute(`
             INSERT INTO role (name) VALUES 
             ('admin'),
-            ('sales'),
+            ('sale'),
             ('staff')
         `);
         console.log('Default roles (admin, sales, staff) inserted');
@@ -367,7 +367,7 @@ async function createTables(db) {
             password: 'aK@123456'
         },
         {
-            role_id: 2, // sales
+            role_id: 2, // sale
             full_name: 'Nimal Perera',
             username: 'nimalP',
             email: 'nimal.sales@example.com',

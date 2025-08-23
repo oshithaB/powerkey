@@ -21,8 +21,8 @@ const io = new Server(server, {
   }
 })();
 
-// Cron job to close expired estimates every 5 minutes
-cron.schedule("*/5 * * * *", async () => {
+// Cron job to close expired estimates every hour
+cron.schedule("0 * * * *", async () => {
   try {
     const [result] = await db.execute(`
       UPDATE estimates

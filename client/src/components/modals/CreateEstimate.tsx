@@ -106,7 +106,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const initialItems = [{
     product_id: 0,
     description: '',
-    quantity: 1,
+    quantity: 0,
     unit_price: 0,
     actual_unit_price: 0,
     tax_rate: 0,
@@ -230,7 +230,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
@@ -320,7 +320,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       if (onSave && typeof onSave === 'function') {
         onSave();
       } else {
-        navigate(-1);
+        navigate("/dashboard/sales", { state: { activeTab: 'estimates' } });
       }
     } catch (error: any) {
       console.error('Error saving estimate:', error);
@@ -718,6 +718,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
+                                      quantity: 1,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',

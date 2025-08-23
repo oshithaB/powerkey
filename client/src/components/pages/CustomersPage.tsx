@@ -99,6 +99,8 @@ export default function CustomersPage() {
       };
 
       if (editingCustomer) {
+        console.log('Updating customer:', editingCustomer.id);
+        console.log('Updated data:', submitData);
         await axiosInstance.put(`/api/updateCustomers/${selectedCompany?.company_id}/${editingCustomer.id}`, submitData);
       } else {
         await axiosInstance.post(`/api/createCustomers/${selectedCompany?.company_id}`, submitData);
@@ -332,7 +334,7 @@ export default function CustomersPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
@@ -553,7 +555,7 @@ export default function CustomersPage() {
                       onChange={(e) => setFormData({ ...formData, shipping_same_as_billing: e.target.checked })}
                     />
                     <label className="form-check-label" htmlFor="sameAsBilling">
-                      Shipping address same as billing address
+                      &nbsp;&nbsp;Shipping address same as billing address
                     </label>
                   </div>
                 </div>
@@ -739,7 +741,6 @@ export default function CustomersPage() {
                       placeholder="Enter Sales Tax Registration"
                       value={formData.sales_tax_registration}
                       onChange={(e) => setFormData({ ...formData, sales_tax_registration: e.target.value })}
-                      required
                     />
                   </div>
 

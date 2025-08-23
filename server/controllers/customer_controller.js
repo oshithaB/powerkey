@@ -171,6 +171,9 @@ const updateCustomer = async (req, res) => {
     try {
         const { company_id, customer_id } = req.params;
         const update = req.body;
+        console.log("Updating customer:", customer_id);
+        console.log("Update data:", update);
+        console.log("Company ID:", company_id);
 
         if (!company_id || !customer_id) {
             return res.status(400).json({ success: false, message: 'Company ID and Customer ID are required' });
@@ -180,6 +183,8 @@ const updateCustomer = async (req, res) => {
             'SELECT * FROM customer WHERE id = ? AND company_id = ? AND is_active = 1',
             [customer_id, company_id]
         );
+
+        console.log("Code pass existing customer check");
 
         if (existingCustomer.length === 0) {
             return res.status(404).json({ success: false, message: 'Customer not found' });
@@ -217,38 +222,46 @@ const updateCustomer = async (req, res) => {
 
         const fieldsToUpdate = {};
         for (const key of allowedFields) {
-            if (update[key] !== undefined) {
+            if (update[key] !== undefined ) {
                 fieldsToUpdate[key] = update[key];
             }
         }
 
-        if (fieldsToUpdate.email) {
+        console.log("Fields to update:", fieldsToUpdate);
+
+        if (fieldsToUpdate.email && fieldsToUpdate.email.trim() !== '') {
             const [emailConflict] = await db.query(
                 'SELECT * FROM customer WHERE company_id = ? AND email = ? AND id != ? AND is_active = 1',
                 [company_id, fieldsToUpdate.email, customer_id]
             );
+
+            console.log("Email conflict check result:", emailConflict);
 
             if (emailConflict.length > 0) {
                 return res.status(400).json({ success: false, message: 'Email already in use by another customer' });
             }
         }
 
-        if (fieldsToUpdate.tax_number) {
+        if (fieldsToUpdate.tax_number && fieldsToUpdate.tax_number.trim() !== '') {
             const [taxNumberConflict] = await db.query(
                 'SELECT * FROM customer WHERE company_id = ? AND tax_number = ? AND id != ? AND is_active = 1',
                 [company_id, fieldsToUpdate.tax_number, customer_id]
             );
+
+            console.log("Tax number conflict check result:", taxNumberConflict);
 
             if (taxNumberConflict.length > 0) {
                 return res.status(400).json({ success: false, message: 'Tax number already in use by another customer' });
             }
         }
 
-        if (fieldsToUpdate.sales_tax_registration) {
+        if (fieldsToUpdate.sales_tax_registration && fieldsToUpdate.sales_tax_registration.trim() !== '') {
             const [salesTaxConflict] = await db.query(
                 'SELECT * FROM customer WHERE company_id = ? AND sales_tax_registration = ? AND id != ? AND is_active = 1',
                 [company_id, fieldsToUpdate.sales_tax_registration, customer_id]
             );
+
+            console.log("Sales tax conflict check result:", salesTaxConflict);
 
             if (salesTaxConflict.length > 0) {
                 return res.status(400).json({ success: false, message: 'Sales tax registration already in use by another customer' });
@@ -276,6 +289,9 @@ const updateCustomer = async (req, res) => {
         }
 
         values.push(customer_id, company_id);
+
+        console.log("Values for update query:", values);
+        console.log("Set clauses for update query:", setClauses);
 
         const updateQuery = `UPDATE customer SET ${setClauses.join(', ')} WHERE id = ? AND company_id = ? AND is_active = 1`;
         const [result] = await db.query(updateQuery, values);

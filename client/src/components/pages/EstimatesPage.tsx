@@ -184,9 +184,13 @@ export default function EstimatesPage() {
     });
   };
 
-  useEffect(() => {
+  // useEffect(() => {
+  //   convertEstimatesToLocked();
+  // }, [lockedEstimates, estimates]);
+
+    useEffect(() => {
     convertEstimatesToLocked();
-  }, [lockedEstimates, estimates]);
+  }, [lockedEstimates]);
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {
@@ -330,25 +334,6 @@ export default function EstimatesPage() {
     if (isNaN(date.getTime())) return '';
     return date.toISOString().split('T')[0];
   };
-
-  // const getStatusColor = (status: string) => {
-  //   switch (status) {
-  //     case 'draft':
-  //       return 'bg-gray-100 text-gray-800';
-  //     case 'sent':
-  //       return 'bg-blue-100 text-blue-800';
-  //     case 'accepted':
-  //       return 'bg-green-100 text-green-800';
-  //     case 'declined':
-  //       return 'bg-red-100 text-red-800';
-  //     case 'expired':
-  //       return 'bg-yellow-100 text-yellow-800';
-  //     case 'converted':
-  //       return 'bg-purple-100 text-purple-800';
-  //     default:
-  //       return 'bg-gray-100 text-gray-800';
-  //   }
-  // };
 
   const getStatusColor = (status: string) => {
     switch (status) {

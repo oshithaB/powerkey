@@ -123,7 +123,7 @@ export default function EditEstimate() {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: 0,
@@ -165,22 +165,50 @@ export default function EditEstimate() {
     }
   };
 
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    console.log('Socket in edit estimate:', socket);
-    console.log('User in edit estimate:', user);
-    console.log('Estimate in edit estimate:', estimate);
+  // useEffect(() => {
+  //   const socket = socketRef.current;
+  //   if (!socket) return;
+  //   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  //   console.log('Socket in edit estimate:', socket);
+  //   console.log('User in edit estimate:', user);
+  //   console.log('Estimate in edit estimate:', estimate);
 
-    socket.emit('start_edit_estimate', { estimateId: estimate.id, user });
-    console.log('Socket in edit estimate emit start_edit_estimate', { estimateId: estimate.id, user });
+  //   socket.emit('start_edit_estimate', { estimateId: estimate.id, user });
+  //   console.log('Socket in edit estimate emit start_edit_estimate', { estimateId: estimate.id, user });
 
-    return () => {
-      socket.emit('stop_edit_estimate', { estimateId: estimate.id, user });
-      console.log('Socket in edit estimate emit stop_edit_estimate', { estimateId: estimate.id, user });
-    };
-  }, [estimate.id]);
+  //   return () => {
+  //     socket.emit('stop_edit_estimate', { estimateId: estimate.id, user });
+  //     console.log('Socket in edit estimate emit stop_edit_estimate', { estimateId: estimate.id, user });
+  //   };
+  // }, [estimate.id]);
+
+  // inside EditEstimate.tsx
+useEffect(() => {
+  const socket = socketRef.current;
+  if (!socket || !estimate) return;
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Start editing
+  socket.emit("start_edit_estimate", { estimateId: estimate.id, user });
+
+  return () => {
+    // Stop editing only when leaving the page (not refresh)
+    socket.emit("stop_edit_estimate", { estimateId: estimate.id, user });
+  };
+}, [estimate?.id]);
+
+useEffect(() => {
+  const socket = socketRef.current;
+  if (!socket || !estimate) return;
+  const interval = setInterval(() => {
+    socket.emit("heartbeat_edit_estimate", { estimateId: estimate.id });
+  }, 5000);
+  return () => clearInterval(interval);
+}, [estimate?.id]);
+
+
+
 
   useEffect(() => {
     if (selectedCompany) {

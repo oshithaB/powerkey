@@ -30,6 +30,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     attachment
   } = req.body;
 
+  console.log('Creating invoice with data:', req.body);
+
   // Validate required fields
   if (!invoice_number) {
     return res.status(400).json({ error: "Invoice number is required" });
@@ -79,42 +81,42 @@ const createInvoice = asyncHandler(async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Check customer's credit limit
-    const [customer] = await connection.query(
-      `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
-      [customer_id, company_id]
-    );
+    // // Check customer's credit limit
+    // const [customer] = await connection.query(
+    //   `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
+    //   [customer_id, company_id]
+    // );
 
-    if (!customer.length || customer[0].credit_limit < total_amount) {
-      await connection.rollback();
-      return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
-    }
+    // if (!customer.length || customer[0].credit_limit < total_amount) {
+    //   await connection.rollback();
+    //   return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
+    // }
+
+    // // Reduce the total_amount by the customer's credit limit
+    // if (customer[0].credit_limit < total_amount) {
+    //   const creditLimit = customer[0].credit_limit;
+    //   total_amount -= creditLimit;
+    //   await connection.query(
+    //     `UPDATE customer SET credit_limit = 0 WHERE id = ? AND company_id = ?`,
+    //     [customer_id, company_id]
+    //   );
+    //   // If total_amount is still greater than 0, it means the invoice exceeds the credit limit
+    //   if (total_amount > 0) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
+    //   }
+    // } else {
+    //   await connection.query(
+    //     `UPDATE customer SET credit_limit = credit_limit - ? WHERE id = ? AND company_id = ?`,
+    //     [total_amount, customer_id, company_id]
+    //   );
+    // }
 
     // Check for duplicate invoice number
     const [duplicateInvoice] = await connection.query(
       `SELECT id FROM invoices WHERE invoice_number = ? AND company_id = ?`,
       [invoice_number, company_id]
     );
-
-    // Reduce the total_amount by the customer's credit limit
-    if (customer[0].credit_limit < total_amount) {
-      const creditLimit = customer[0].credit_limit;
-      total_amount -= creditLimit;
-      await connection.query(
-        `UPDATE customer SET credit_limit = 0 WHERE id = ? AND company_id = ?`,
-        [customer_id, company_id]
-      );
-      // If total_amount is still greater than 0, it means the invoice exceeds the credit limit
-      if (total_amount > 0) {
-        await connection.rollback();
-        return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
-      }
-    } else {
-      await connection.query(
-        `UPDATE customer SET credit_limit = credit_limit - ? WHERE id = ? AND company_id = ?`,
-        [total_amount, customer_id, company_id]
-      );
-    }
 
     if (duplicateInvoice.length > 0) {
       await connection.rollback();
@@ -928,6 +930,66 @@ const recordPayment = asyncHandler(async (req, res) => {
   }
 });
 
+const checkCustomerEligibility = asyncHandler(async (req, res) => {
+  const { customer_id, company_id } = req.body;
+
+  console.log('Checking customer eligibility:', { customer_id, company_id });
+
+  if (!customer_id || !company_id) {
+    return res.status(400).json({ error: "Customer ID and Company ID are required" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    // Get customer's credit limit
+    const [customerRows] = await connection.query(
+      `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
+      [customer_id, company_id]
+    );
+    if (customerRows.length === 0) {
+      connection.release();
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    const creditLimit = Number(customerRows[0].credit_limit) || 0;
+
+    // Get all relevant invoices for the customer
+    const [invoiceRows] = await connection.query(
+      `SELECT status, balance_due FROM invoices 
+       WHERE customer_id = ? AND company_id = ? 
+       AND status IN ('draft', 'sent', 'partially_paid', 'overdue')`,
+      [customer_id, company_id]
+    );
+
+    let totalBalanceDue = 0;
+    let hasOverdue = false;
+    for (const invoice of invoiceRows) {
+      totalBalanceDue += Number(invoice.balance_due) || 0;
+      if (invoice.status === 'overdue') {
+        hasOverdue = true;
+      }
+    }
+
+    if (hasOverdue) {
+      connection.release();
+      return res.status(403).json({ eligible: false, reason: "Customer has overdue invoices" });
+    }
+
+    if (creditLimit < totalBalanceDue) {
+      connection.release();
+      return res.status(403).json({ eligible: false, reason: "Customer's credit limit exceeded" });
+    }
+
+    connection.release();
+    res.status(200).json({ eligible: true, credit_limit: creditLimit, total_balance_due: totalBalanceDue });
+  } catch (error) {
+    connection.release();
+    console.error('Error checking customer eligibility:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+
+
+});
+
 module.exports = {
   createInvoice,
   updateInvoice,
@@ -937,5 +999,6 @@ module.exports = {
   getInvoiceById,
   getInvoiceItems,
   getInvoicesByCustomer,
-  recordPayment
+  recordPayment,
+  checkCustomerEligibility
 };

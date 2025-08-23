@@ -415,20 +415,21 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
         console.log('User role:', userRole);
         if (userRole !== 'admin') {
-          const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`,
-            {
+          try {
+            const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
               company_id: selectedCompany?.company_id,
-              customer_id: formData.customer_id
+              customer_id: parseInt(formData.customer_id)
+            });
+            console.log('Eligibility response:', eligibilityRes.data);
+            if (!eligibilityRes.data.eligible) {
+              throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
             }
-          );
-          console.log('Eligibility response:', eligibilityRes.data);
-          if (!eligibilityRes.data.eligible) {
-            console.log('Customer is not eligible to create invoice');
-            throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
+            console.log('Customer is eligible to create invoice');
+          } catch (eligibilityError: any) {
+            console.error('Eligibility check failed:', eligibilityError);
+            throw new Error(eligibilityError.response?.data?.reason || 'Failed to verify customer eligibility');
           }
-          console.log('Customer is eligible to create invoice');
         }
-        // Only send createInvoice request if eligible
         response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
         if (formData.estimate_id) {
           await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
@@ -447,7 +448,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       }
     } catch (error: any) {
       console.error('Error saving invoice:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to save invoice';
+      const errorMessage = error.response?.data?.reason || error.response?.data?.error || error.message || 'Failed to save invoice';
       setError(errorMessage);
       alert(errorMessage);
     } finally { 

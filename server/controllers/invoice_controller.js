@@ -954,7 +954,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     // Get all relevant invoices for the customer
     const [invoiceRows] = await connection.query(
-      `SELECT status, balance_due FROM invoices 
+      `SELECT status, balance_due, due_date FROM invoices 
        WHERE customer_id = ? AND company_id = ? 
        AND status IN ('draft', 'sent', 'partially_paid', 'overdue')`,
       [customer_id, company_id]
@@ -962,11 +962,27 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     let totalBalanceDue = 0;
     let hasOverdue = false;
+    let hasOverdue60Days = false;
+    const currentDate = new Date();
+
     for (const invoice of invoiceRows) {
       totalBalanceDue += Number(invoice.balance_due) || 0;
       if (invoice.status === 'overdue') {
         hasOverdue = true;
+        const dueDate = new Date(invoice.due_date);
+        const daysOverdue = Math.floor((currentDate - dueDate) / (1000 * 60 * 60 * 24));
+        if (daysOverdue > 60) {
+          hasOverdue60Days = true;
+        }
       }
+    }
+
+    if (hasOverdue60Days) {
+      connection.release();
+      return res.status(403).json({ 
+        eligible: false, 
+        reason: "Customer has invoices overdue by more than 60 days. Only admins can create invoices for this customer."
+      });
     }
 
     if (hasOverdue) {
@@ -986,8 +1002,6 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
     console.error('Error checking customer eligibility:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-
-
 });
 
 module.exports = {

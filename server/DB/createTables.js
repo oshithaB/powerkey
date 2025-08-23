@@ -343,60 +343,122 @@ async function createTables(db) {
         }
     }
 
-    // Insert default roles if they don't exist
+    // Insert default roles and users
     try {
-    // Insert roles if not exist
-    const [existingRoles] = await db.execute('SELECT COUNT(*) as count FROM role');
-    if (existingRoles[0].count === 0) {
-        await db.execute(`
-            INSERT INTO role (name) VALUES 
-            ('admin'),
-            ('sale'),
-            ('staff')
-        `);
-        console.log('Default roles (admin, sales, staff) inserted');
-    }
+        // Check existing roles
+        const [existingRoles] = await db.execute('SELECT role_id, name FROM role WHERE name IN ("admin", "sale", "staff")');
+        console.log(`Found ${existingRoles.length} roles:`, existingRoles);
 
-    // Users to insert
-    const users = [
-        {
-            role_id: 1, // admin
-            full_name: 'Aruna Kaldera',
-            username: 'Ansk02',
-            email: 'aruna.kaldera@example.com',
-            password: 'aK@123456'
-        },
-        {
-            role_id: 2, // sale
-            full_name: 'Nimal Perera',
-            username: 'nimalP',
-            email: 'nimal.sales@example.com',
-            password: 'nP@123456'
-        },
-        {
-            role_id: 3, // staff
-            full_name: 'Suneth Silva',
-            username: 'sunethS',
-            email: 'suneth.staff@example.com',
-            password: 'sS@789123'
-        }
-    ];
+        const roleMap = existingRoles.reduce((map, role) => {
+            map[role.name] = role.role_id;
+            return map;
+        }, {});
 
-    // Insert users if user table is empty
-    const [existingUser] = await db.execute('SELECT COUNT(*) as count FROM user');
-    if (existingUser[0].count === 0) {
-        for (const user of users) {
-            const passwordHash = await bcrypt.hash(user.password, 10);
-            await db.execute(
-                `INSERT INTO user (role_id, full_name, username, email, password_hash)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [user.role_id, user.full_name, user.username, user.email, passwordHash]
-            );
-            console.log(`Default user inserted: ${user.email} (Role ID: ${user.role_id})`);
+        // Define expected roles
+        const expectedRoles = ['admin', 'sale', 'staff'];
+        const missingRoles = expectedRoles.filter(role => !roleMap[role]);
+
+        if (missingRoles.length > 0) {
+            console.log(`Missing roles: ${missingRoles.join(', ')}. Inserting...`);
+            await db.beginTransaction();
+            try {
+                // Insert missing roles
+                const placeholders = missingRoles.map(() => '(?)').join(', ');
+                const [roleResult] = await db.execute(
+                    `INSERT INTO role (name) VALUES ${placeholders}`,
+                    missingRoles
+                );
+                console.log(`Inserted ${roleResult.affectedRows} roles`);
+
+                // Refresh role map with newly inserted roles
+                const [roles] = await db.execute('SELECT role_id, name FROM role WHERE name IN ("admin", "sale", "staff")');
+                console.log('Fetched roles:', roles);
+
+                if (roles.length !== 3) {
+                    throw new Error(`Expected 3 roles, but found ${roles.length}`);
+                }
+
+                roles.forEach(role => {
+                    roleMap[role.name] = role.role_id;
+                });
+                console.log('Updated role map:', roleMap);
+
+                // Commit role insertion
+                await db.commit();
+            } catch (error) {
+                await db.rollback();
+                console.error('Error inserting roles, transaction rolled back:', error);
+                throw error;
+            }
+        } else {
+            console.log('All required roles (admin, sale, staff) already exist');
         }
-    }
+
+        // Check if users exist
+        const [existingUsers] = await db.execute('SELECT COUNT(*) as count FROM user');
+        console.log(`User count in database: ${existingUsers[0].count}`);
+
+        // Insert users regardless of existing users to ensure insertion
+        console.log('Inserting default users...');
+        await db.beginTransaction();
+        try {
+            const users = [
+                {
+                    role_id: roleMap['admin'],
+                    full_name: 'Aruna Kaldera',
+                    username: 'Ansk02',
+                    email: 'aruna.kaldera@example.com',
+                    password: 'aK@123456'
+                },
+                {
+                    role_id: roleMap['sale'],
+                    full_name: 'Nimal Perera',
+                    username: 'nimalP',
+                    email: 'nimal.sales@example.com',
+                    password: 'nP@123456'
+                },
+                {
+                    role_id: roleMap['staff'],
+                    full_name: 'Suneth Silva',
+                    username: 'sunethS',
+                    email: 'suneth.staff@example.com',
+                    password: 'sS@789123'
+                }
+            ];
+
+            for (const user of users) {
+                if (!user.role_id) {
+                    console.error(`Role ID for ${user.full_name} not found, skipping user insertion`);
+                    continue;
+                }
+                // Check if user already exists by email or username
+                const [existingUser] = await db.execute(
+                    'SELECT COUNT(*) as count FROM user WHERE email = ? OR username = ?',
+                    [user.email, user.username]
+                );
+                if (existingUser[0].count > 0) {
+                    console.log(`User with email ${user.email} or username ${user.username} already exists, skipping`);
+                    continue;
+                }
+                const passwordHash = await bcrypt.hash(user.password, 10);
+                const [userResult] = await db.execute(
+                    `INSERT INTO user (role_id, full_name, username, email, password_hash)
+                    VALUES (?, ?, ?, ?, ?)`,
+                    [user.role_id, user.full_name, user.username, user.email, passwordHash]
+                );
+                console.log(`Inserted user: ${user.email} (Role ID: ${user.role_id}, Affected Rows: ${userResult.affectedRows})`);
+            }
+
+            // Commit user insertion
+            await db.commit();
+            console.log('User insertion transaction committed successfully');
+        } catch (error) {
+            await db.rollback();
+            console.error('Error inserting users, transaction rolled back:', error);
+            throw error;
+        }
     } catch (error) {
-        console.error('Error inserting default data:', error);
+        console.error('Error in role/user insertion block:', error.message, error.stack);
     }
 
 }

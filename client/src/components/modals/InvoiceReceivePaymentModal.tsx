@@ -609,6 +609,9 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   className="input w-full"
                   disabled={paymentMethodsLoading}
                 >
+                  <option value="" disabled>
+                    Select Payment Method
+                  </option>
                   <option value="create_new">Create New</option>
                   {paymentMethods.map((method) => (
                     <option key={method} value={method}>
@@ -632,6 +635,9 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   className="input w-full"
                   disabled={depositPurposesLoading}
                 >
+                  <option value="" disabled>
+                    Select Deposit Purpose
+                  </option>
                   <option value="create_new">Create New</option>
                   {depositPurposes.map((purpose) => (
                     <option key={purpose} value={purpose}>

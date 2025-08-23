@@ -388,7 +388,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
         }
       );
       alert('Payment recorded successfully');
-      navigate('/dashboard/invoices');
+      navigate('/dashboard/sales', { state: { activeTab: 'invoices' } });
     } catch (error) {
       console.error('Error recording payment:', error);
       alert('Failed to record payment');
@@ -658,7 +658,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               />
             </div>
             <div className="flex justify-end space-x-2">
-              <button type="button" onClick={() => navigate(-1)} className="btn btn-secondary btn-md">
+              <button type="button" onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })} className="btn btn-secondary btn-md">
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading || depositPurposesLoading}>

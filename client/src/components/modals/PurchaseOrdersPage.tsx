@@ -1111,7 +1111,7 @@ export default function PurchaseOrdersPage() {
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowVendorModal(false)}
+                    onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })}
                     className="btn btn-secondary btn-md"
                   >
                     Cancel

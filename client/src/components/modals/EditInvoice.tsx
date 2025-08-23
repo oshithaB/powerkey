@@ -652,7 +652,7 @@ export default function EditInvoice() {
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index} className="border-t" style={{ paddingBottom: '2rem' }}>
-                        <td className="px-4 py-2 relative">
+                        <td className="px-4 py-2">
                           <input
                             type="text"
                             value={item.product_name || ''}
@@ -900,7 +900,7 @@ export default function EditInvoice() {
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })}
                 className="btn btn-secondary btn-md"
               >
                 Cancel

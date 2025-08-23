@@ -664,7 +664,7 @@ useEffect(() => {
                   <tbody>
                     {items.map((item, index) => (
                       <tr key={index} className="border-t" style={{ paddingBottom: '2rem' }}>
-                        <td className="px-4 py-2 relative">
+                        <td className="px-4 py-2">
                           <input
                             type="text"
                             value={item.product_name || ''}

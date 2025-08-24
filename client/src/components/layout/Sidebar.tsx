@@ -21,6 +21,7 @@ import {
   SendToBack
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth to access user role
 
 interface SidebarProps {
   open: boolean;
@@ -49,6 +50,7 @@ const navigation = [
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
   const { selectedCompany } = useCompany();
+  const { user } = useAuth(); // Access the authenticated user from AuthContext
 
   return (
     <>
@@ -106,21 +108,25 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           <ul role="list" className="flex flex-1 flex-col gap-y-7">
             <li>
               <ul role="list" className="-mx-2 space-y-1">
-                {navigation.map((item) => {
-                  const isActive = location.pathname === item.href;
-                  return (
-                    <li key={item.name}>
-                      <Link
-                        to={item.href}
-                        className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                        onClick={() => setOpen(false)}
-                      >
-                        <item.icon className="h-5 w-5 mr-3" />
-                        {item.name}
-                      </Link>
-                    </li>
-                  );
-                })}
+                {navigation
+                  .filter((item) => 
+                    item.name !== 'Employees' || (user?.role === 'admin' && item.name === 'Employees')
+                  )
+                  .map((item) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <li key={item.name}>
+                        <Link
+                          to={item.href}
+                          className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                          onClick={() => setOpen(false)}
+                        >
+                          <item.icon className="h-5 w-5 mr-3" />
+                          {item.name}
+                        </Link>
+                      </li>
+                    );
+                  })}
               </ul>
             </li>
           </ul>

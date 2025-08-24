@@ -1,10 +1,36 @@
 const db = require("../DB/db");
+const bcrypt = require('bcrypt');
+
+const getRoles = async (req, res) => {
+    try {
+        const [roles] = await db.query('SELECT role_id, name FROM role');
+        return res.status(200).json(roles);
+    } catch (error) {
+        console.error('Error fetching roles:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+const getUserByEmployeeId = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [user] = await db.query(
+            'SELECT user_id, username, role_id FROM user WHERE user_id = ? AND is_active = 1',
+            [id]
+        );
+        if (user.length === 0) {
+            return res.status(200).json(null);
+        }
+        return res.status(200).json(user[0]);
+    } catch (error) {
+        console.error('Error fetching user by employee ID:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
 
 const createEmployee = async (req, res) => {
     try {
-        const { name, email, address, phone, hire_date } = req.body;
-
-        // console.log('Create employee request received:', req.body);
+        const { name, email, address, phone, hire_date, role_id, username, password } = req.body;
 
         // Validate required fields
         if (!name || name.trim() === '') {
@@ -13,27 +39,43 @@ const createEmployee = async (req, res) => {
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ success: false, message: 'Invalid email format' });
         }
+        if ((username || password) && (!username || !password)) {
+            return res.status(400).json({ success: false, message: 'Both username and password are required if one is provided' });
+        }
+        if ((username && password) && !role_id) {
+            return res.status(400).json({ success: false, message: 'Role is required when creating user credentials' });
+        }
 
-        // Check if employee already exists by email (email is unique in the database)
+        // Check if employee already exists by email
         const [existingEmployee] = await db.query(
             'SELECT * FROM employees WHERE email = ? AND is_active = 1', 
             [email]
         );
-        // console.log('Existing employee check result:', existingEmployee);
 
         if (existingEmployee.length > 0) {
             return res.status(400).json({ success: false, message: 'Employee with this email already exists' });
         }
 
+        // Check if user already exists by email or username, only if credentials are provided
+        if (username && password) {
+            const [existingUser] = await db.query(
+                'SELECT * FROM user WHERE email = ? OR username = ? AND is_active = 1',
+                [email, username]
+            );
+
+            if (existingUser.length > 0) {
+                return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+            }
+        }
+
         // Insert new employee
-        const [result] = await db.query(
+        const [employeeResult] = await db.query(
             'INSERT INTO employees (name, email, address, phone, hire_date, is_active) VALUES (?, ?, ?, ?, ?, ?)',
             [name, email || null, address || null, phone || null, hire_date || null, true]
         );
-        // console.log('New employee created:', result);
 
         const employeeData = {
-            id: result.insertId,
+            id: employeeResult.insertId,
             name,
             email: email || null,
             address: address || null,
@@ -42,6 +84,15 @@ const createEmployee = async (req, res) => {
             is_active: true,
             created_at: new Date()
         };
+
+        // Insert corresponding user only if credentials are provided
+        if (username && password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await db.query(
+                'INSERT INTO user (user_id, role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [employeeResult.insertId, role_id, name, username, email || null, hashedPassword, true]
+            );
+        }
 
         return res.status(201).json({ 
             success: true, 
@@ -57,9 +108,7 @@ const createEmployee = async (req, res) => {
 
 const getEmployees = async (req, res) => {
     try {
-        // console.log('Get employees request received');
         const [employees] = await db.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY created_at DESC');
-        // console.log('Employees fetched:', employees);        
         return res.status(200).json(employees);
     } catch (error) {
         console.error('Error fetching employees:', error);
@@ -70,9 +119,7 @@ const getEmployees = async (req, res) => {
 const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, phone, address, hire_date, is_active } = req.body;
-
-        // console.log('Update employee request received for id:', id, req.body);
+        const { name, email, phone, address, hire_date, is_active, username, password, role_id } = req.body;
 
         // Validate required fields
         if (!name || name.trim() === '') {
@@ -80,6 +127,12 @@ const updateEmployee = async (req, res) => {
         }
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ success: false, message: 'Invalid email format' });
+        }
+        if ((username || password) && (!username || !password)) {
+            return res.status(400).json({ success: false, message: 'Both username and password are required if one is provided' });
+        }
+        if ((username && password) && !role_id) {
+            return res.status(400).json({ success: false, message: 'Role is required when updating user credentials' });
         }
 
         // Check if employee exists
@@ -92,10 +145,10 @@ const updateEmployee = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Employee not found' });
         }
 
-        // Check if email is already used by another employee
+        // Check for email uniqueness in employees table (check all records, not just active)
         if (email) {
             const [emailCheck] = await db.query(
-                'SELECT * FROM employees WHERE email = ? AND id != ? AND is_active = 1', 
+                'SELECT * FROM employees WHERE email = ? AND id != ?', 
                 [email, id]
             );
             if (emailCheck.length > 0) {
@@ -103,11 +156,58 @@ const updateEmployee = async (req, res) => {
             }
         }
 
+        // Check for user existence and uniqueness of email/username if credentials provided
+        let userExists = false;
+        if (username && password) {
+            const [existingUser] = await db.query(
+                'SELECT * FROM user WHERE (email = ? OR username = ?) AND user_id != ? AND is_active = 1',
+                [email, username, id]
+            );
+            if (existingUser.length > 0) {
+                return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+            }
+
+            // Check if user already exists for this employee
+            const [currentUser] = await db.query(
+                'SELECT * FROM user WHERE user_id = ?',
+                [id]
+            );
+            userExists = currentUser.length > 0;
+        }
+
         // Update employee
         await db.query(
             'UPDATE employees SET name = ?, email = ?, address = ?, phone = ?, hire_date = ?, is_active = ? WHERE id = ?',
             [name, email || null, address || null, phone || null, hire_date || null, is_active !== undefined ? is_active : existingEmployee[0].is_active, id]
         );
+
+        // Update or create user if credentials provided
+        if (username && password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            if (userExists) {
+                await db.query(
+                    'UPDATE user SET role_id = ?, full_name = ?, username = ?, email = ?, password_hash = ?, is_active = ? WHERE user_id = ?',
+                    [role_id, name, username, email || null, hashedPassword, is_active !== undefined ? is_active : true, id]
+                );
+            } else {
+                await db.query(
+                    'INSERT INTO user (user_id, role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [id, role_id, name, username, email || null, hashedPassword, is_active !== undefined ? is_active : true]
+                );
+            }
+        } else {
+            // Update user details without changing password if user exists
+            const [currentUser] = await db.query(
+                'SELECT * FROM user WHERE user_id = ?',
+                [id]
+            );
+            if (currentUser.length > 0) {
+                await db.query(
+                    'UPDATE user SET full_name = ?, email = ?, role_id = ?, is_active = ? WHERE user_id = ?',
+                    [name, email || null, role_id || currentUser[0].role_id, is_active !== undefined ? is_active : true, id]
+                );
+            }
+        }
 
         const employeeData = {
             id: parseInt(id),
@@ -120,7 +220,6 @@ const updateEmployee = async (req, res) => {
             created_at: existingEmployee[0].created_at
         };
 
-        // console.log('Employee updated:', employeeData);
         return res.status(200).json({ 
             success: true, 
             message: 'Employee updated successfully',
@@ -136,7 +235,6 @@ const updateEmployee = async (req, res) => {
 const deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        // console.log('Delete employee request received for id:', id);
 
         // Check if employee exists
         const [existingEmployee] = await db.query(
@@ -148,9 +246,18 @@ const deleteEmployee = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Employee not found' });
         }
 
-        // Delete employee
-        await db.query('UPDATE employees SET is_active = 0 WHERE id = ?', [id]);
-        // console.log('Employee deleted:', id);
+        // Deactivate employee
+        await db.query('DELETE FROM employees WHERE id = ?', [id]);
+
+        // Deactivate associated user if exists
+        const [existingUser] = await db.query(
+            'SELECT * FROM user WHERE user_id = ? AND is_active = 1',
+            [id]
+        );
+
+        if (existingUser.length > 0) {
+            await db.query('DELETE FROM user WHERE user_id = ?', [id]);
+        }
 
         return res.status(200).json({ 
             success: true, 
@@ -167,5 +274,7 @@ module.exports = {
     createEmployee,
     getEmployees,
     updateEmployee,
-    deleteEmployee
+    deleteEmployee,
+    getRoles,
+    getUserByEmployeeId
 };

@@ -6,7 +6,6 @@ import { CompanyProvider, useCompany } from './contexts/CompanyContext';
 import { SocketProvider } from './contexts/SocketContext';
 
 import Login from './components/auth/Login';
-import Register from './components/auth/Register';
 import CompanySelection from './components/company/CompanySelection';
 import CreateCompany from './components/company/CreateCompany';
 import Dashboard from './components/dashboard/Dashboard';
@@ -52,7 +51,6 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
               <Route path="/companies" 
               element={
                   <ProtectedRoute>

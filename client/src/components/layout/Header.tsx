@@ -60,6 +60,7 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
             <div className="flex items-center gap-x-4">
               <span className="text-sm font-medium text-gray-700">
                 {user?.fullname}
+                {user?.role ? ` (${user.role})` : ''}
               </span>
               <div className="flex items-center gap-x-2">
                 <Link

@@ -6,11 +6,22 @@ import { format } from 'date-fns';
 interface Employee {
   id: number;
   name: string;
-  email: string;
-  phone: string;
-  address: string;
-  hire_date: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  hire_date: string | null;
   created_at: string;
+}
+
+interface Role {
+  role_id: number;
+  name: string;
+}
+
+interface User {
+  user_id: number;
+  username: string;
+  role_id: number;
 }
 
 export default function EmployeesPage() {
@@ -24,12 +35,28 @@ export default function EmployeesPage() {
     email: '',
     phone: '',
     address: '',
-    hire_date: ''
+    hire_date: '',
+    role_id: '',
+    username: '',
+    password: '',
   });
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEmployees();
+    fetchRoles();
   }, []);
+
+  const fetchUserData = async (id: number): Promise<User | null> => {
+    try {
+      const response = await axiosInstance.get(`/api/users/by-employee/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      return null;
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -42,35 +69,109 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.hire_date && isNaN(new Date(formData.hire_date).getTime())) {
-      console.error('Invalid hire date');
-      return;
-    }
+  const fetchRoles = async () => {
     try {
-      if (editingEmployee) {
-        await axiosInstance.put(`/api/employees/${editingEmployee.id}`, formData);
-      } else {
-        await axiosInstance.post('/api/employees', formData);
-      }
-      fetchEmployees();
-      setShowModal(false);
-      resetForm();
+      const response = await axiosInstance.get('/api/roles');
+      setRoles(response.data);
     } catch (error) {
-      console.error('Error saving employee:', error);
+      console.error('Error fetching roles:', error);
     }
   };
 
-  const handleEdit = (employee: Employee) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+  
+    if (formData.hire_date && isNaN(new Date(formData.hire_date).getTime())) {
+      setErrorMessage('Invalid hire date');
+      return;
+    }
+  
+    // Validate that role_id is provided if username or password is filled
+    if ((formData.username || formData.password) && !formData.role_id) {
+      setErrorMessage('Role is required when username or password is provided');
+      return;
+    }
+    // Validate that both username and password are provided if one is filled
+    if ((formData.username || formData.password) && (!formData.username || !formData.password)) {
+      setErrorMessage('Both username and password are required if one is provided');
+      return;
+    }
+  
+    // Employee data payload (without user credentials)
+    const employeePayload = {
+      name: formData.name,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      address: formData.address || null,
+      hire_date: formData.hire_date || null,
+    };
+  
+    try {
+      // Update/Create employee first
+      if (editingEmployee) {
+        await axiosInstance.put(`/api/employees/${editingEmployee.id}`, employeePayload);
+        
+        // Handle user credentials separately for editing
+        if (formData.username && formData.password && formData.role_id) {
+          const userPayload = {
+            username: formData.username,
+            password: formData.password,
+            role_id: parseInt(formData.role_id),
+          };
+          
+          // Check if user already exists for this employee
+          const existingUser = await fetchUserData(editingEmployee.id);
+          
+          if (existingUser) {
+            // Update existing user
+            await axiosInstance.put(`/api/updateUser/${existingUser.user_id}`, userPayload);
+          } else {
+            // Create new user for existing employee
+            await axiosInstance.post('/api/addUser', {
+              ...userPayload,
+              employee_id: editingEmployee.id,
+            });
+          }
+        }
+      } else {
+        // For new employees, include user data in the employee creation payload
+        const newEmployeePayload: any = { ...employeePayload };
+        
+        if (formData.username && formData.password && formData.role_id) {
+          newEmployeePayload.username = formData.username;
+          newEmployeePayload.password = formData.password;
+          newEmployeePayload.role_id = parseInt(formData.role_id);
+        }
+        
+        await axiosInstance.post('/api/employees', newEmployeePayload);
+      }
+      
+      fetchEmployees();
+      setShowModal(false);
+      resetForm();
+    } catch (error: any) {
+      console.error('Error saving employee:', error);
+      if (error.response?.status === 400) {
+        setErrorMessage(error.response.data.message || 'Invalid input data');
+      } else {
+        setErrorMessage('An unexpected error occurred');
+      }
+    }
+  };
+
+  const handleEdit = async (employee: Employee) => {
     setEditingEmployee(employee);
-    console.log('hire_date:', employee.hire_date);
+    const userData = await fetchUserData(employee.id);
     setFormData({
       name: employee.name || '',
       email: employee.email || '',
       phone: employee.phone || '',
       address: employee.address || '',
-      hire_date: employee.hire_date || ''
+      hire_date: employee.hire_date || '',
+      role_id: userData?.role_id?.toString() || '',
+      username: userData?.username || '',
+      password: '',
     });
     setShowModal(true);
   };
@@ -82,6 +183,7 @@ export default function EmployeesPage() {
         fetchEmployees();
       } catch (error) {
         console.error('Error deleting employee:', error);
+        setErrorMessage('Failed to delete employee');
       }
     }
   };
@@ -92,9 +194,13 @@ export default function EmployeesPage() {
       email: '',
       phone: '',
       address: '',
-      hire_date: ''
+      hire_date: '',
+      role_id: '',
+      username: '',
+      password: '',
     });
     setEditingEmployee(null);
+    setErrorMessage(null);
   };
 
   const filteredEmployees = employees.filter(employee =>
@@ -138,6 +244,12 @@ export default function EmployeesPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+          {errorMessage}
+        </div>
+      )}
 
       <div className="card">
         <div className="overflow-x-auto">
@@ -230,7 +342,12 @@ export default function EmployeesPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
               </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {errorMessage && (
+                <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+                  {errorMessage}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -295,6 +412,61 @@ export default function EmployeesPage() {
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
+
+                <hr />
+
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  Login Credentials
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Role {(formData.username || formData.password) && '*'}
+                    </label>
+                    <select
+                      className="input"
+                      value={formData.role_id}
+                      onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
+                      required={!!formData.username || !!formData.password}
+                    >
+                      <option value="" disabled>Select Role</option>
+                      {roles.map((role) => (
+                        <option key={role.role_id} value={role.role_id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Username {(formData.password || formData.role_id) && '*'}
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Username"
+                      value={formData.username}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      autoComplete="off"
+                      required={!!formData.password || !!formData.role_id}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Password {(formData.username || formData.role_id) && '*'}
+                    </label>
+                    <input
+                      type="password"
+                      className="input"
+                      placeholder="Enter Password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      autoComplete="new-password"
+                      required={!!formData.username || !!formData.role_id}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"

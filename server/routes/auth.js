@@ -3,7 +3,6 @@ const router = express.Router();
 
 const {
     authenticateUser,
-    registerUser,
     verifyUser,
     verifyOTP,
     resendOTP,
@@ -11,8 +10,6 @@ const {
 } = require("../controllers/auth_controller");
 
 router.post('/login', authenticateUser);
-
-router.post('/signup', registerUser);
 
 router.post('/userVerification', verifyUser);
 

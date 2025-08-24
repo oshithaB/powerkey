@@ -7,6 +7,7 @@ const {
     getUserDetails,
     addUser,
     updateUser,
+    updateUserById,
     softDeleteUser,
     // permanentlyDeleteUser
 } = require('../controllers/user_controller');
@@ -14,6 +15,7 @@ const {
 router.get('/getUserDetails', verifyToken, getUserDetails);
 router.post('/addUser', verifyToken, authorizedRoles('admin'), addUser);
 router.put('/updateUser', verifyToken, updateUser);
+router.put('/updateUser/:userId', verifyToken, authorizedRoles(['admin']), updateUserById);
 router.put('/softDeleteUser/:userId', verifyToken, authorizedRoles('admin'), softDeleteUser);
 // router.delete('/permanentlyDeleteUser/:userId', verifyToken, authorizedRoles('admin'), permanentlyDeleteUser);
 

@@ -154,6 +154,24 @@ const updateOrder = async (req, res) => {
                 companyId
             ]
         );
+
+        if(status === 'closed') {
+            // update product quantity in inventory
+            const [orderItems] = await db.execute(
+                'SELECT product_id, qty FROM order_items WHERE order_id = ?',
+                [orderId]
+            );
+
+            for (const item of orderItems) {
+                await db.execute(
+                    'UPDATE products SET quantity_on_hand = quantity_on_hand + ? WHERE id = ? AND company_id = ?',
+                    [item.qty, item.product_id, companyId]
+                );
+            }
+
+
+        }
+
         res.json({ message: 'Order updated successfully' });
     } catch (error) {
         console.error('Error updating order:', error);

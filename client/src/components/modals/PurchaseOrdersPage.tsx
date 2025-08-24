@@ -443,62 +443,35 @@ export default function PurchaseOrdersPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vendor
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
                 <div className="relative">
-                  <input
-                    type="text"
-                    className="input pr-3 w-full"
-                    value={vendorFilter}
-                    onChange={handleVendorInputChange}
-                    placeholder="Search vendors..."
-                    onFocus={() => {
-                      if (vendorFilter) {
-                        const filteredVendors = vendors.filter((vendor) =>
-                          vendor.name.toLowerCase().includes(vendorFilter.toLowerCase())
-                        );
-                        setVendorSuggestions(filteredVendors);
+                  <select
+                    className="input"
+                    name="vendor_id"
+                    value={order.vendor_id || ''}
+                    onChange={(e) => {
+                      if (e.target.value === "add_new_vendor") {
+                        setShowVendorModal(true);
+                        resetVendorForm();
+                      } else {
+                        const selectedVendor = vendors.find(vendor => vendor.vendor_id === Number(e.target.value));
+                        setOrder({
+                          ...order,
+                          vendor_id: e.target.value === '' ? null : Number(e.target.value),
+                          mailling_address: selectedVendor ? selectedVendor.address || '' : '',
+                        });
+                        setVendorFilter(selectedVendor ? selectedVendor.name : '');
                       }
                     }}
-                    onBlur={() => {
-                      setTimeout(() => setVendorSuggestions([]), 200);
-                    }}
-                  />
-                  {(vendorSuggestions.length > 0 || vendorFilter) && (
-                    <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
-                      {vendorFilter && (
-                        <li
-                          className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-blue-25"
-                          onMouseDown={() => handleVendorSelection('new_vendor')}
-                        >
-                          <div className="flex items-center text-blue-600">
-                            <Plus className="h-4 w-4 mr-2" />
-                            <span className="font-medium">Add New Vendor</span>
-                          </div>
-                        </li>
-                      )}
-                      {vendorSuggestions.map((vendor) => (
-                        <li
-                          key={vendor.vendor_id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
-                          onMouseDown={() => handleVendorSelection(vendor)}
-                        >
-                          <div className="flex-shrink-0 h-8 w-8 mr-3">
-                            <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                              <Truck className="h-4 w-4 text-gray-600" />
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{vendor.name}</div>
-                            {vendor.email && (
-                              <div className="text-xs text-gray-500">{vendor.email}</div>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  >
+                    <option value="" disabled>Select Vendor</option>
+                    <option value="add_new_vendor">Add New Vendor</option>
+                    {vendors.map((vendor) => (
+                      <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                        {vendor.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>

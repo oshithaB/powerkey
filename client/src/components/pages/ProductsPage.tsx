@@ -669,66 +669,54 @@ export default function ProductsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select
-                      className="input"
-                      value={productFormData.category_id}
-                      onChange={(e) => setProductFormData({ ...productFormData, category_id: e.target.value })}
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        className="input"
+                        value={productFormData.category_id}
+                        onChange={(e) => {
+                          if (e.target.value === "add_new_category") {
+                            setShowCategoryModal(true);
+                          } else {
+                            setProductFormData({ ...productFormData, category_id: e.target.value });
+                          }
+                        }}
+                      >
+                        <option value="" disabled>Select Category</option>
+                        <option value="add_new_category">Add New Category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vendor
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
                     <div className="relative">
-                      <input
-                        type="text"
-                        className="input pr-3 w-full"
-                        value={vendorFilter}
+                      <select
+                        className="input"
+                        value={selectedVendorId}
                         onChange={(e) => {
-                          setVendorFilter(e.target.value);
-                          if (!e.target.value) {
-                            setVendorSuggestions([]);
-                            setSelectedVendorId('');
-                            setProductFormData({ ...productFormData, preferred_vendor_id: '' });
+                          if (e.target.value === "add_new_vendor") {
+                            setShowVendorModal(true);
+                          } else {
+                            setSelectedVendorId(e.target.value);
+                            setProductFormData({ ...productFormData, preferred_vendor_id: e.target.value });
+                            const selectedVendor = vendors.find(v => v.vendor_id.toString() === e.target.value);
+                            setVendorFilter(selectedVendor ? selectedVendor.name : '');
                           }
                         }}
-                        onFocus={() => {
-                          if (vendors.length > 0) {
-                            const suggestions = [...vendors];
-                            setVendorSuggestions(suggestions);
-                          }
-                        }}
-                        placeholder="Search vendors..."
-                        onBlur={() => setTimeout(() => setVendorSuggestions([]), 200)}
-                      />
-                      {vendorSuggestions.length > 0 && (
-                        <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
-                          <li
-                            className="px-4 py-2 hover:bg-blue-100 cursor-pointer border-b text-blue-600 font-medium"
-                            onMouseDown={handleAddNewVendor}
-                          >
-                            <Plus className="h-4 w-4 inline mr-2" />
-                            Add New Vendor
-                          </li>
-                          {vendorSuggestions.map((vendor) => (
-                            <li
-                              key={vendor.vendor_id}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                              onMouseDown={() => handleVendorSelection(vendor)}
-                            >
-                              {vendor.name}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      >
+                        <option value="" disabled>Select Vendor</option>
+                        <option value="add_new_vendor">Add New Vendor</option>
+                        {vendors.map((vendor) => (
+                          <option key={vendor.vendor_id} value={vendor.vendor_id}>
+                            {vendor.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 

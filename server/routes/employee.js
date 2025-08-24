@@ -6,8 +6,17 @@ const {
     createEmployee,
     getEmployees,
     updateEmployee,
-    deleteEmployee
+    deleteEmployee,
+    getRoles,
+    getUserByEmployeeId
 } = require('../controllers/employee_controller');
+
+router.get(
+    '/roles',
+    verifyToken,
+    authorizedRoles(['admin']),
+    getRoles
+);
 
 router.post(
     '/employees',
@@ -34,6 +43,12 @@ router.delete(
     verifyToken,
     authorizedRoles(['admin']),
     deleteEmployee
+);
+
+router.get(
+    '/users/by-employee/:id',
+    verifyToken,
+    getUserByEmployeeId
 );
 
 module.exports = router;

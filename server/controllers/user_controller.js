@@ -1,8 +1,6 @@
 const db = require("../DB/db");
 const bcrypt = require('bcrypt');
 
-// This function retrieves user details based on the userId from the request
-// and returns the user information in JSON format.
 const getUserDetails = async (req, res) => {
     try {
         const userId = req.userId;
@@ -31,16 +29,55 @@ const getUserDetails = async (req, res) => {
 }
 
 
-// This function adds a new user to the database.
-// It checks for existing username and email, hashes the password.
 const addUser = async (req, res) => {
     try {
-        const {fullname, username, email, password, role} = req.body;
+        const { fullname, username, email, password, role, role_id, employee_id } = req.body;
         console.log('Add user request received:', req.body);
 
+        // Use role_id directly if provided, otherwise convert role string to role_id
+        let finalRoleId;
+        
+        if (role_id) {
+            finalRoleId = role_id;
+        } else if (role) {
+            const role_lowercase = role.toLowerCase();
+            console.log('Role after conversion to lowercase:', role_lowercase);
+
+            const [roleResult] = await db.query(
+                'SELECT role_id FROM role WHERE name = ?',
+                [role_lowercase]
+            );
+            console.log('Role ID fetched:', roleResult);
+
+            if (roleResult.length === 0) {
+                return res.status(400).json({ success: false, message: 'Invalid role' });
+            }
+            finalRoleId = roleResult[0].role_id;
+        } else {
+            return res.status(400).json({ success: false, message: 'Either role or role_id is required' });
+        }
+
+        // If employee_id is provided, get employee details for user creation
+        let userFullName = fullname;
+        let userEmail = email;
+        
+        if (employee_id) {
+            const [employeeData] = await db.query(
+                'SELECT name, email FROM employees WHERE id = ?',
+                [employee_id]
+            );
+            
+            if (employeeData.length === 0) {
+                return res.status(404).json({ success: false, message: 'Employee not found' });
+            }
+            
+            userFullName = userFullName || employeeData[0].name;
+            userEmail = userEmail || employeeData[0].email;
+        }
+
         const [result] = await db.query(
-            'SELECT * FROM user WHERE username = ? OR email = ? AND is_active = 1',
-            [username, email]
+            'SELECT * FROM user WHERE username = ? OR (email IS NOT NULL AND email = ?) AND is_active = 1',
+            [username, userEmail]
         );
         console.log('Checking for existing user:', result);
 
@@ -50,23 +87,16 @@ const addUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const role_lowercase = role.toLowerCase();
-        console.log('Role after conversion to lowercase:', role_lowercase);
+        // Use employee_id as user_id if provided, otherwise auto-increment
+        const insertQuery = employee_id 
+            ? 'INSERT INTO user (user_id, full_name, username, email, password_hash, role_id) VALUES (?, ?, ?, ?, ?, ?)'
+            : 'INSERT INTO user (full_name, username, email, password_hash, role_id) VALUES (?, ?, ?, ?, ?)';
+        
+        const insertParams = employee_id 
+            ? [employee_id, userFullName, username, userEmail, hashedPassword, finalRoleId]
+            : [userFullName, username, userEmail, hashedPassword, finalRoleId];
 
-        const [role_id] = await db.query(
-            'SELECT role_id FROM role WHERE name = ?',
-            [role_lowercase]
-        );
-        console.log('Role ID fetched:', role_id);
-
-        if (role_id.length === 0) {
-            return res.status(400).json({ success: false, message: 'Invalid role' });
-        }
-
-        const [newUser] = await db.query(
-            'INSERT INTO user (full_name, username, email, password_hash, role_id) VALUES (?, ?, ?, ?, ?)',
-            [fullname, username, email, hashedPassword, role_id[0].role_id]
-        );
+        const [newUser] = await db.query(insertQuery, insertParams);
         console.log('New user created:', newUser);
 
         if (newUser.affectedRows === 0) {
@@ -80,11 +110,7 @@ const addUser = async (req, res) => {
     }
 }
 
-// This function updates user details based on the userId from the request.
-// It allows updating fields like fullname, username, email, and password.
-// It checks for conflicts with existing usernames and emails.
-// It hashes the new password if provided.
-// It returns success or error messages based on the operation outcome.
+
 const updateUser = async (req, res) => {
     try {
         const userId = req.userId;
@@ -199,6 +225,81 @@ const updateUser = async (req, res) => {
     }
 }
 
+const updateUserById = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { username, password, role_id, full_name, email } = req.body;
+        
+        console.log('Update user by ID request received for userId:', userId, 'with updates:', req.body);
+
+        // Validate required fields
+        if (!username || !password || !role_id) {
+            return res.status(400).json({ success: false, message: 'Username, password, and role_id are required' });
+        }
+
+        // Get the current employee's email from the employees table
+        const [employeeData] = await db.query(
+            'SELECT name, email FROM employees WHERE id = ?',
+            [userId]
+        );
+
+        if (employeeData.length === 0) {
+            return res.status(404).json({ success: false, message: 'Employee not found' });
+        }
+
+        // Use email from request body if provided, otherwise use employee's email
+        const userEmail = email || employeeData[0].email;
+        const userFullName = full_name || employeeData[0].name;
+
+        // Check if user exists
+        const [existingUser] = await db.query(
+            'SELECT * FROM user WHERE user_id = ?',
+            [userId]
+        );
+
+        if (existingUser.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Check for username and email conflicts with other users (only if email is being set)
+        let conflictQuery = 'SELECT * FROM user WHERE username = ? AND user_id != ? AND is_active = 1';
+        let conflictParams = [username, userId];
+        
+        if (userEmail) {
+            conflictQuery = 'SELECT * FROM user WHERE (username = ? OR email = ?) AND user_id != ? AND is_active = 1';
+            conflictParams = [username, userEmail, userId];
+        }
+
+        const [conflict] = await db.query(conflictQuery, conflictParams);
+
+        if (conflict.length > 0) {
+            return res.status(400).json({ success: false, message: 'Username or email already exists for another user' });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Update user
+        const [result] = await db.query(
+            'UPDATE user SET role_id = ?, full_name = ?, username = ?, email = ?, password_hash = ?, is_active = 1 WHERE user_id = ?',
+            [role_id, userFullName, username, userEmail, hashedPassword, userId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: 'Failed to update user' });
+        }
+
+        return res.status(200).json({ 
+            success: true, 
+            message: 'User updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Error updating user by ID:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 const softDeleteUser = async (req, res) => {
     try {
         const {userId} = req.params;
@@ -258,12 +359,11 @@ const softDeleteUser = async (req, res) => {
 //     }
 // };
 
-
-
 module.exports = {
     getUserDetails,
     addUser,
     updateUser,
+    updateUserById,  // Export the new function
     softDeleteUser,
     // permanentlyDeleteUser
 };

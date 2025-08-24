@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Building2, Mail, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 
@@ -221,18 +221,6 @@ export default function Login() {
                 'Sign in'
               )}
             </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="font-medium text-primary-600 hover:text-primary-500 transition-colors"
-              >
-                Sign up here
-              </Link>
-            </p>
           </div>
         </form>
       </div>

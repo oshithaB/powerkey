@@ -59,6 +59,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   const [showEstimateSidebar, setShowEstimateSidebar] = useState(false);
   const navigate = useNavigate();
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showInvoiceTypeDropdown, setShowInvoiceTypeDropdown] = useState(false);
 
   const initialFormData = {
     invoice_number: `INV-${Date.now()}`,
@@ -77,7 +78,8 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     billing_address: '',
     ship_via: '',
     shipping_date: '',
-    tracking_number: ''
+    tracking_number: '',
+    invoice_type: 'invoice' as 'invoice' | 'proforma',
   };
 
   const [newCustomerForm, setNewCustomerForm] = useState({
@@ -125,7 +127,8 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     ...initialFormData,
     ...invoice,
     invoice_date: invoice.invoice_date.split('T')[0],
-    shipping_cost: invoice.shipping_cost || 0
+    shipping_cost: invoice.shipping_cost || 0,
+    invoice_type: invoice.status === 'proforma' ? 'proforma' : 'invoice',
   } : initialFormData);
 
   const [items, setItems] = useState<InvoiceItem[]>(invoice?.items || initialItems);
@@ -357,12 +360,15 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     return { subtotal, totalTax, discountAmount, shippingCost, total };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, invoiceType?: 'invoice' | 'proforma') => {
     e.preventDefault();
     setLoading(true);
     setError(null);
   
     try {
+      // Use the invoiceType parameter if provided, otherwise use the formData value
+      const currentInvoiceType = invoiceType || formData.invoice_type;
+  
       if (!formData.invoice_number) {
         throw new Error('Invoice number is required');
       }
@@ -378,7 +384,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   
       const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
   
-      // Check customer's credit limit
       const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
       if (selectedCustomer && selectedCustomer.credit_limit < total) {
         throw new Error("Invoice total exceeds customer's credit limit");
@@ -396,6 +401,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         discount_amount: Number(discountAmount),
         shipping_cost: Number(shippingCost),
         total_amount: Number(total),
+        status: currentInvoiceType === 'proforma' ? 'proforma' : 'opened',
         items: items.map(item => ({
           ...item,
           product_id: parseInt(item.product_id as any) || null,
@@ -414,7 +420,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       } else {
         const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
         console.log('User role:', userRole);
-        if (userRole !== 'admin') {
+        if (userRole !== 'admin' && submitData.status !== 'proforma') {
           try {
             const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
               company_id: selectedCompany?.company_id,
@@ -440,18 +446,15 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   
       setFormData(initialFormData);
       setItems(initialItems);
-      
-      if (onSave && typeof onSave === 'function') {
-        onSave();
-      } else {
-        navigate(-1);
-      }
+  
+      navigate("/dashboard/sales", { state: { activeTab: 'invoices' } });
+  
     } catch (error: any) {
       console.error('Error saving invoice:', error);
       const errorMessage = error.response?.data?.reason || error.response?.data?.error || error.message || 'Failed to save invoice';
       setError(errorMessage);
       alert(errorMessage);
-    } finally { 
+    } finally {
       setLoading(false);
     }
   };
@@ -1108,13 +1111,44 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary btn-md"
-              >
-                {loading ? 'Saving...' : invoice ? 'Update Invoice' : 'Create Invoice'}
-              </button>
+              <div className="relative">
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="btn btn-primary btn-md rounded-r-none"
+                    onClick={(e) => {
+                      handleSubmit(e, 'invoice');
+                    }}
+                  >
+                    {loading ? 'Saving...' : invoice ? 'Update Invoice' : 'Create Invoice'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-md px-3 rounded-l-none border-l border-blue-600"
+                    onClick={() => setShowInvoiceTypeDropdown(!showInvoiceTypeDropdown)}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                </div>
+                {showInvoiceTypeDropdown && (
+                  <div className="right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                    <button
+                      type="button"
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowInvoiceTypeDropdown(false);
+                        handleSubmit(e, 'proforma');
+                      }}
+                    >
+                      Create Proforma Invoice
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </form>
           {showCustomerModal && (

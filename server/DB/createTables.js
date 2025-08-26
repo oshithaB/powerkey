@@ -234,7 +234,7 @@ async function createTables(db) {
             total_amount DECIMAL(10,2) NOT NULL,
             paid_amount DECIMAL(15,2) DEFAULT 0.00,
             balance_due DECIMAL(15,2) DEFAULT 0.00,
-            status ENUM('draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled') DEFAULT 'draft',
+            status ENUM('opened', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'proforma') DEFAULT 'opened',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id),

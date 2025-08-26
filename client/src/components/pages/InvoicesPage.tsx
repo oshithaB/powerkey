@@ -45,7 +45,7 @@ interface Invoice {
   paid_amount: number;
   balance_due: number;
   shipping_cost?: number;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
   notes: string;
   terms: string;
   created_at: string;
@@ -346,7 +346,7 @@ export default function InvoicesPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
+      case 'opened':
         return 'bg-gray-100 text-gray-800';
       case 'sent':
         return 'bg-blue-100 text-blue-800';
@@ -358,6 +358,8 @@ export default function InvoicesPage() {
         return 'bg-red-100 text-red-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'proforma':
+        return 'bg-purple-200 text-purple-900';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -403,7 +405,7 @@ export default function InvoicesPage() {
     .reduce((acc, invoice) => acc + (Number(invoice.balance_due) || 0), 0);
 
   const balanceDueData = invoices
-    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft' || invoice.status === 'sent')
+    .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'opened' || invoice.status === 'sent')
     .reduce((acc, invoice) => {
       const amount = invoice.status === 'partially_paid'
         ? (Number(invoice.balance_due) || 0) 
@@ -508,7 +510,7 @@ export default function InvoicesPage() {
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                 >
                   <option value="">All Statuses</option>
-                  <option value="draft">Draft</option>
+                  <option value="opened">Opened</option>
                   <option value="sent">Sent</option>
                   <option value="paid">Paid</option>
                   <option value="partially_paid">Partially Paid</option>
@@ -748,7 +750,7 @@ export default function InvoicesPage() {
                     {/* Taxed Invoice Badge */}
                     {!!selectedCompany?.is_taxable && (
                       <span
-                        className="px-3 py-1 text-lg font-semibold text-red-600"
+                        className="px-3 py-1 text-2xl font-semibold text-red-600"
                       >
                         Tax Invoice
                       </span>
@@ -756,12 +758,12 @@ export default function InvoicesPage() {
 
                     {/* Customer Tax Number */}
                     <p className="text-sm text-gray-700">
-                      Customer Tax No: {printingInvoice.customer_tax_number || 'N/A'}
+                      Customer VAT No: {printingInvoice.customer_tax_number || 'N/A'}
                     </p>
 
                     {/* Company Tax Number */}
                     <p className="text-sm text-gray-700">
-                      Company Tax No: {selectedCompany?.tax_number || 'N/A'}
+                      Company VAT No: {selectedCompany?.tax_number || 'N/A'}
                     </p>
                   </div>
                 </div>

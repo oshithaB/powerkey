@@ -26,6 +26,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     discount_amount,
     shipping_cost,
     total_amount,
+    status, // Added status
     items,
     attachment
   } = req.body;
@@ -50,6 +51,9 @@ const createInvoice = asyncHandler(async (req, res) => {
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "At least one valid item is required" });
+  }
+  if (!status || !['opened', 'proforma'].includes(status)) {
+    return res.status(400).json({ error: "Invalid invoice status" });
   }
 
   // Validate items
@@ -80,37 +84,6 @@ const createInvoice = asyncHandler(async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-
-    // // Check customer's credit limit
-    // const [customer] = await connection.query(
-    //   `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
-    //   [customer_id, company_id]
-    // );
-
-    // if (!customer.length || customer[0].credit_limit < total_amount) {
-    //   await connection.rollback();
-    //   return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
-    // }
-
-    // // Reduce the total_amount by the customer's credit limit
-    // if (customer[0].credit_limit < total_amount) {
-    //   const creditLimit = customer[0].credit_limit;
-    //   total_amount -= creditLimit;
-    //   await connection.query(
-    //     `UPDATE customer SET credit_limit = 0 WHERE id = ? AND company_id = ?`,
-    //     [customer_id, company_id]
-    //   );
-    //   // If total_amount is still greater than 0, it means the invoice exceeds the credit limit
-    //   if (total_amount > 0) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ error: "Invoice total exceeds customer's credit limit" });
-    //   }
-    // } else {
-    //   await connection.query(
-    //     `UPDATE customer SET credit_limit = credit_limit - ? WHERE id = ? AND company_id = ?`,
-    //     [total_amount, customer_id, company_id]
-    //   );
-    // }
 
     // Check for duplicate invoice number
     const [duplicateInvoice] = await connection.query(
@@ -146,7 +119,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount: discount_amount || 0,
       shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
-      status: 'draft',
+      status, // Use provided status
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -218,7 +191,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount,
       shipping_cost,
       total_amount,
-      status: 'draft',
+      status,
       created_at: invoiceData.created_at.toISOString(),
       updated_at: invoiceData.updated_at.toISOString(),
       items
@@ -876,7 +849,7 @@ const recordPayment = asyncHandler(async (req, res) => {
       const newPaidAmount = (Number(invoice[0].paid_amount) || 0) + Number(invoicePaymentAmount);
       const totalAmount = Number(invoice[0].total_amount) || 0;
       const balanceDue = totalAmount - newPaidAmount;
-      let status = 'draft';
+      let status = 'opened';
 
       if (newPaidAmount >= totalAmount) {
         status = 'paid';
@@ -956,7 +929,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
     const [invoiceRows] = await connection.query(
       `SELECT status, balance_due, due_date FROM invoices 
        WHERE customer_id = ? AND company_id = ? 
-       AND status IN ('draft', 'sent', 'partially_paid', 'overdue')`,
+       AND status IN ('opened', 'sent', 'partially_paid', 'overdue')`,
       [customer_id, company_id]
     );
 

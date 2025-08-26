@@ -741,7 +741,7 @@ export default function InvoicesPage() {
                       <span
                         className="px-3 py-1 text-lg font-semibold text-red-600"
                       >
-                        Taxed Invoice
+                        Tax Invoice
                       </span>
                     )}
 
@@ -883,59 +883,48 @@ export default function InvoicesPage() {
                     </div>
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-3">Company Section</h3>
-                <div className="flex justify-between items-center border-t border-gray-200 bg-gradient-to-r from-gray-50 to-white rounded-lg shadow-md p-6 mb-8">
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-gray-600 mb-2">Accepted By</p>
-                    <div className="w-48 h-10 flex items-center justify-center">
-                      _____________________
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-gray-600 mb-2">Accepted Date</p>
-                    <div className="w-48 h-10 flex items-center justify-center">
-                      _____________________
-                    </div>
-                  </div>
-                </div>
-
-                <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-3">
-                  Customer Section
-                </h3>
 
                 <div className="grid grid-cols-2 gap-6 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-white rounded-lg shadow-md p-6">
 
-                  {/* Name */}
-                  <div className="flex flex-col items-center">
-                    <p className="text-sm font-medium text-gray-600 mb-1">Name</p>
-                    <div className="w-60 h-10 border-b border-gray-400" />
+                  {/* Left side */}
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex">
+                      <span className="w-28 text-sm font-medium text-gray-600">Name:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400"></span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-sm font-medium text-gray-600">NIC:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400"></span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-sm font-medium text-gray-600">Contact No:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400"></span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-sm font-medium text-gray-600">Vehicle No:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400"></span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-sm font-medium text-gray-600">Signature:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400"></span>
+                    </div>
                   </div>
 
-                  {/* NIC */}
-                  <div className="flex flex-col items-center">
-                    <p className="text-sm font-medium text-gray-600 mb-1">NIC</p>
-                    <div className="w-60 h-10 border-b border-gray-400" />
-                  </div>
-
-                  {/* Contact Number */}
-                  <div className="flex flex-col items-center">
-                    <p className="text-sm font-medium text-gray-600 mb-1">Contact Number</p>
-                    <div className="w-60 h-10 border-b border-gray-400" />
-                  </div>
-
-                  {/* Vehicle Number */}
-                  <div className="flex flex-col items-center">
-                    <p className="text-sm font-medium text-gray-600 mb-1">Vehicle Number</p>
-                    <div className="w-60 h-10 border-b border-gray-400" />
-                  </div>
-
-                  {/* Signature */}
-                  <div className="col-span-2 flex flex-col items-center mt-4">
-                    <p className="text-sm font-medium text-gray-600 mb-1">Signature</p>
-                    <div className="w-60 h-10 border-b border-gray-400" />
+                  {/* Right side */}
+                  <div className="flex flex-col space-y-2 items-end text-right">
+                    <div className="flex w-full justify-end">
+                      <span className="w-40 text-sm font-medium text-gray-600">Order Created by:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400 ml-2"></span>
+                    </div>
+                    <div className="flex w-full justify-end">
+                      <span className="w-40 text-sm font-medium text-gray-600">Order Checked by:</span>
+                      <span className="flex-1 border-b border-dotted border-gray-400 ml-2"></span>
+                    </div>
                   </div>
 
                 </div>
+
+
               </div>
                 
             </div>

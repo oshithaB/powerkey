@@ -795,9 +795,12 @@ export default function InvoicesPage() {
                 </div>
 
                 <div>
+                {printingInvoice.head_note && (
                   <p className="text-lg mb-5 bg-gray-100 p-4 rounded">
-                    {printingInvoice.head_note || "No head note available"}
+                    {printingInvoice.head_note}
                   </p>
+                )}
+
                 </div>
 
                 <div className="mb-6">

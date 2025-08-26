@@ -405,24 +405,33 @@ export default function InvoicesPage() {
   const balanceDueData = invoices
     .filter(invoice => invoice.status === 'partially_paid' || invoice.status === 'draft' || invoice.status === 'sent')
     .reduce((acc, invoice) => {
-      const amount = invoice.status === 'partially_paid' 
+      const amount = invoice.status === 'partially_paid'
         ? (Number(invoice.balance_due) || 0) 
         : (Number(invoice.total_amount) || 0);
       return acc + amount;
-    }, 0);
+  }, 0);
+
+  const partially_paidData = invoices
+    .filter(invoices => invoices.status === 'partially_paid')
+    .reduce((acc, invoice) => acc + (Number(invoice.paid_amount)), 0);
 
   const paidData = invoices
-    .filter(invoice => invoice.status === 'paid')
-    .reduce((acc, invoice) => acc + (Number(invoice.paid_amount) || 0), 0);
+    .filter(invoices => invoices.status === 'paid')
+    .reduce((acc, invoice) => acc + (Number(invoice.paid_amount)), 0);
+    console.log('Paid Data Calculation:', invoices.filter(invoice => invoice.status === 'paid').map(inv => ({id: inv.id, paid_amount: inv.paid_amount})));
+
+  const cancelledData = invoices
+    .filter(invoice => invoice.status === 'cancelled')
+    .reduce((acc, invoice) => acc + (Number(invoice.total_amount) || 0), 0);
 
   const chartData = {
-    labels: ['Overdue', 'Balance Due', 'Paid'],
+    labels: ['Overdue', 'Balance Due', 'Partially Paid', 'Paid', 'Cancelled'],
     datasets: [
       {
         label: 'Amount (LKR)',
-        data: [overdueData, balanceDueData, paidData],
-        backgroundColor: ['#dc2626', '#6b7280', '#10b981'],
-        borderColor: ['#dc2626', '#6b7280', '#10b981'],
+        data: [overdueData, balanceDueData, partially_paidData, paidData, cancelledData],
+        backgroundColor: ['#dc2626', '#6b7280', '#f4f871', '#10b981', '#f87171'],
+        borderColor: ['#dc2626', '#6b7280', '#f4f871', '#10b981', '#f87171'],
         borderWidth: 1,
       },
     ],

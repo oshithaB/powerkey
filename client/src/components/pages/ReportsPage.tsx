@@ -40,6 +40,7 @@ export default function ReportsPage() {
       icon: BarChart3,
       color: 'bg-orange-100 text-orange-600'
     }
+
   ];
 
   const businessOverviewReports = [
@@ -60,6 +61,11 @@ export default function ReportsPage() {
       name: 'Accounts receivable ageing summary',
       description: 'Current month P&L statement',
       path: '/reports/profit&loss'
+    },
+    {
+      name: 'Commissions Report',
+      description: 'Commission details for sales persons',
+      path: '/reports/commissionReport'
     }
   ];
 
@@ -219,6 +225,8 @@ export default function ReportsPage() {
             ))}
           </div>
         </div>
+
+        
       </div>
 
       {/* Sales and Customers */}

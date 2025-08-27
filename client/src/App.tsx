@@ -23,7 +23,7 @@ import CreateExpense from './components/modals/CreateExpense';
 import CreateBill from './components/modals/CreateBill';
 
 // Reports
-// import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
+import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -167,6 +167,16 @@ function App() {
               />
 
               <Route path="/" element={<Navigate to="/companies" />} />
+
+              {/* Reports */}
+              <Route
+                path="/reports/profit&loss"
+                element={
+                  <ProtectedRoute>
+                    <ProfitAndLossReport />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Catch-all route for 404 Not Found */}
               <Route path='*' element={<NotFound />} />

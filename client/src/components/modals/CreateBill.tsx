@@ -34,7 +34,7 @@ interface CreateModalProps {
   label: string;
 }
 
-export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
+export default function BillModal({ expense, onSave }: ExpenseModalProps) {
   const { selectedCompany } = useCompany();
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);

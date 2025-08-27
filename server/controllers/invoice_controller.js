@@ -577,7 +577,7 @@ const getInvoices = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS               customer_tax_number, c.credit_limit AS customer_credit_limit,
+      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS customer_tax_number, c.credit_limit AS customer_credit_limit,
                      e.name AS employee_name
                      FROM invoices i
                      LEFT JOIN customer c ON i.customer_id = c.id
@@ -595,7 +595,9 @@ const getInvoices = async (req, res) => {
         const totalAmount = Number(invoice.total_amount) || 0;
         const balanceDue = totalAmount - paidAmount;
 
+        // Only update status to overdue if NOT proforma
         if (
+          invoice.status !== 'proforma' &&
           dueDate &&
           dueDate < currentDate &&
           invoice.status !== 'paid' &&
@@ -715,7 +717,7 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS               customer_tax_number, c.credit_limit AS customer_credit_limit, e.name AS employee_name
+      const query = `SELECT i.*, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone, c.tax_number AS customer_tax_number, c.credit_limit AS customer_credit_limit, e.name AS employee_name
                      FROM invoices i
                      LEFT JOIN customer c ON i.customer_id = c.id
                      LEFT JOIN employees e ON i.employee_id = e.id
@@ -732,7 +734,10 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
       const currentDate = new Date();
       for (const invoice of invoices) {
         const dueDate = new Date(invoice.due_date);
+        
+        // FIXED: Only update status to overdue if NOT proforma
         if (
+          invoice.status !== 'proforma' && // Added this check
           dueDate < currentDate &&
           invoice.status !== 'paid' &&
           invoice.status !== 'cancelled' &&
@@ -837,55 +842,65 @@ const recordPayment = asyncHandler(async (req, res) => {
       }
 
       const [invoice] = await connection.query(
-        `SELECT total_amount, paid_amount, due_date FROM invoices WHERE id = ? AND company_id = ? AND customer_id = ?`,
+        `SELECT total_amount, paid_amount, due_date, status 
+         FROM invoices 
+         WHERE id = ? AND company_id = ? AND customer_id = ?`,
         [invoice_id, company_id, customerId]
       );
-
+      
       if (invoice.length === 0) {
         await connection.rollback();
         return res.status(404).json({ error: `Invoice ${invoice_id} not found` });
       }
-
+      
       const newPaidAmount = (Number(invoice[0].paid_amount) || 0) + Number(invoicePaymentAmount);
       const totalAmount = Number(invoice[0].total_amount) || 0;
       const balanceDue = totalAmount - newPaidAmount;
-      let status = 'opened';
-
-      if (newPaidAmount >= totalAmount) {
-        status = 'paid';
-      } else if (newPaidAmount > 0) {
-        status = 'partially_paid';
+      let status = invoice[0].status;
+      
+      // FIXED: Only update status if the invoice is NOT proforma
+      if (status !== 'proforma') {
+        status = 'opened';
+      
+        if (newPaidAmount >= totalAmount) {
+          status = 'paid';
+        } else if (newPaidAmount > 0) {
+          status = 'partially_paid';
+        }
+      
+        const dueDate = new Date(invoice[0].due_date);
+        if (
+          status !== 'paid' &&
+          dueDate < currentDate &&
+          balanceDue > 0 &&
+          status !== 'cancelled'
+        ) {
+          status = 'overdue';
+        }
       }
-
-      const dueDate = new Date(invoice[0].due_date);
-      if (
-        status !== 'paid' &&
-        dueDate < currentDate &&
-        balanceDue > 0 &&
-        status !== 'cancelled'
-      ) {
-        status = 'overdue';
-      }
-
+      // If status is 'proforma', it remains unchanged regardless of payment status
+      
+      // Insert payment
       await connection.query(
         `INSERT INTO payments (invoice_id, customer_id, company_id, payment_amount, payment_date, payment_method, deposit_to, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [invoice_id, customerId, company_id, invoicePaymentAmount, payment_date, payment_method, deposit_to, notes || null]
       );
-
-      // Update customer credit limit (credit limit is reduced by the payment amount)
+      
+      // Update customer credit limit
       await connection.query(
         `UPDATE customer 
          SET credit_limit = credit_limit - ?
          WHERE id = ? AND company_id = ?`,
         [invoicePaymentAmount, customerId, company_id]
       );
-
+      
+      // Update invoice - paid_amount and balance_due are updated, but status is preserved for proforma
       await connection.query(
         `UPDATE invoices 
          SET paid_amount = ?, 
              balance_due = ?, 
-             status = ?,
+             status = ?, 
              updated_at = ?
          WHERE id = ? AND company_id = ?`,
         [newPaidAmount, balanceDue, status, new Date(), invoice_id, company_id]

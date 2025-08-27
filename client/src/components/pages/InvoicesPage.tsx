@@ -45,7 +45,7 @@ interface Invoice {
   paid_amount: number;
   balance_due: number;
   shipping_cost?: number;
-  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   notes: string;
   terms: string;
   created_at: string;
@@ -691,13 +691,13 @@ export default function InvoicesPage() {
                           >
                             <DollarSign className="h-4 w-4" />
                           </button>
-                          {/* <button
+                          <button
                             onClick={() => handleDelete(invoice.id)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button> */}
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Edit, Trash2, FileText, DollarSign, Filter, Printer, X } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, Filter, Printer, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
@@ -45,7 +45,7 @@ interface Invoice {
   paid_amount: number;
   balance_due: number;
   shipping_cost?: number;
-  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   notes: string;
   terms: string;
   created_at: string;
@@ -455,7 +455,7 @@ export default function InvoicesPage() {
       y: {
         beginAtZero: true,
         ticks: {
-          callback: (value: number) => `LKR ${value.toLocaleString()}`,
+          callback: (tickValue: string | number) => `LKR ${Number(tickValue).toLocaleString()}`,
         },
       },
     },

@@ -38,7 +38,7 @@ interface Invoice {
   total_amount: number | string | null;
   paid_amount: number | string | null;
   balance_due: number | string | null;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   computed_status?: string;
   discount_type: 'fixed' | 'percentage';
   discount_value: string;
@@ -563,7 +563,10 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                                   ? 'bg-yellow-100 text-yellow-800'
                                   : (invoice.computed_status || invoice.status) === 'overdue'
                                   ? 'bg-red-100 text-red-800'
+                                  : (invoice.computed_status || invoice.status) === 'proforma'
+                                  ? 'bg-purple-100 text-purple-800'
                                   : 'bg-gray-100 text-gray-800'
+                                  
                               }`}
                             >
                               {(invoice.computed_status || invoice.status)

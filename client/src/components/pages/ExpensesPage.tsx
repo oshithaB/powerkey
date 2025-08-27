@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
-import { Plus, Search, Edit, Trash2, Receipt, Eye, Upload } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Receipt, Eye } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import BillsPage from './BillsPage';
 
 interface Expense {
   id: number;
@@ -46,6 +47,8 @@ export default function ExpensesPage() {
     description: ''
   });
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState('expenses');
+  const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -168,151 +171,187 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-        <button
-          onClick={() => {
-            navigate("/expense/create");
-          }}
-          className="btn btn-primary btn-md"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Expense
-        </button>
+      <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('expenses')}
+            className={`${
+              activeTab === 'expenses'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Expenses
+          </button>
+          <button
+            onClick={() => setActiveTab('bills')}
+            className={`${
+              activeTab === 'bills'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Bills
+          </button>
+        </nav>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-        <input
-          type="text"
-          placeholder="Search expenses..."
-          className="input pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      {/* Tab Content */}
+      {activeTab === 'expenses' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div></div>
+            <button
+              onClick={() => {
+                navigate("/expense/create");
+              }}
+              className="btn btn-primary btn-md"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Expense
+            </button>
+          </div>
 
-      {/* Expenses Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Expense
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vendor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Account
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredExpenses.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
-                          <Receipt className="h-5 w-5 text-red-600" />
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Search expenses..."
+              className="input pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Expenses Table */}
+          <div className="card">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Expense
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vendor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredExpenses.map((expense) => (
+                    <tr key={expense.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
+                              <Receipt className="h-5 w-5 text-red-600" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {expense.expense_number}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {expense.description}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {expense.expense_number}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {expense.vendor_name || 'No vendor'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {expense.first_name && expense.last_name 
+                          ? `${expense.first_name} ${expense.last_name}`
+                          : 'Not assigned'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {expense.account_name || 'No account'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {format(new Date(expense.expense_date), 'MMM dd, yyyy')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          ${expense.total_amount?.toLocaleString() || '0.00'}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {expense.description}
+                        {expense.tax_amount > 0 && (
+                          <div className="text-sm text-gray-500">
+                            Tax: ${expense.tax_amount.toLocaleString()}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(expense.status)}`}>
+                          {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(expense)}
+                            className="text-primary-600 hover:text-primary-900"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {expense.receipt_file && (
+                            <button
+                              onClick={() => window.open(expense.receipt_file, '_blank')}
+                              className="text-green-600 hover:text-green-900"
+                              title="View Receipt"
+                            >
+                              <Receipt className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(expense.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {expense.vendor_name || 'No vendor'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {expense.first_name && expense.last_name 
-                      ? `${expense.first_name} ${expense.last_name}`
-                      : 'Not assigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {expense.account_name || 'No account'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {format(new Date(expense.expense_date), 'MMM dd, yyyy')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      ${expense.total_amount?.toLocaleString() || '0.00'}
-                    </div>
-                    {expense.tax_amount > 0 && (
-                      <div className="text-sm text-gray-500">
-                        Tax: ${expense.tax_amount.toLocaleString()}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(expense.status)}`}>
-                      {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(expense)}
-                        className="text-primary-600 hover:text-primary-900"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      {expense.receipt_file && (
-                        <button
-                          onClick={() => window.open(expense.receipt_file, '_blank')}
-                          className="text-green-600 hover:text-green-900"
-                          title="View Receipt"
-                        >
-                          <Receipt className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(expense.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'bills' && (
+        <BillsPage />
+      )}
     </div>
   );
 }

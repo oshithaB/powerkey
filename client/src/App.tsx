@@ -20,6 +20,7 @@ import InvoiceRecievedPayment from './components/modals/InvoiceReceivePaymentMod
 import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 import EditPurchaseOrders from './components/modals/EditPurchaseOrders';
 import CreateExpense from './components/modals/CreateExpense';
+import CreateBill from './components/modals/CreateBill';
 
 // Reports
 // import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
@@ -152,6 +153,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CreateExpense />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/bill/create"
+                element={
+                  <ProtectedRoute>
+                    <CreateBill />
                   </ProtectedRoute>
                 }
               />

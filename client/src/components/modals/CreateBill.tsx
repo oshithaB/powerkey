@@ -37,19 +37,14 @@ interface CreateModalProps {
 export default function BillModal({ expense, onSave }: ExpenseModalProps) {
   const { selectedCompany } = useCompany();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [paymentAccountFilter, setPaymentAccountFilter] = useState('');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [categorySuggestions, setCategorySuggestions] = useState<Category[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
-  const [isCreatePaymentAccountModalOpen, setIsCreatePaymentAccountModalOpen] = useState(false);
-  const [isCreatePaymentMethodModalOpen, setIsCreatePaymentMethodModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const initialFormData = {
@@ -114,23 +109,6 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     } catch (error) {
       console.error('Error creating category:', error);
       alert('Failed to create category.');
-    }
-  };
-
-  const handleCreatePaymentMethod = async (name: string) => {
-    try {
-      const response = await axiosInstance.post('/api/createPaymentMethod', {
-        name,
-      });
-      const newMethod = response.data.name;
-      setPaymentMethods((prev) => [...prev, newMethod]);
-      setFormData({ ...formData, payment_method: newMethod });
-      setPaymentMethodFilter(newMethod);
-      setIsCreatePaymentMethodModalOpen(false);
-      alert('Payment method created successfully.');
-    } catch (error) {
-      console.error('Error creating payment method:', error);
-      alert('Failed to create payment method.');
     }
   };
 

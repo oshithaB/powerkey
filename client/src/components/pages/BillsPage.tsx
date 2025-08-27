@@ -10,12 +10,9 @@ interface Bill {
   expense_number: string;
   category_id: number;
   category_name?: string;
-  payment_account_id: number;
-  payment_account_name?: string;
   bill_date: string;
   due_date?: string;
   total_amount: number;
-  payment_method: string;
   payee: string;
   notes: string;
   terms: string;
@@ -132,9 +129,6 @@ export default function BillsPage() {
                     Category
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Payment Account
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Bill Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -176,9 +170,6 @@ export default function BillsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {bill.category_name || 'No category'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.payment_account_name || 'No account'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {format(new Date(bill.bill_date), 'MMM dd, yyyy')}

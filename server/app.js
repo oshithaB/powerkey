@@ -57,6 +57,7 @@ const tax_ratesRoutes = require("./routes/tax_rates");
 const estimateRoutes = require("./routes/estimates");
 const invoiceRoutes = require("./routes/invoice");
 const paymentMethodRoutes = require("./routes/paymentMethod");
+const exprenseRoutes = require("./routes/expenses");
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow frontend origin

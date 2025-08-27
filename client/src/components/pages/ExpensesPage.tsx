@@ -3,6 +3,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import axios from 'axios';
 import { Plus, Search, Edit, Trash2, Receipt, Eye, Upload } from 'lucide-react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface Expense {
   id: number;
@@ -29,9 +30,6 @@ interface Expense {
 export default function ExpensesPage() {
   const { selectedCompany } = useCompany();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [vendors, setVendors] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -48,49 +46,20 @@ export default function ExpensesPage() {
     description: ''
   });
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchExpenses();
-    fetchVendors();
-    fetchEmployees();
-    fetchAccounts();
   }, [selectedCompany]);
 
   const fetchExpenses = async () => {
     try {
-      const response = await axios.get(`/api/expenses/${selectedCompany?.id}`);
+      const response = await axios.get(`/api/getExpenses/${selectedCompany?.company_id}`);
       setExpenses(response.data);
     } catch (error) {
       console.error('Error fetching expenses:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchVendors = async () => {
-    try {
-      const response = await axios.get(`/api/vendors/${selectedCompany?.id}`);
-      setVendors(response.data);
-    } catch (error) {
-      console.error('Error fetching vendors:', error);
-    }
-  };
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await axios.get(`/api/employees/${selectedCompany?.id}`);
-      setEmployees(response.data);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-    }
-  };
-
-  const fetchAccounts = async () => {
-    try {
-      const response = await axios.get(`/api/accounts/${selectedCompany?.id}`);
-      setAccounts(response.data.filter((acc: any) => acc.account_type === 'Expense'));
-    } catch (error) {
-      console.error('Error fetching accounts:', error);
     }
   };
 
@@ -108,11 +77,11 @@ export default function ExpensesPage() {
       }
 
       if (editingExpense) {
-        await axios.put(`/api/expenses/${selectedCompany?.id}/${editingExpense.id}`, submitData, {
+        await axios.put(`/api/expenses/${selectedCompany?.company_id}/${editingExpense.id}`, submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       } else {
-        await axios.post(`/api/expenses/${selectedCompany?.id}`, submitData, {
+        await axios.post(`/api/expenses/${selectedCompany?.company_id}`, submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       }
@@ -144,7 +113,7 @@ export default function ExpensesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        await axios.delete(`/api/expenses/${selectedCompany?.id}/${id}`);
+        await axios.delete(`/api/expenses/${selectedCompany?.company_id}/${id}`);
         fetchExpenses();
       } catch (error) {
         console.error('Error deleting expense:', error);
@@ -203,13 +172,12 @@ export default function ExpensesPage() {
         <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
         <button
           onClick={() => {
-            resetForm();
-            setShowModal(true);
+            navigate("/expense/create");
           }}
           className="btn btn-primary btn-md"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Expense
+          Create Expense
         </button>
       </div>
 
@@ -345,196 +313,6 @@ export default function ExpensesPage() {
           </table>
         </div>
       </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"  style={{marginTop: "-1px"}}>
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editingExpense ? 'Edit Expense' : 'Add New Expense'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vendor
-                    </label>
-                    <select
-                      className="input"
-                      value={formData.vendor_id}
-                      onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
-                    >
-                      <option value="">Select Vendor</option>
-                      {vendors.map((vendor) => (
-                        <option key={vendor.id} value={vendor.id}>
-                          {vendor.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employee
-                    </label>
-                    <select
-                      className="input"
-                      value={formData.employee_id}
-                      onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.first_name} {employee.last_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expense Account *
-                    </label>
-                    <select
-                      required
-                      className="input"
-                      value={formData.account_id}
-                      onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                    >
-                      <option value="">Select Account</option>
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.account_code} - {account.account_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expense Date *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      className="input"
-                      value={formData.expense_date}
-                      onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      className="input"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tax Amount
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input"
-                      value={formData.tax_amount}
-                      onChange={(e) => setFormData({ ...formData, tax_amount: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Payment Method
-                    </label>
-                    <select
-                      className="input"
-                      value={formData.payment_method}
-                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as any })}
-                    >
-                      <option value="cash">Cash</option>
-                      <option value="check">Check</option>
-                      <option value="credit_card">Credit Card</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Reference Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.reference_number}
-                      onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                      placeholder="Check number, transaction ID, etc."
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    className="input min-h-[80px]"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Expense description..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Receipt
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="input"
-                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-                  />
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex justify-between font-bold">
-                    <span>Total Amount:</span>
-                    <span>${(formData.amount + formData.tax_amount).toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="btn btn-secondary btn-md"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-md"
-                  >
-                    {editingExpense ? 'Update' : 'Create'} Expense
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

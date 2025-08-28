@@ -189,7 +189,7 @@ export default function ChequesPage() {
                   return (
                     <tr
                       key={cheque.id}
-                      className={`hover:bg-gray-50 ${isNearDue ? 'bg-red-100' : ''}`}
+                      className={` ${isNearDue ? 'bg-red-100' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

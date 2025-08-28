@@ -377,7 +377,7 @@ const ProfitAndLossReport: React.FC = () => {
             <div className="overflow-y-auto max-h-[70vh]">
               <div
                 ref={printRef}
-                className="p-8 bg-white w-[210mm] min-h-[297mm] text-gray-900"
+                className="p-8 bg-white text-gray-900"
               >
                 {/* Header with Company Info and Logo */}
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
@@ -389,12 +389,6 @@ const ProfitAndLossReport: React.FC = () => {
                     <p className="text-sm text-gray-600">
                       Period: January 1 - {data.period.end_date || 'August 28, 2025'}
                     </p>
-                    {selectedCompany?.address && (
-                      <p className="text-sm text-gray-600">{selectedCompany.address}</p>
-                    )}
-                    {selectedCompany?.contact_number && (
-                      <p className="text-sm text-gray-600">Phone: {selectedCompany.contact_number}</p>
-                    )}
                   </div>
                   {selectedCompany?.company_logo && (
                     <img
@@ -410,7 +404,7 @@ const ProfitAndLossReport: React.FC = () => {
                   <tbody>
                     {/* Income Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header">
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header">
                         INCOME
                       </td>
                     </tr>
@@ -439,13 +433,13 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-1 border-b text-right font-bold">{formatCurrency(data.income.total_income)}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-b font-bold" style={{paddingBottom: '20px'}}>Net Income</td>
-                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '20px'}}>{formatCurrency(data.income.net_income)}</td>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Net Income</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.income.net_income)}</td>
                     </tr>
 
                     {/* Cost of Sales Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact',}}>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact',}}>
                         COST OF SALES
                       </td>
                     </tr>
@@ -458,13 +452,13 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-1 border-b text-right">{formatCurrency(data.cost_of_sales.inventory_shrinkage)}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-b font-bold" style={{paddingBottom: '20px'}}>Total Cost of Sales</td>
-                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '20px'}}>{formatCurrency(data.cost_of_sales.total_cost_of_sales)}</td>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Total Cost of Sales</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.cost_of_sales.total_cost_of_sales)}</td>
                     </tr>
 
                     {/* Expenses Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
                         EXPENSES
                       </td>
                     </tr>
@@ -477,13 +471,13 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-1 border-b text-right">{formatCurrency(data.expenses.other_expenses)}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-b font-bold" style={{paddingBottom: '20px'}}>Total Expenses</td>
-                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '20px'}}>{formatCurrency(data.expenses.total_expenses)}</td>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Total Expenses</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.expenses.total_expenses)}</td>
                     </tr>
 
                     {/* Profitability Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
                         PROFITABILITY
                       </td>
                     </tr>
@@ -500,13 +494,13 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-1 border-b text-right">{formatPercentage(data.profitability.gross_profit_margin)}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-b" style={{paddingBottom: '20px'}}>Net Profit Margin</td>
-                      <td className="p-1 border-b text-right" style={{paddingBottom: '20px'}}>{formatPercentage(data.profitability.net_profit_margin)}</td>
+                      <td className="p-1 border-b" style={{paddingBottom: '15px'}}>Net Profit Margin</td>
+                      <td className="p-1 border-b text-right" style={{paddingBottom: '15px'}}>{formatPercentage(data.profitability.net_profit_margin)}</td>
                     </tr>
 
                     {/* Cash Flow Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
                         CASH FLOW
                       </td>
                     </tr>
@@ -523,13 +517,13 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-1 border-b text-right">{formatCurrency(data.cash_flow.outstanding_balance)}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-b" style={{paddingBottom: '20px'}}>Collection Rate</td>
-                      <td className="p-1 border-b text-right" style={{paddingBottom: '20px'}}>{formatPercentage(data.cash_flow.collection_rate)}</td>
+                      <td className="p-1 border-b" style={{paddingBottom: '15px'}}>Collection Rate</td>
+                      <td className="p-1 border-b text-right" style={{paddingBottom: '15px'}}>{formatPercentage(data.cash_flow.collection_rate)}</td>
                     </tr>
 
                     {/* Summary Section */}
                     <tr>
-                      <td colSpan={2} className="bg-gray-100 p-1 font-bold text-lg border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
                         SUMMARY
                       </td>
                     </tr>
@@ -548,8 +542,8 @@ const ProfitAndLossReport: React.FC = () => {
                       </td>
                     </tr>
                     <tr>
-                      <td className="p-1">Profitable</td>
-                      <td className={`p-1 text-right font-bold ${data.summary.is_profitable ? 'text-green-600' : 'text-red-600'}`}>
+                      <td className="pt-1">Profitable</td>
+                      <td className={`text-right font-bold pt-1 ${data.summary.is_profitable ? 'text-green-600' : 'text-red-600'}`}>
                         {data.summary.is_profitable ? 'Yes' : 'No'}
                       </td>
                     </tr>
@@ -557,7 +551,7 @@ const ProfitAndLossReport: React.FC = () => {
                 </table>
 
                 {/* Footer */}
-                <div className="border-t pt-4 mt-8">
+                <div className="border-t pt-2">
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-gray-600">
@@ -568,7 +562,6 @@ const ProfitAndLossReport: React.FC = () => {
                       <p className="text-sm text-gray-600">
                         {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                       </p>
-                      <p className="text-sm text-gray-600">Profit & Loss Report</p>
                     </div>
                   </div>
                 </div>

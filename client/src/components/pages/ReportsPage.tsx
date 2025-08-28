@@ -65,7 +65,7 @@ export default function ReportsPage() {
     {
       name: 'Commissions Report',
       description: 'Commission details for sales persons',
-      path: '/reports/commissionReport'
+      path: '/reports/commission'
     }
   ];
 

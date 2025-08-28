@@ -28,6 +28,7 @@ import EditCheques from './components/modals/EditCheques';
 
 // Reports
 import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
+import CommissionReport from './components/reports/CommissionReport';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -227,6 +228,16 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/reports/commission"
+          element={
+            <ProtectedRoute>
+              <CommissionReport />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Catch-all route for 404 Not Found */}
         <Route path="*" element={<NotFound />} />
       </Routes>

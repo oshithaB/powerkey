@@ -34,7 +34,7 @@ const getChequesByCompanyId = async (req, res) => {
 
     try {
         const [rows] = await db.execute(
-            `SELECT * FROM cheques WHERE company_id = ?`,
+            `SELECT * FROM cheques WHERE company_id = ? ORDER BY created_at DESC`,
             [company_id]
         );
 

@@ -172,7 +172,7 @@ export default function ChequesPage() {
                             {cheque.cheque_number}
                           </div>
                           <div className="text-sm text-gray-500">
-                            Created {format(new Date(cheque.created_at), 'MMM dd, yyyy')}
+                            #{cheque.id} | Created on {format(new Date(cheque.created_at), 'MMM dd, yyyy')}
                           </div>
                         </div>
                       </div>

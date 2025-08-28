@@ -14,6 +14,7 @@ import EmployeesPage from '../pages/EmployeesPage';
 import SalesPage from '../pages/SalesPage';
 import PurchasesPage from '../pages/PurchasesPage';
 import AccountingPage from '../pages/AccountingPage';
+import ChequesPage from '../pages/ChequesPage';
 import ReportsPage from '../pages/ReportsPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import SettingsPage from '../pages/SettingsPage';
@@ -65,6 +66,7 @@ export default function Dashboard() {
       <Route path="/sales" element={<SalesPage />} />
       <Route path="/purchases" element={<PurchasesPage />} />
       <Route path="/accounting" element={<AccountingPage />} />
+      <Route path="/cheques" element={<ChequesPage />} />
       <Route path="/reports" element={<ReportsPage />} />
       <Route path="/analytics" element={<AnalyticsPage />} />
       <Route path="/settings" element={<SettingsPage />} />

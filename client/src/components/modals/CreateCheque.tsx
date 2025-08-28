@@ -203,7 +203,7 @@ export default function CreateCheque() {
                         <div className="flex justify-end space-x-3 pt-4">
                             <button
                                 type="button"
-                                onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
+                                onClick={() => navigate(-1)}
                                 className="btn btn-secondary btn-md"
                                 disabled={loading}
                             >

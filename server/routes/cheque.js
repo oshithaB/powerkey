@@ -7,7 +7,8 @@ const {
     addCheque,
     getChequesByCompanyId,
     updateCheque,
-    deleteCheque
+    deleteCheque,
+    updateStatus
 } = require('../controllers/cheque_controller');
 
 router.post (
@@ -37,5 +38,12 @@ router.delete (
     authorizedRoles(['admin', 'staff', 'sale']),
     deleteCheque
 );
+
+router.put (
+    '/updateStatus/:cheque_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sale']),
+    updateStatus
+)
 
 module.exports = router;

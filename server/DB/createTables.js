@@ -326,7 +326,7 @@ async function createTables(db) {
             cheque_number VARCHAR(50) NOT NULL UNIQUE,
             bank_name VARCHAR(100),
             branch_name VARCHAR(100),
-            cheque_date DATE,
+            cheque_date VARCHAR(150),
             payee_name VARCHAR(255),
             amount DECIMAL(15,2) NOT NULL,
             status ENUM('pending', 'deposited', 'returned') DEFAULT 'pending',

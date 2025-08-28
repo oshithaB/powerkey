@@ -22,6 +22,7 @@ import EditPurchaseOrders from './components/modals/EditPurchaseOrders';
 import CreateExpense from './components/modals/CreateExpense';
 import CreateBill from './components/modals/CreateBill';
 import CreateCheque from './components/modals/CreateCheque';
+import EditCheques from './components/modals/EditCheques';
 
 // Reports
 import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
@@ -172,6 +173,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CreateCheque />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/cheque/edit/:id"
+                element={
+                  <ProtectedRoute>
+                    <EditCheques />
                   </ProtectedRoute>
                 }
               />

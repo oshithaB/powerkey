@@ -180,10 +180,34 @@ const updateStatus = async (req, res) => {
     }
 };
 
+// get cheque by id
+const getChequeByID = async (req, res) => {
+    const { cheque_id, company_id } = req.params;
+    if (!cheque_id || !company_id) {
+        return res.status(400).json({ error: 'Cheque ID and Company ID are required' });
+    }
+    try {
+        const [rows] = await db.execute(
+            `SELECT * FROM cheques WHERE id = ? AND company_id = ?`,
+            [cheque_id, company_id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Cheque not found' });
+        }
+
+        return res.status(200).json(rows[0]);
+    } catch (error) {
+        console.error('Error fetching cheque:', error);
+        return res.status(500).json({ error: 'Failed to fetch cheque' });
+    }
+}
+
 module.exports = {
     addCheque,
     getChequesByCompanyId,
     updateCheque,
     deleteCheque,
-    updateStatus
+    updateStatus,
+    getChequeByID
 }

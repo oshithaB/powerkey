@@ -8,7 +8,8 @@ const {
     getChequesByCompanyId,
     updateCheque,
     deleteCheque,
-    updateStatus
+    updateStatus,
+    getChequeByID
 } = require('../controllers/cheque_controller');
 
 router.post (
@@ -44,6 +45,13 @@ router.put (
     verifyToken,
     authorizedRoles(['admin', 'staff', 'sale']),
     updateStatus
+);
+
+router.get (
+    '/getChequeByID/:cheque_id/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sale']),
+    getChequeByID
 )
 
 module.exports = router;

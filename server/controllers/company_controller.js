@@ -146,7 +146,7 @@ const getDashboardData = async (req, res) => {
         console.log('Get dashboard data for companyId:', companyId);
 
         // Get basic metrics
-        const [customers] = await db.query('SELECT COUNT(*) as count FROM customer WHERE company_id = ?', [companyId]);
+        const [cheques] = await db.query('SELECT COUNT(*) as count FROM cheques WHERE company_id = ? AND status = "pending" AND cheque_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)', [companyId]);
         const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ? AND quantity_on_hand <= reorder_level', [companyId]);
         const [overdue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status = "overdue"', [companyId]);
         const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);
@@ -168,7 +168,7 @@ const getDashboardData = async (req, res) => {
 
         const dashboardData = {
             metrics: {
-                customers: customers[0]?.count || 0,
+                nearDueCheques: cheques[0]?.count || 0,
                 products: products[0]?.count || 0,
                 overdue: overdue[0]?.total || 0,
                 totalRevenue: revenue[0]?.total || 0
@@ -184,7 +184,7 @@ const getDashboardData = async (req, res) => {
         // Return empty data instead of error to prevent dashboard from breaking
         return res.status(200).json({
             metrics: {
-                customers: 0,
+                cheques: 0,
                 products: 0,
                 invoices: 0,
                 totalRevenue: 0

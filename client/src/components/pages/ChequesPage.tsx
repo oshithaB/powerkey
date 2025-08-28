@@ -160,7 +160,7 @@ export default function ChequesPage() {
               ) : (
                 filteredCheques.map((cheque) => {
                   // Check if cheque date is within 3 days from today
-                  const isNearDue = cheque.cheque_date
+                  const isNearDue = cheque.cheque_date && cheque.status === 'pending'
                     ? (() => {
                         const today = new Date();
                         const chequeDate = new Date(cheque.cheque_date);

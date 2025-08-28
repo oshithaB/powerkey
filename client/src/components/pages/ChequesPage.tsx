@@ -158,75 +158,96 @@ export default function ChequesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredCheques.map((cheque) => (
-                  <tr key={cheque.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Banknote className="h-5 w-5 text-blue-600" />
+                filteredCheques.map((cheque) => {
+                  // Check if cheque date is within 3 days from today
+                  const isNearDue = cheque.cheque_date
+                    ? (() => {
+                        const today = new Date();
+                        const chequeDate = new Date(cheque.cheque_date);
+                        const diffInTime = chequeDate.getTime() - today.getTime();
+                        const diffInDays = diffInTime / (1000 * 3600 * 24);
+                        return diffInDays >= 0 && diffInDays <= 3;
+                      })()
+                    : false;
+
+                  return (
+                    <tr
+                      key={cheque.id}
+                      className={`hover:bg-gray-50 ${isNearDue ? 'bg-red-100' : ''}`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Banknote className="h-5 w-5 text-blue-600" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {cheque.cheque_number}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              #{cheque.id} | Created on{' '}
+                              {format(new Date(cheque.created_at), 'MMM dd, yyyy')}
+                            </div>
                           </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {cheque.cheque_number}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            #{cheque.id} | Created on {format(new Date(cheque.created_at), 'MMM dd, yyyy')}
-                          </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {cheque.bank_name || 'N/A'}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {cheque.bank_name || 'N/A'}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {cheque.branch_name || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {cheque.payee_name || 'No payee'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {cheque.cheque_date ? format(new Date(cheque.cheque_date), 'MMM dd, yyyy') : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        Rs. {cheque.amount?.toLocaleString() || '0.00'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={cheque.status}
-                        onChange={(e) => handleStatusChange(cheque.id, e.target.value)}
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border-0 ${getStatusColor(cheque.status)}`}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="deposited">Deposited</option>
-                        <option value="returned">Returned</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(cheque)}
-                          className="text-primary-600 hover:text-primary-900"
-                          title="Edit"
+                        <div className="text-sm text-gray-500">
+                          {cheque.branch_name || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {cheque.payee_name || 'No payee'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {cheque.cheque_date
+                          ? format(new Date(cheque.cheque_date), 'MMM dd, yyyy')
+                          : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          Rs. {cheque.amount?.toLocaleString() || '0.00'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <select
+                          value={cheque.status}
+                          onChange={(e) => handleStatusChange(cheque.id, e.target.value)}
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border-0 ${getStatusColor(
+                            cheque.status
+                          )}`}
                         >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(cheque.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <option value="pending">Pending</option>
+                          <option value="deposited">Deposited</option>
+                          <option value="returned">Returned</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(cheque)}
+                            className="text-primary-600 hover:text-primary-900"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(cheque.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, Banknote, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Banknote } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,6 +20,7 @@ interface Cheque {
 
 export default function ChequesPage() {
   const { selectedCompany } = useCompany();
+  const { setHasNearDueCheques } = useNotification();
   const [cheques, setCheques] = useState<Cheque[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,7 +34,21 @@ export default function ChequesPage() {
     try {
       if (selectedCompany?.company_id) {
         const response = await axiosInstance.get(`/api/getChequesByCompanyId/${selectedCompany.company_id}`);
-        setCheques(response.data);
+        const fetchedCheques = response.data;
+        setCheques(fetchedCheques);
+
+        // Check for near-due pending cheques
+        const hasNearDue = fetchedCheques.some((cheque: Cheque) => {
+          if (cheque.cheque_date && cheque.status === 'pending') {
+            const today = new Date();
+            const chequeDate = new Date(cheque.cheque_date);
+            const diffInTime = chequeDate.getTime() - today.getTime();
+            const diffInDays = diffInTime / (1000 * 3600 * 24);
+            return diffInDays >= 0 && diffInDays <= 3;
+          }
+          return false;
+        });
+        setHasNearDueCheques(hasNearDue);
       }
     } catch (error) {
       console.error('Error fetching cheques:', error);
@@ -159,7 +175,7 @@ export default function ChequesPage() {
                 </tr>
               ) : (
                 filteredCheques.map((cheque) => {
-                  // Check if cheque date is within 3 days from today
+                  // Check if cheque date is within 3 days from today and status is pending
                   const isNearDue = cheque.cheque_date && cheque.status === 'pending'
                     ? (() => {
                         const today = new Date();
@@ -253,7 +269,6 @@ export default function ChequesPage() {
           </table>
         </div>
       </div>
-
     </div>
   );
 }

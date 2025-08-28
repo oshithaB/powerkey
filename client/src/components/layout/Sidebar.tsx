@@ -4,21 +4,18 @@ import {
   LayoutDashboard, 
   Users, 
   Package, 
-  FileText, 
-  DollarSign, 
   BarChart3, 
   Settings,
   X,
   Building2,
+  Banknote,
   ShoppingCart,
   Truck,
   Calculator,
   CreditCard,
   PieChart,
   Receipt,
-  FileCheck,
   Folder,
-  SendToBack
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth to access user role
@@ -41,6 +38,7 @@ const navigation = [
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Purchases', href: '/dashboard/purchases', icon: CreditCard },
   { name: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
+  { name: 'Cheques', href: '/dashboard/cheques', icon: Banknote },
   { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
   { name: 'Analytics', href: '/dashboard/analytics', icon: PieChart },
   { name: 'Employees', href: '/dashboard/employees', icon: Users },

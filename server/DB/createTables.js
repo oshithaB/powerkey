@@ -319,6 +319,20 @@ async function createTables(db) {
             KEY product_id (product_id),
             CONSTRAINT order_items_ibfk_1 FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
             CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS cheques (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            cheque_number VARCHAR(50) NOT NULL UNIQUE,
+            bank_name VARCHAR(100),
+            branch_name VARCHAR(100),
+            cheque_date DATE,
+            payee_name VARCHAR(255),
+            amount DECIMAL(15,2) NOT NULL,
+            status ENUM('pending', 'deposited', 'returned') DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`
         // `CREATE TABLE IF NOT EXISTS categories (
         //     id INT AUTO_INCREMENT PRIMARY KEY,

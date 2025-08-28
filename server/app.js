@@ -59,6 +59,7 @@ const invoiceRoutes = require("./routes/invoice");
 const paymentMethodRoutes = require("./routes/paymentMethod");
 const exprenseRoutes = require("./routes/expenses");
 const reportRoutes = require("./routes/reports");
+const chequeRoutes = require("./routes/cheque");
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow frontend origin
@@ -84,6 +85,7 @@ app.use("/api", invoiceRoutes);
 app.use("/api", paymentMethodRoutes);
 app.use("/api", exprenseRoutes);
 app.use("/api", reportRoutes);
+app.use("/api", chequeRoutes);
 
 const editingEstimates = {}; // { estimateId: user }
 const editingInvoices = {}; // { invoiceId: user }

@@ -30,6 +30,8 @@ import EditCheques from './components/modals/EditCheques';
 import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
 import CommissionReport from './components/reports/CommissionReport';
 import CommissionReportByEmployees from './components/reports/CommissionReportByEmployees';
+import SalesReport from './components/reports/SalesReport';
+import SalesReportByEmployees from './components/reports/SalesReportByEmployees';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -244,6 +246,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CommissionReportByEmployees />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales"
+          element={
+            <ProtectedRoute>
+              <SalesReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-employee/:employeeId"
+          element={
+            <ProtectedRoute>
+              <SalesReportByEmployees />
             </ProtectedRoute>
           }
         />

@@ -73,8 +73,8 @@ export default function ReportsPage() {
   const salesAndCustomersReports = [
     {
       name: 'Sales by employee summary',
-      description: 'Current month P&L statement',
-      path: '/reports/profit&loss'
+      description: 'Sales performance by employee',
+      path: '/reports/sales'
     }
   ];
 

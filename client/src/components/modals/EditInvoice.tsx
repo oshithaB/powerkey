@@ -603,8 +603,14 @@ export default function EditInvoice() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   <option value="">Select Status</option>
-                  <option value="sent">Sent</option>
-                  <option value="cancelled">Cancelled</option>
+                  {formData.status === 'proforma' ? (
+                    <>
+                      <option value="sent">Opened</option>
+                      <option value="cancelled">Cancelled</option>
+                    </>
+                  ) : formData.status !== 'cancelled' ? (
+                    <option value="cancelled">Cancelled</option>
+                  ) : null}
                 </select>
               </div>
             </div>

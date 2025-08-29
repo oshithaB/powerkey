@@ -719,7 +719,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 0,
+                                      quantity: 1,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',

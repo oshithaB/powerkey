@@ -56,6 +56,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "Invalid invoice status" });
   }
 
+  console.log('Validated required fields successfully');
+
   // Validate items
   for (const item of items) {
     if (!item.product_id || item.product_id === 0) {
@@ -80,6 +82,8 @@ const createInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Total price cannot be negative" });
     }
   }
+
+  console.log('Validated items successfully');
 
   const connection = await db.getConnection();
   try {
@@ -119,29 +123,32 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount: discount_amount || 0,
       shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
-      balance_due: total_amount || 0, // Initialize balance_due to total_amount
+      balance_due: status === 'proforma' ? 0 : (total_amount || 0), // If proforma, balance_due = 0
       status, // Use provided status
       created_at: new Date(),
       updated_at: new Date()
     };
 
-    const [customerRows] = await connection.query(
+    // Only update customer balance if invoice is NOT proforma
+    if (status !== 'proforma') {
+      const [customerRows] = await connection.query(
       `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
       [customer_id, company_id]
-    );
+      );
 
-    if (customerRows.length === 0) {
+      if (customerRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ error: "Customer not found" });
-    }
+      }
 
-    const currentBalance = Number(customerRows[0].current_balance) || 0;
-    const newBalance = currentBalance + (invoiceData.balance_due || 0);
+      const currentBalance = Number(customerRows[0].current_balance) || 0;
+      const newBalance = currentBalance + (invoiceData.balance_due || 0);
 
-    await connection.query(
+      await connection.query(
       `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
       [newBalance, customer_id, company_id]
-    );
+      );
+    }
 
     // Create new invoice
     const [result] = await connection.query(

@@ -444,16 +444,23 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
           // - User is admin OR
           // - Status is proforma OR
           // - Customer passed eligibility
+
+          console.log('Submitting invoice data:', submitData);
+
           const response = await axiosInstance.post(
             `/api/createInvoice/${selectedCompany?.company_id}`,
             submitData
           );
+
+          console.log('Create invoice response:', response.data);
 
           if (formData.estimate_id) {
             await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
               invoice_id: response.data.id,
             });
           }
+
+          
 
           console.log('Invoice created:', response.data);
           return response.data;

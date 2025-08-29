@@ -105,6 +105,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
 
   const initialItems = [{
     product_id: 0,
+    product_name: '',
     description: '',
     quantity: 0,
     unit_price: 0,
@@ -718,7 +719,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 1,
+                                      quantity: 0,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',
@@ -762,8 +763,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                         <td className="px-4 py-2">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0.01"
+                            min="0"
                             className="input w-20"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}

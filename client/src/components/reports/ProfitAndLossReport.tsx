@@ -58,7 +58,7 @@ const ProfitAndLossReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [filter, setFilter] = useState<string>('year');
+  const [filter, setFilter] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -208,7 +208,7 @@ const ProfitAndLossReport: React.FC = () => {
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2"
+                  className="border rounded-md p-2 w-40"
                 >
                   <option value="week">Last Week</option>
                   <option value="month">Last Month</option>
@@ -234,7 +234,7 @@ const ProfitAndLossReport: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</p>
                 <p className="text-sm">
-                  {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data?.period.end_date || 'August 28, 2025'}
+                  {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data?.period.end_date}
                 </p>
               </div>
 

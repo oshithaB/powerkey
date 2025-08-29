@@ -93,10 +93,12 @@ const getCommissionReportByEmployeeId = async (req, res) => {
         `;
 
         let whereDate = '';
-        let paramsInvoices = [employeeId];
+        let paramsInvoices = [];
         if (start_date && end_date) {
             whereDate = ' AND i.invoice_date >= ? AND i.invoice_date <= ?';
-            paramsInvoices = [start_date, end_date, employeeId];
+            paramsInvoices = [employeeId, start_date, end_date];
+        } else {
+            paramsInvoices = [employeeId];
         }
 
         // Query to fetch invoice details for the employee

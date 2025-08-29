@@ -478,7 +478,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center pt-8">
         <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
         <div className="flex space-x-2">
           <button

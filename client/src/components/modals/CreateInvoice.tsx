@@ -559,7 +559,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
-        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
               {invoice ? 'Edit Invoice' : 'Create New Invoice'}
@@ -1016,6 +1016,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
@@ -1027,6 +1028,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."
@@ -1134,19 +1136,19 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </button>
                 </div>
                 {showInvoiceTypeDropdown && (
-                  <div className="right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                    <div className="absolute left-10 mt-1 bg-white rounded-md shadow-lg z-10 w-auto min-w-max">
                     <button
                       type="button"
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                      className="btn btn-primary btn-md px-3 rounded"
                       onClick={(e) => {
-                        e.preventDefault();
-                        setShowInvoiceTypeDropdown(false);
-                        handleSubmit(e, 'proforma');
+                      e.preventDefault();
+                      setShowInvoiceTypeDropdown(false);
+                      handleSubmit(e, 'proforma');
                       }}
                     >
                       Create Proforma Invoice
                     </button>
-                  </div>
+                    </div>
                 )}
               </div>
             </div>

@@ -196,7 +196,9 @@ const CommissionReport: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm">Employee Commission Summary</p>
                 <p className="text-sm">
-                  {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
+                  {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                 </p>
               </div>
 

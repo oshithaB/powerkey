@@ -55,13 +55,13 @@ const CommissionReportByEmployees: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/commission-report/${employeeId}`, {
-        params: { start_date: startDate, end_date: endDate }
-      });
+      console.log('Fetching with params:', { start_date: startDate, end_date: endDate, employeeId });
+      const response = await axiosInstance.get(`/api/commission-report/${employeeId}`);
+      console.log('API Response:', response.data);
       setData(response.data.data);
     } catch (err) {
       setError('Failed to fetch commission data. Please try again.');
-      console.error(err);
+      console.error('Fetch Error:', err);
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ const CommissionReportByEmployees: React.FC = () => {
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
-
+  
       if (filter === 'week') {
         startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
@@ -80,10 +80,15 @@ const CommissionReportByEmployees: React.FC = () => {
       } else if (filter === 'year') {
         startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
       }
-
+  
+      console.log('Filter:', filter, 'Start Date:', startDate, 'End Date:', endDate);
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
       fetchCommissionData(employeeId, startDate, endDate);
+    } else {
+      console.log('Missing selectedCompany or employeeId:', { selectedCompany, employeeId });
+      setError('Missing company or employee information');
+      setLoading(false);
     }
   }, [selectedCompany?.company_id, employeeId, filter]);
 

@@ -210,6 +210,7 @@ const ProfitAndLossReport: React.FC = () => {
                   onChange={(e) => setFilter(e.target.value)}
                   className="border rounded-md p-2 w-40"
                 >
+                  <option value="">Select Period</option>
                   <option value="week">Last Week</option>
                   <option value="month">Last Month</option>
                   <option value="year">Last Year</option>

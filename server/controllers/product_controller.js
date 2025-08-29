@@ -79,6 +79,7 @@ const createProduct = async (req, res) => {
                 unit_price,
                 cost_price,
                 quantity_on_hand,
+                manual_count,
                 reorder_level,
                 commission
             } = req.body;
@@ -107,10 +108,13 @@ const createProduct = async (req, res) => {
             const validatedUnitPrice = unit_price ? parseFloat(unit_price) : 0;
             const validatedCostPrice = cost_price ? parseFloat(cost_price) : 0;
             const validatedQuantity = quantity_on_hand ? parseInt(quantity_on_hand) : 0;
+            const validateManualCount = manual_count ? parseInt(manual_count) : 0;
             const validatedReorderLevel = reorder_level ? parseInt(reorder_level) : 0;
 
             if (isNaN(validatedUnitPrice) || isNaN(validatedCostPrice) || 
-                isNaN(validatedQuantity) || isNaN(validatedReorderLevel)) {
+                isNaN(validatedQuantity) || isNaN(validatedReorderLevel) ||
+                isNaN(validateManualCount
+                )) {
                 return res.status(400).json({ success: false, message: 'Invalid numeric values provided' });
             }
 
@@ -171,8 +175,8 @@ const createProduct = async (req, res) => {
                 `INSERT INTO products (
                     company_id, sku, name, image, description, category_id, 
                     preferred_vendor_id, added_employee_id, unit_price, cost_price, 
-                    quantity_on_hand, reorder_level, commission, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    quantity_on_hand, manual_count, reorder_level, commission, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     company_id, 
                     productSku, 
@@ -185,6 +189,7 @@ const createProduct = async (req, res) => {
                     validatedUnitPrice, 
                     validatedCostPrice,
                     validatedQuantity, 
+                    validateManualCount,
                     validatedReorderLevel, 
                     validatedCommission, 
                     true
@@ -204,6 +209,7 @@ const createProduct = async (req, res) => {
                 unit_price: validatedUnitPrice,
                 cost_price: validatedCostPrice,
                 quantity_on_hand: validatedQuantity,
+                manual_count: validateManualCount,
                 reorder_level: validatedReorderLevel,
                 commission: validatedCommission,
                 is_active: true,
@@ -242,6 +248,7 @@ const updateProduct = async (req, res) => {
                 unit_price,
                 cost_price,
                 quantity_on_hand,
+                manual_count,
                 reorder_level,
                 is_active
             } = req.body;
@@ -295,7 +302,7 @@ const updateProduct = async (req, res) => {
             const allowedFields = [
                 'sku', 'name', 'image', 'description', 'category_id', 
                 'preferred_vendor_id', 'added_employee_id', 'unit_price', 
-                'cost_price', 'quantity_on_hand', 'reorder_level', 'commission', 'is_active'
+                'cost_price', 'quantity_on_hand', 'manual_count', 'reorder_level', 'commission', 'is_active'
             ];
 
             const fieldsToUpdate = {};

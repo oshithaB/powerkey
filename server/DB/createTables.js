@@ -146,6 +146,7 @@ async function createTables(db) {
             unit_price decimal(15,2) DEFAULT 0,
             cost_price decimal(15,2) DEFAULT 0,
             quantity_on_hand int DEFAULT 0,
+            manual_count int DEFAULT 0,
             reorder_level int DEFAULT 0,
             commission decimal(10,2) DEFAULT 0.00,
             is_active BOOLEAN DEFAULT TRUE,

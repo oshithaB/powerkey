@@ -7,16 +7,16 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
-interface CommissionData {
+interface SalesData {
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
-  totalCommission: string;
+  totalSalesAmount: string;
 }
 
-const CommissionReport: React.FC = () => {
+const SalesReport: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<CommissionData[]>([]);
+  const [data, setData] = useState<SalesData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -32,17 +32,17 @@ const CommissionReport: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchCommissionData = async (startDate?: string, endDate?: string) => {
+  const fetchSalesData = async (startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/commission-report`, {
+      const response = await axiosInstance.get('/api/sales-report', {
         params: { start_date: startDate, end_date: endDate }
       });
       console.log(response.data);
       setData(response.data.data);
     } catch (err) {
-      setError('Failed to fetch commission data. Please try again.');
+      setError('Failed to fetch sales data. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -65,7 +65,7 @@ const CommissionReport: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchCommissionData(startDate, endDate);
+      fetchSalesData(startDate, endDate);
     }
   }, [selectedCompany?.company_id, filter]);
 
@@ -73,8 +73,8 @@ const CommissionReport: React.FC = () => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
   };
 
-  const getTotalCommission = () => {
-    return data.reduce((total, employee) => total + parseFloat(employee.totalCommission), 0);
+  const getTotalSales = () => {
+    return data.reduce((total, employee) => total + parseFloat(employee.totalSalesAmount), 0);
   };
 
   const handlePrint = () => {
@@ -82,7 +82,7 @@ const CommissionReport: React.FC = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/reports/commission-by-employee/${employeeId}`);
+    navigate(`/reports/sales-by-employee/${employeeId}`);
   };
 
   const handleDownloadPDF = async () => {
@@ -128,7 +128,7 @@ const CommissionReport: React.FC = () => {
           }
         }
 
-        pdf.save(`commission-report.pdf`);
+        pdf.save(`sales-report.pdf`);
         setShowPrintPreview(false);
       }
     } catch (error) {
@@ -165,7 +165,7 @@ const CommissionReport: React.FC = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold mb-4">Commission Report - All Employees</h1>
+              <h1 className="text-2xl font-bold mb-4">Sales Report - All Employees</h1>
               <div className="flex space-x-2">
                 <select
                   value={filter}
@@ -194,7 +194,7 @@ const CommissionReport: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm">Employee Commission Summary</p>
+                <p className="text-sm">Employee Sales Summary</p>
                 <p className="text-sm">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -210,7 +210,7 @@ const CommissionReport: React.FC = () => {
                     <tr>
                       <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Employee Name</th>
                       <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Email</th>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Commission</th>
+                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Sales</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -222,12 +222,12 @@ const CommissionReport: React.FC = () => {
                       >
                         <td className="p-2 border-b">{employee.employeeName}</td>
                         <td className="p-2 border-b">{employee.employeeEmail}</td>
-                        <td className="p-2 border-b text-right">{formatCurrency(employee.totalCommission)}</td>
+                        <td className="p-2 border-b text-right">{formatCurrency(employee.totalSalesAmount)}</td>
                       </tr>
                     ))}
                     <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>Total Commission</td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotalCommission().toString())}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>Total Sales</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotalSales().toString())}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -247,7 +247,7 @@ const CommissionReport: React.FC = () => {
           <div className="relative top-4 mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Commission Report
+                Print Preview - Sales Report
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -265,8 +265,8 @@ const CommissionReport: React.FC = () => {
                 {/* Header */}
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Commission Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Commission Summary</h2>
+                    <h1 className="text-3xl font-bold mb-2">Sales Report</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Summary</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>
@@ -290,7 +290,7 @@ const CommissionReport: React.FC = () => {
                     <tr>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMPLOYEE NAME</th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMAIL</th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL COMMISSION</th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL SALES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,12 +298,12 @@ const CommissionReport: React.FC = () => {
                       <tr key={employee.employeeId}>
                         <td className="p-2 border-b">{employee.employeeName}</td>
                         <td className="p-2 border-b">{employee.employeeEmail}</td>
-                        <td className="p-2 border-b text-right font-medium">{formatCurrency(employee.totalCommission)}</td>
+                        <td className="p-2 border-b text-right font-medium">{formatCurrency(employee.totalSalesAmount)}</td>
                       </tr>
                     ))}
                     <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>TOTAL COMMISSION</td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right text-lg">{formatCurrency(getTotalCommission().toString())}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>TOTAL SALES</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right text-lg">{formatCurrency(getTotalSales().toString())}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -318,7 +318,7 @@ const CommissionReport: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Commission Report
+                        Sales Report
                       </p>
                     </div>
                   </div>
@@ -347,4 +347,4 @@ const CommissionReport: React.FC = () => {
   );
 };
 
-export default CommissionReport;
+export default SalesReport;

@@ -58,18 +58,21 @@ const ProfitAndLossReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [filter, setFilter] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchProfitAndLossData = async () => {
+  const fetchProfitAndLossData = async (startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/profit-and-loss/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/profit-and-loss/${selectedCompany?.company_id}`, {
+        params: { start_date: startDate, end_date: endDate }
+      });
       console.log(response.data);
       setData(response.data.data);
     } catch (err) {
-      setError('Failed to fetch profit and loss data. Please try again.');
+      setError('You have no permission to view this report');
       console.error(err);
     } finally {
       setLoading(false);
@@ -78,9 +81,21 @@ const ProfitAndLossReport: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
-      fetchProfitAndLossData();
+      const today = new Date();
+      let startDate: string | undefined;
+      let endDate: string = today.toISOString().split('T')[0];
+
+      if (filter === 'week') {
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+      } else if (filter === 'month') {
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
+      } else if (filter === 'year') {
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+      }
+
+      fetchProfitAndLossData(startDate, endDate);
     }
-  }, [selectedCompany?.company_id]);
+  }, [selectedCompany?.company_id, filter]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(value);
@@ -190,6 +205,16 @@ const ProfitAndLossReport: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
               <h1 className="text-2xl font-bold mb-4">Profit and Loss Report</h1>
               <div className="flex space-x-2">
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="border rounded-md p-2 w-40"
+                >
+                  <option value="">Select Period</option>
+                  <option value="week">Last Week</option>
+                  <option value="month">Last Month</option>
+                  <option value="year">Last Year</option>
+                </select>
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600"
@@ -209,7 +234,9 @@ const ProfitAndLossReport: React.FC = () => {
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</p>
-                <p className="text-sm">January 1 - {data?.period.end_date || 'August 28, 2025'}</p>
+                <p className="text-sm">
+                  {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data?.period.end_date}
+                </p>
               </div>
 
               {error && <div className="text-red-500 mb-4">{error}</div>}
@@ -387,7 +414,7 @@ const ProfitAndLossReport: React.FC = () => {
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      Period: January 1 - {data.period.end_date || 'August 28, 2025'}
+                      Period: {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data.period.end_date}
                     </p>
                   </div>
                   {selectedCompany?.company_logo && (
@@ -422,7 +449,7 @@ const ProfitAndLossReport: React.FC = () => {
                     </tr>
                     <tr>
                       <td className="p-1 border-b">Discounts Given</td>
-                      <td className="p-1 border-b text-right text-red-600">{formatCurrency(-data.income.discounts_given)}</td>
+                      <td className="p-1 border-b text-right text-red-600">{formatCurrency(data.income.discounts_given)}</td>
                     </tr>
                     <tr>
                       <td className="p-1 border-b">Other Income</td>

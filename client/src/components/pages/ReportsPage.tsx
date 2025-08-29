@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart3, FileText, TrendingUp, Download, Star } from 'lucide-react';
+import path from 'path';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -66,14 +67,14 @@ export default function ReportsPage() {
       name: 'Commissions Report',
       description: 'Commission details for sales persons',
       path: '/reports/commission'
-    }
+    },
   ];
 
   const salesAndCustomersReports = [
     {
       name: 'Sales by employee summary',
-      description: 'Current month P&L statement',
-      path: '/reports/profit&loss'
+      description: 'Sales performance by employee',
+      path: '/reports/sales'
     }
   ];
 

@@ -1,22 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosInstance from '../../axiosInstance';
-import { X, Printer } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { X, Printer, ArrowLeft } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
-interface CommissionData {
+interface Invoice {
+  invoiceId: string;
+  companyId: string;
+  companyName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  discountAmount: string;
+  totalAmount: string;
+  customerId: string;
+  customerName: string;
+}
+
+interface SalesData {
   employeeId: string;
   employeeName: string;
   employeeEmail: string;
-  totalCommission: string;
+  totalSalesAmount: string;
+  invoices: Invoice[];
 }
 
-const CommissionReport: React.FC = () => {
+const SalesReportByEmployees: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<CommissionData[]>([]);
+  const [data, setData] = useState<SalesData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -25,6 +38,7 @@ const CommissionReport: React.FC = () => {
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const { employeeId } = useParams<{ employeeId: string }>();
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -32,25 +46,26 @@ const CommissionReport: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchCommissionData = async (startDate?: string, endDate?: string) => {
+  const fetchSalesData = async (employeeId: string, startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/commission-report`, {
-        params: { start_date: startDate, end_date: endDate }
+      console.log('Fetching with params:', { start_date: startDate, end_date: endDate, employeeId });
+      const response = await axiosInstance.get(`/api/sales-report/${employeeId}`, {
+        params: { start_date: startDate, end_date: endDate },
       });
-      console.log(response.data);
+      console.log('API Response:', response.data);
       setData(response.data.data);
     } catch (err) {
-      setError('Failed to fetch commission data. Please try again.');
-      console.error(err);
+      setError('Failed to fetch sales data. Please try again.');
+      console.error('Fetch Error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id) {
+    if (selectedCompany?.company_id && employeeId) {
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
@@ -63,26 +78,23 @@ const CommissionReport: React.FC = () => {
         startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
       }
 
+      console.log('Filter:', filter, 'Start Date:', startDate, 'End Date:', endDate);
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchCommissionData(startDate, endDate);
+      fetchSalesData(employeeId, startDate, endDate);
+    } else {
+      console.log('Missing selectedCompany or employeeId:', { selectedCompany, employeeId });
+      setError('Missing company or employee information');
+      setLoading(false);
     }
-  }, [selectedCompany?.company_id, filter]);
+  }, [selectedCompany?.company_id, employeeId, filter]);
 
   const formatCurrency = (value: string) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
   };
 
-  const getTotalCommission = () => {
-    return data.reduce((total, employee) => total + parseFloat(employee.totalCommission), 0);
-  };
-
   const handlePrint = () => {
     setShowPrintPreview(true);
-  };
-
-  const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/reports/commission-by-employee/${employeeId}`);
   };
 
   const handleDownloadPDF = async () => {
@@ -128,7 +140,7 @@ const CommissionReport: React.FC = () => {
           }
         }
 
-        pdf.save(`commission-report.pdf`);
+        pdf.save(`sales-report-${data?.employeeName || 'employee'}.pdf`);
         setShowPrintPreview(false);
       }
     } catch (error) {
@@ -149,7 +161,7 @@ const CommissionReport: React.FC = () => {
     .section-header {
       -webkit-print-color-adjust: exact !important;
       color-adjust: exact !important;
-      print-color-adjust: exact !important;
+      printColorAdjust: exact !important;
     }
   `;
 
@@ -164,8 +176,15 @@ const CommissionReport: React.FC = () => {
       >
         <div className="container mx-auto px-4 py-8">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-gray-400 hover:text-gray-600 mr-4"
+              title="Go Back"
+            >
+              <ArrowLeft className="h-6 w-6" />
+            </button>
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold mb-4">Commission Report - All Employees</h1>
+              <h1 className="text-2xl font-bold mb-4">Employee Sales Report</h1>
               <div className="flex space-x-2">
                 <select
                   value={filter}
@@ -184,7 +203,7 @@ const CommissionReport: React.FC = () => {
                   <Printer className="h-6 w-6" />
                 </button>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate('/dashboard/reports')}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-6 w-6" />
@@ -194,52 +213,63 @@ const CommissionReport: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm">Employee Commission Summary</p>
+                <p className="text-sm">Employee Sales Details</p>
                 <p className="text-sm">
-                  {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
                 </p>
               </div>
 
               {error && <div className="text-red-500 mb-4">{error}</div>}
               {loading && <div className="text-center">Loading data...</div>}
-              {data.length > 0 && (
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Employee Name</th>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Email</th>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Commission</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.map((employee, index) => (
-                      <tr 
-                        key={employee.employeeId}
-                        onClick={() => handleEmployeeClick(employee.employeeId)}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <td className="p-2 border-b">{employee.employeeName}</td>
-                        <td className="p-2 border-b">{employee.employeeEmail}</td>
-                        <td className="p-2 border-b text-right">{formatCurrency(employee.totalCommission)}</td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>Total Commission</td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotalCommission().toString())}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              {data && (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-lg font-semibold">{data.employeeName}</h2>
+                    <p className="text-sm text-gray-600">{data.employeeEmail}</p>
+                    <p className="text-sm text-gray-600">Total Sales: {formatCurrency(data.totalSalesAmount)}</p>
+                  </div>
+                  {data.invoices.length > 0 ? (
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Invoice Number</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Company</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Date</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Customer</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Discount Amount</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.invoices.map((invoice) => (
+                          <tr key={invoice.invoiceId}>
+                            <td className="p-2 border-b">{invoice.invoiceNumber}</td>
+                            <td className="p-2 border-b">{invoice.companyName}</td>
+                            <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                            <td className="p-2 border-b">{invoice.customerName}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={5}>Total Sales</td>
+                          <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totalSalesAmount)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-sm text-gray-600">No invoices found for this employee.</p>
+                  )}
+                  <p className="text-sm mt-5">Report generated at {new Date().toLocaleString()}</p>
+                </>
               )}
-              <p className="text-sm mt-5">Report generated at {new Date().toLocaleString()}</p>
             </div>
           </div>
         </div>
       </motion.div>
 
       {/* Print Preview Modal */}
-      {showPrintPreview && data.length > 0 && (
+      {showPrintPreview && data && (
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50"
           style={{ marginTop: "-10px" }}
@@ -247,7 +277,7 @@ const CommissionReport: React.FC = () => {
           <div className="relative top-4 mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Commission Report
+                Print Preview - Employee Sales Report
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -265,14 +295,16 @@ const CommissionReport: React.FC = () => {
                 {/* Header */}
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Commission Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Commission Summary</h2>
+                    <h1 className="text-3xl font-bold mb-2">Employee Sales Report</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Details</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>
                     <p className="text-sm text-gray-600">
                       Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
                     </p>
+                    <p className="text-sm text-gray-600 mt-2">Employee: {data.employeeName}</p>
+                    <p className="text-sm text-gray-600">Email: {data.employeeEmail}</p>
                   </div>
 
                   {/* {selectedCompany?.company_logo && (
@@ -285,28 +317,38 @@ const CommissionReport: React.FC = () => {
                 </div>
 
                 {/* Report Content */}
-                <table className="w-full border-collapse mb-6">
-                  <thead>
-                    <tr>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMPLOYEE NAME</th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMAIL</th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL COMMISSION</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.map((employee, index) => (
-                      <tr key={employee.employeeId}>
-                        <td className="p-2 border-b">{employee.employeeName}</td>
-                        <td className="p-2 border-b">{employee.employeeEmail}</td>
-                        <td className="p-2 border-b text-right font-medium">{formatCurrency(employee.totalCommission)}</td>
+                {data.invoices.length > 0 ? (
+                  <table className="w-full border-collapse mb-6">
+                    <thead>
+                      <tr>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>INVOICE NUMBER</th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>COMPANY</th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>DATE</th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>CUSTOMER</th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>DISCOUNT AMOUNT</th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL AMOUNT</th>
                       </tr>
-                    ))}
-                    <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={2}>TOTAL COMMISSION</td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right text-lg">{formatCurrency(getTotalCommission().toString())}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.invoices.map((invoice) => (
+                        <tr key={invoice.invoiceId}>
+                          <td className="p-2 border-b">{invoice.invoiceNumber}</td>
+                          <td className="p-2 border-b">{invoice.companyName}</td>
+                          <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="p-2 border-b">{invoice.customerName}</td>
+                          <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
+                          <td className="p-2 border-b text-right font-medium">{formatCurrency(invoice.totalAmount)}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={5}>TOTAL SALES</td>
+                        <td className="p-2 border-t-2 border-gray-800 font-bold text-right text-lg">{formatCurrency(data.totalSalesAmount)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-sm text-gray-600">No invoices found for this employee.</p>
+                )}
 
                 {/* Footer */}
                 <div className="border-t pt-2">
@@ -318,7 +360,7 @@ const CommissionReport: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Commission Report
+                        Employee Sales Report
                       </p>
                     </div>
                   </div>
@@ -347,4 +389,4 @@ const CommissionReport: React.FC = () => {
   );
 };
 
-export default CommissionReport;
+export default SalesReportByEmployees;

@@ -120,7 +120,7 @@ export default function EditInvoice() {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: 0,
@@ -244,7 +244,7 @@ export default function EditInvoice() {
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((subtotal * item.tax_rate / 100).toFixed(2));
+      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));
       item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
@@ -258,7 +258,7 @@ export default function EditInvoice() {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
@@ -277,7 +277,7 @@ export default function EditInvoice() {
       ? Number(items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unit_price)), 0).toFixed(2))
       : 0;
     const totalTax = items.length > 0 
-      ? Number(items.reduce((sum, item) => sum + Number(item.tax_amount), 0).toFixed(2))
+      ? Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2))
       : 0;
     const shippingCost = Number(formData.shipping_cost || 0);
     
@@ -367,7 +367,7 @@ export default function EditInvoice() {
           product_id: 0,
           product_name: '',
           description: '',
-          quantity: 1,
+          quantity: 0,
           unit_price: 0,
           actual_unit_price: 0,
           tax_rate: 0,
@@ -697,7 +697,7 @@ export default function EditInvoice() {
                                     const taxRate = updatedItems[index].tax_rate || (defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0);
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
-                                    updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
+                                    updatedItems[index].tax_amount = Number((item.actual_unit_price * taxRate / 100).toFixed(2));
                                     updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * 100) / (100 + taxRate)).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);
@@ -826,12 +826,12 @@ export default function EditInvoice() {
                     type="file"
                     className="input"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        setFormData({ ...formData, attachment: file });
-                      }
-                    }}
+                    // onChange={(e) => {
+                    //   if (e.target.files && e.target.files.length > 0) {
+                    //     const file = e.target.files[0];
+                    //     setFormData({ ...formData, attachment: file });
+                    //   }
+                    // }}
                   />
                 </div>
               </div>

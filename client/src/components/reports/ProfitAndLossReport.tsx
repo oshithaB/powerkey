@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { X } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ProfitAndLossData {
   period: {
@@ -54,7 +57,9 @@ const ProfitAndLossReport: React.FC = () => {
   const [data, setData] = useState<ProfitAndLossData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const navigate = useNavigate();
+  const printRef = useRef<HTMLDivElement>(null);
 
   const fetchProfitAndLossData = async () => {
     setLoading(true);
@@ -85,97 +90,502 @@ const ProfitAndLossReport: React.FC = () => {
     return `${value.toFixed(2)}%`;
   };
 
+  const handlePrint = () => {
+    setShowPrintPreview(true);
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      if (printRef.current) {
+        const logoUrl = selectedCompany?.company_logo ? `http://localhost:3000${selectedCompany.company_logo}` : null;
+        let logoImage: HTMLImageElement | null = null;
+        if (logoUrl) {
+          logoImage = new Image();
+          logoImage.crossOrigin = 'Anonymous';
+          logoImage.src = logoUrl;
+          await new Promise((resolve, reject) => {
+            if (logoImage) {
+              logoImage.onload = resolve;
+              logoImage.onerror = reject;
+            }
+          });
+        }
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const maxContentHeight = pageHeight - 2 * margin;
+
+        const scale = 3;
+        const canvas = await html2canvas(printRef.current, {
+          scale,
+          useCORS: true,
+          logging: false,
+          windowWidth: printRef.current.scrollWidth,
+          windowHeight: printRef.current.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pageWidth - 2 * margin;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+        const totalPages = Math.ceil(imgHeight / maxContentHeight);
+
+        for (let i = 0; i < totalPages; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          const srcY = i * maxContentHeight * (canvas.width / imgWidth);
+          const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.width / imgWidth));
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = pageContentHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
+            const pageImgData = tempCanvas.toDataURL('image/png', 1.0);
+            pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
+          }
+        }
+
+        pdf.save(`profit-and-loss-report.pdf`);
+        setShowPrintPreview(false);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Ensure the logo image is accessible.');
+    }
+  };
+
+  const printStyles = `
+    @media print {
+      .section-header {
+        background-color: #e2e8f0 !important;
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+    .section-header {
+      -webkit-print-color-adjust: exact !important;
+      color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  `;
+
   return (
-    <div className="container mx-auto p-4">
-      <div className='flex justify-between items-center mb-4'>
-        <h1 className="text-2xl font-bold mb-4">Profit and Loss Report</h1>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+      <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 50 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="container mx-auto px-4 py-8">
+          <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-2xl font-bold mb-4">Profit and Loss Report</h1>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handlePrint}
+                  className="text-gray-400 hover:text-gray-600"
+                  title="Print Report"
+                >
+                  <Printer className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
 
-        <button
-          onClick={() => navigate(-1)}
-          className="text-gray-400 hover:text-gray-600"
+            <div id="print-content">
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</p>
+                <p className="text-sm">January 1 - {data?.period.end_date || 'August 28, 2025'}</p>
+              </div>
+
+              {error && <div className="text-red-500 mb-4">{error}</div>}
+              {loading && <div className="text-center">Loading data...</div>}
+              {data && (
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {/* Income Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Income</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Product Income</td>
+                      <td className="p-2 border-b">{formatCurrency(data.income.sales_of_product_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Shipping Income</td>
+                      <td className="p-2 border-b">{formatCurrency(data.income.shipping_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Tax Income</td>
+                      <td className="p-2 border-b">{formatCurrency(data.income.tax_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Discounts Given</td>
+                      <td className="p-2 border-b">{formatCurrency(-data.income.discounts_given)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Other Income</td>
+                      <td className="p-2 border-b">{formatCurrency(data.income.other_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-bold">Total Income</td>
+                      <td className="p-2 border-b font-bold">{formatCurrency(data.income.total_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-bold">Net Income</td>
+                      <td className="p-2 border-b font-bold">{formatCurrency(data.income.net_income)}</td>
+                    </tr>
+
+                    {/* Cost of Sales Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Cost of Sales</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Cost of Sales</td>
+                      <td className="p-2 border-b">{formatCurrency(data.cost_of_sales.cost_of_sales)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Inventory Shrinkage</td>
+                      <td className="p-2 border-b">{formatCurrency(data.cost_of_sales.inventory_shrinkage)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-bold">Total Cost of Sales</td>
+                      <td className="p-2 border-b font-bold">{formatCurrency(data.cost_of_sales.total_cost_of_sales)}</td>
+                    </tr>
+
+                    {/* Expenses Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Expenses</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Operating Expenses</td>
+                      <td className="p-2 border-b">{formatCurrency(data.expenses.operating_expenses)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Other Expenses</td>
+                      <td className="p-2 border-b">{formatCurrency(data.expenses.other_expenses)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b font-bold">Total Expenses</td>
+                      <td className="p-2 border-b font-bold">{formatCurrency(data.expenses.total_expenses)}</td>
+                    </tr>
+
+                    {/* Profitability Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Profitability</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Gross Profit</td>
+                      <td className="p-2 border-b">{formatCurrency(data.profitability.gross_profit)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Net Earnings</td>
+                      <td className="p-2 border-b">{formatCurrency(data.profitability.net_earnings)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Gross Profit Margin</td>
+                      <td className="p-2 border-b">{formatPercentage(data.profitability.gross_profit_margin)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Net Profit Margin</td>
+                      <td className="p-2 border-b">{formatPercentage(data.profitability.net_profit_margin)}</td>
+                    </tr>
+
+                    {/* Cash Flow Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Cash Flow</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Total Invoiced</td>
+                      <td className="p-2 border-b">{formatCurrency(data.cash_flow.total_invoiced)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Total Paid</td>
+                      <td className="p-2 border-b">{formatCurrency(data.cash_flow.total_paid)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Outstanding Balance</td>
+                      <td className="p-2 border-b">{formatCurrency(data.cash_flow.outstanding_balance)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Collection Rate</td>
+                      <td className="p-2 border-b">{formatPercentage(data.cash_flow.collection_rate)}</td>
+                    </tr>
+
+                    {/* Summary Section */}
+                    <tr className="section-spacing">
+                      <td colSpan={2} className="bg-gray-100 p-1 font-semibold text-lg border-b section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Summary</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Total Revenue</td>
+                      <td className="p-2 border-b">{formatCurrency(data.summary.total_revenue)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Total Costs</td>
+                      <td className="p-2 border-b">{formatCurrency(data.summary.total_costs)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Net Profit/Loss</td>
+                      <td className="p-2 border-b">{formatCurrency(data.summary.net_profit_loss)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-b">Profitable</td>
+                      <td className="p-2 border-b">{data.summary.is_profitable ? 'Yes' : 'No'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+              <p className="text-sm mt-5">{data?.period.generated_at ? `Report generated at ${new Date(data.period.generated_at).toLocaleString()}` : 'Report generated at --'}</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Print Preview Modal */}
+      {showPrintPreview && data && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50"
+          style={{ marginTop: "-10px" }}
         >
-          <X className="h-6 w-6" />
-        </button>
+          <div className="relative top-4 mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Print Preview - Profit and Loss Report
+              </h3>
+              <button
+                onClick={() => setShowPrintPreview(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
 
-      </div>
+            <div className="overflow-y-auto max-h-[70vh]">
+              <div
+                ref={printRef}
+                className="p-8 bg-white text-gray-900"
+              >
+                {/* Header with Company Info and Logo */}
+                <div className="flex justify-between items-start border-b pb-4 mb-6">
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2">Profit and Loss Report</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">
+                      {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      Period: January 1 - {data.period.end_date || 'August 28, 2025'}
+                    </p>
+                  </div>
+                  {selectedCompany?.company_logo && (
+                    <img
+                      src={`http://localhost:3000${selectedCompany.company_logo}`}
+                      alt={`${selectedCompany.name} Logo`}
+                      className="h-20 w-auto max-w-[200px] object-contain"
+                    />
+                  )}
+                </div>
 
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      {loading && <div className="text-center">Loading data...</div>}
-      {data && (
-        <div className="space-y-6">
-          {/* Company Info */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Company: {selectedCompany?.name}</h2>
-            <p>Address: {selectedCompany?.address || 'N/A'}</p>
-            <p>Email: {selectedCompany?.email_address || 'N/A'}</p>
-            <p>Phone: {selectedCompany?.contact_number || 'N/A'}</p>
-          </div>
+                {/* Report Content */}
+                <table className="w-full border-collapse mb-6">
+                  <tbody>
+                    {/* Income Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header">
+                        INCOME
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Product Income</td>
+                      <td className="p-1 border-b text-right font-medium">{formatCurrency(data.income.sales_of_product_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Shipping Income</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.income.shipping_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Tax Income</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.income.tax_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Discounts Given</td>
+                      <td className="p-1 border-b text-right text-red-600">{formatCurrency(-data.income.discounts_given)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Other Income</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.income.other_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b font-bold">Total Income</td>
+                      <td className="p-1 border-b text-right font-bold">{formatCurrency(data.income.total_income)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Net Income</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.income.net_income)}</td>
+                    </tr>
 
-          {/* Period */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Report Period</h2>
-            <p>Start Date: {data.period.start_date}</p>
-            <p>End Date: {data.period.end_date}</p>
-            <p>Generated At: {new Date(data.period.generated_at).toLocaleString()}</p>
-          </div>
+                    {/* Cost of Sales Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact',}}>
+                        COST OF SALES
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Cost of Sales</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.cost_of_sales.cost_of_sales)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Inventory Shrinkage</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.cost_of_sales.inventory_shrinkage)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Total Cost of Sales</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.cost_of_sales.total_cost_of_sales)}</td>
+                    </tr>
 
-          {/* Income Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Income</h2>
-            <p>Product Income: {formatCurrency(data.income.sales_of_product_income)}</p>
-            <p>Shipping Income: {formatCurrency(data.income.shipping_income)}</p>
-            <p>Tax Income: {formatCurrency(data.income.tax_income)}</p>
-            <p>Discounts Given: {formatCurrency(data.income.discounts_given)}</p>
-            <p>Other Income: {formatCurrency(data.income.other_income)}</p>
-            <p>Total Income: {formatCurrency(data.income.total_income)}</p>
-            <p>Net Income: {formatCurrency(data.income.net_income)}</p>
-          </div>
+                    {/* Expenses Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                        EXPENSES
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Operating Expenses</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.expenses.operating_expenses)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Other Expenses</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.expenses.other_expenses)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b font-bold" style={{paddingBottom: '15px'}}>Total Expenses</td>
+                      <td className="p-1 border-b text-right font-bold" style={{paddingBottom: '15px'}}>{formatCurrency(data.expenses.total_expenses)}</td>
+                    </tr>
 
-          {/* Cost of Sales Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Cost of Sales</h2>
-            <p>Cost of Sales: {formatCurrency(data.cost_of_sales.cost_of_sales)}</p>
-            <p>Inventory Shrinkage: {formatCurrency(data.cost_of_sales.inventory_shrinkage)}</p>
-            <p>Total Cost of Sales: {formatCurrency(data.cost_of_sales.total_cost_of_sales)}</p>
-          </div>
+                    {/* Profitability Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                        PROFITABILITY
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Gross Profit</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.profitability.gross_profit)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Net Earnings</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.profitability.net_earnings)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Gross Profit Margin</td>
+                      <td className="p-1 border-b text-right">{formatPercentage(data.profitability.gross_profit_margin)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b" style={{paddingBottom: '15px'}}>Net Profit Margin</td>
+                      <td className="p-1 border-b text-right" style={{paddingBottom: '15px'}}>{formatPercentage(data.profitability.net_profit_margin)}</td>
+                    </tr>
 
-          {/* Expenses Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Expenses</h2>
-            <p>Operating Expenses: {formatCurrency(data.expenses.operating_expenses)}</p>
-            <p>Other Expenses: {formatCurrency(data.expenses.other_expenses)}</p>
-            <p>Total Expenses: {formatCurrency(data.expenses.total_expenses)}</p>
-          </div>
+                    {/* Cash Flow Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                        CASH FLOW
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Total Invoiced</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.cash_flow.total_invoiced)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Total Paid</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.cash_flow.total_paid)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Outstanding Balance</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.cash_flow.outstanding_balance)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b" style={{paddingBottom: '15px'}}>Collection Rate</td>
+                      <td className="p-1 border-b text-right" style={{paddingBottom: '15px'}}>{formatPercentage(data.cash_flow.collection_rate)}</td>
+                    </tr>
 
-          {/* Profitability Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Profitability</h2>
-            <p>Gross Profit: {formatCurrency(data.profitability.gross_profit)}</p>
-            <p>Net Earnings: {formatCurrency(data.profitability.net_earnings)}</p>
-            <p>Gross Profit Margin: {formatPercentage(data.profitability.gross_profit_margin)}</p>
-            <p>Net Profit Margin: {formatPercentage(data.profitability.net_profit_margin)}</p>
-          </div>
+                    {/* Summary Section */}
+                    <tr>
+                      <td colSpan={2} className="bg-gray-100 p-1/2 font-bold text-base border section-header" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>
+                        SUMMARY
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Total Revenue</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.summary.total_revenue)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b">Total Costs</td>
+                      <td className="p-1 border-b text-right">{formatCurrency(data.summary.total_costs)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-1 border-b-2 border-gray-800">Net Profit/Loss</td>
+                      <td className={`p-1 border-b-2 border-gray-800 text-right font-bold text-lg ${data.summary.net_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(data.summary.net_profit_loss)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="pt-1">Profitable</td>
+                      <td className={`text-right font-bold pt-1 ${data.summary.is_profitable ? 'text-green-600' : 'text-red-600'}`}>
+                        {data.summary.is_profitable ? 'Yes' : 'No'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-          {/* Cash Flow Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Cash Flow</h2>
-            <p>Total Invoiced: {formatCurrency(data.cash_flow.total_invoiced)}</p>
-            <p>Total Paid: {formatCurrency(data.cash_flow.total_paid)}</p>
-            <p>Outstanding Balance: {formatCurrency(data.cash_flow.outstanding_balance)}</p>
-            <p>Collection Rate: {formatPercentage(data.cash_flow.collection_rate)}</p>
-          </div>
+                {/* Footer */}
+                <div className="border-t pt-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        Report generated at: {data.period.generated_at ? new Date(data.period.generated_at).toLocaleString() : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">
+                        {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          {/* Summary Section */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-xl font-semibold">Summary</h2>
-            <p>Total Revenue: {formatCurrency(data.summary.total_revenue)}</p>
-            <p>Total Costs: {formatCurrency(data.summary.total_costs)}</p>
-            <p>Net Profit/Loss: {formatCurrency(data.summary.net_profit_loss)}</p>
-            <p>Profitable: {data.summary.is_profitable ? 'Yes' : 'No'}</p>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                onClick={() => setShowPrintPreview(false)}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="btn btn-primary btn-md"
+              >
+                Download PDF
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

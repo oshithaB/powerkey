@@ -4,24 +4,22 @@ import {
   LayoutDashboard, 
   Users, 
   Package, 
-  FileText, 
-  DollarSign, 
   BarChart3, 
   Settings,
   X,
   Building2,
+  Banknote,
   ShoppingCart,
   Truck,
   Calculator,
   CreditCard,
   PieChart,
   Receipt,
-  FileCheck,
   Folder,
-  SendToBack
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
-import { useAuth } from '../../contexts/AuthContext'; // Import useAuth to access user role
+import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface SidebarProps {
   open: boolean;
@@ -30,9 +28,6 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  // { name: 'Estimates', href: '/dashboard/estimates', icon: FileCheck },
-  // { name: 'Invoices', href: '/dashboard/invoices', icon: FileText },
-  // { name: 'Orders', href: '/dashboard/orders', icon: SendToBack },
   { name: 'Customers', href: '/dashboard/customers', icon: Users },
   { name: 'Categories', href: '/dashboard/categories', icon: Folder },
   { name: 'Vendors', href: '/dashboard/vendors', icon: Truck },
@@ -41,6 +36,7 @@ const navigation = [
   { name: 'Sales', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Purchases', href: '/dashboard/purchases', icon: CreditCard },
   { name: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
+  { name: 'Cheques', href: '/dashboard/cheques', icon: Banknote },
   { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
   { name: 'Analytics', href: '/dashboard/analytics', icon: PieChart },
   { name: 'Employees', href: '/dashboard/employees', icon: Users },
@@ -50,7 +46,8 @@ const navigation = [
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
   const { selectedCompany } = useCompany();
-  const { user } = useAuth(); // Access the authenticated user from AuthContext
+  const { user } = useAuth();
+  const { hasNearDueCheques } = useNotification();
 
   return (
     <>
@@ -115,7 +112,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                   .map((item) => {
                     const isActive = location.pathname === item.href;
                     return (
-                      <li key={item.name}>
+                      <li key={item.name} className="relative">
                         <Link
                           to={item.href}
                           className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
@@ -123,6 +120,9 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                         >
                           <item.icon className="h-5 w-5 mr-3" />
                           {item.name}
+                          {item.name === 'Cheques' && hasNearDueCheques && (
+                            <span className="absolute right-2 top-1/2 transform -translate-y-1/2 h-2 w-2 bg-red-500 rounded-full"></span>
+                          )}
                         </Link>
                       </li>
                     );

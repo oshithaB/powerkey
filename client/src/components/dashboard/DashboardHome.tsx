@@ -1,16 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Users, 
+  Banknote,
   Package, 
   FileText, 
   DollarSign, 
   TrendingUp, 
   Workflow,
-  TrendingDown,
   ArrowUpRight,
-  Calendar,
-  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -25,11 +22,11 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
 
   const statCards = [
     {
-      name: 'Total Customers',
-      value: metrics.customers || 0,
-      icon: Users,
-      color: 'bg-blue-500',
-      href: '/dashboard/customers'
+      name: 'Payable Cheques',
+      value: metrics.nearDueCheques || 0,
+      icon: Banknote,
+      color: 'bg-red-500',
+      href: '/dashboard/cheques'
     },
     {
       name: 'Low stock Products',
@@ -161,7 +158,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                 to="/dashboard/customers"
                 className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
               >
-                <Users className="h-8 w-8 text-primary-600 mb-2" />
+                <Banknote className="h-8 w-8 text-primary-600 mb-2" />
                 <p className="font-medium text-gray-900">Add Customer</p>
                 <p className="text-sm text-gray-600">Create new customer</p>
               </Link>
@@ -216,7 +213,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
             
             <div className="text-center">
               <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mx-auto mb-3">
-                <Users className="h-6 w-6 text-blue-600" />
+                <Banknote className="h-6 w-6 text-blue-600" />
               </div>
               <p className="text-2xl font-bold text-gray-900">{metrics.customers || 0}</p>
               <p className="text-sm text-gray-600">Active Customers</p>

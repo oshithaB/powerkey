@@ -120,7 +120,7 @@ export default function EditInvoice() {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: 0,
@@ -258,7 +258,7 @@ export default function EditInvoice() {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
@@ -367,7 +367,7 @@ export default function EditInvoice() {
           product_id: 0,
           product_name: '',
           description: '',
-          quantity: 1,
+          quantity: 0,
           unit_price: 0,
           actual_unit_price: 0,
           tax_rate: 0,
@@ -824,12 +824,12 @@ export default function EditInvoice() {
                     type="file"
                     className="input"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        setFormData({ ...formData, attachment: file });
-                      }
-                    }}
+                    // onChange={(e) => {
+                    //   if (e.target.files && e.target.files.length > 0) {
+                    //     const file = e.target.files[0];
+                    //     setFormData({ ...formData, attachment: file });
+                    //   }
+                    // }}
                   />
                 </div>
               </div>

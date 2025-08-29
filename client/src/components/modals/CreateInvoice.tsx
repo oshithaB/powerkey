@@ -115,7 +115,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     product_id: 0,
     product_name: '',
     description: '',
-    quantity: 1,
+    quantity: 0,
     unit_price: 0,
     actual_unit_price: 0,
     tax_rate: 0,
@@ -329,7 +329,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       product_id: 0,
       product_name: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit_price: 0,
       actual_unit_price: 0,
       tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
@@ -947,8 +947,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                         <td className="px-4 py-2">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0.01"
+                            min="0"
                             className="input w-20"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}

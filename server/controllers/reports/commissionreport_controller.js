@@ -1,14 +1,21 @@
 const db = require('../../DB/db');
 
 const getCommissionReport = async (req, res) => {
+    const { start_date, end_date } = req.query;
     try {
-        // Query to calculate total commission per employee as quantity * commission
+        let sumExpression = 'COALESCE(SUM(ii.quantity * p.commission), 0)';
+        let params = [];
+        if (start_date && end_date) {
+            sumExpression = 'COALESCE(SUM(CASE WHEN i.invoice_date >= ? AND i.invoice_date <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
+            params = [start_date, end_date];
+        }
+
         const query = `
             SELECT
                 e.id AS employee_id,
                 e.name AS employee_name,
                 e.email AS employee_email,
-                COALESCE(SUM(ii.quantity * p.commission), 0) AS total_commission
+                ${sumExpression} AS total_commission
             FROM
                 employees e
             LEFT JOIN
@@ -26,7 +33,7 @@ const getCommissionReport = async (req, res) => {
         `;
 
         // Execute the query
-        const [results] = await db.execute(query);
+        const [results] = await db.execute(query, params);
 
         // Format the response
         const commissionReport = results.map(row => ({
@@ -55,14 +62,22 @@ const getCommissionReport = async (req, res) => {
 // getCommissionReportByEmployeeId
 const getCommissionReportByEmployeeId = async (req, res) => {
     const { employeeId } = req.params;
+    const { start_date, end_date } = req.query;
     try {
+        let sumExpression = 'COALESCE(SUM(ii.quantity * p.commission), 0)';
+        let paramsTotal = [employeeId];
+        if (start_date && end_date) {
+            sumExpression = 'COALESCE(SUM(CASE WHEN i.invoice_date >= ? AND i.invoice_date <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
+            paramsTotal = [start_date, end_date, employeeId];
+        }
+
         // Query to calculate total commission for a specific employee
         const totalCommissionQuery = `
             SELECT
                 e.id AS employee_id,
                 e.name AS employee_name,
                 e.email AS employee_email,
-                COALESCE(SUM(ii.quantity * p.commission), 0) AS total_commission
+                ${sumExpression} AS total_commission
             FROM
                 employees e
             LEFT JOIN
@@ -76,6 +91,13 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             GROUP BY
                 e.id, e.name, e.email
         `;
+
+        let whereDate = '';
+        let paramsInvoices = [employeeId];
+        if (start_date && end_date) {
+            whereDate = ' AND i.invoice_date >= ? AND i.invoice_date <= ?';
+            paramsInvoices = [start_date, end_date, employeeId];
+        }
 
         // Query to fetch invoice details for the employee
         const invoicesQuery = `
@@ -107,14 +129,14 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             LEFT JOIN
                 company co ON i.company_id = co.company_id
             WHERE
-                e.is_active = TRUE AND e.id = ? AND i.id IS NOT NULL
+                e.is_active = TRUE AND e.id = ? AND i.id IS NOT NULL${whereDate}
             ORDER BY
                 i.invoice_date DESC
         `;
 
         // Execute the queries
-        const [totalCommissionResults] = await db.execute(totalCommissionQuery, [employeeId]);
-        const [invoicesResults] = await db.execute(invoicesQuery, [employeeId]);
+        const [totalCommissionResults] = await db.execute(totalCommissionQuery, paramsTotal);
+        const [invoicesResults] = await db.execute(invoicesQuery, paramsInvoices);
 
         if (totalCommissionResults.length === 0) {
             return res.status(404).json({

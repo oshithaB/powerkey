@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const reportController = require('../controllers/reports/profit&lossreport_controller');
 const commissionReportController = require('../controllers/reports/commissionreport_controller');
+const salesReportController = require('../controllers/reports/salesreport_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -14,6 +15,11 @@ const {
     getCommissionReport,
     getCommissionReportByEmployeeId
 } = commissionReportController;
+
+const {
+    getSalesReport,
+    getSalesReportByEmployeeId
+} = salesReportController;
 
 // Profit and Loss Report Routes
 router.get(
@@ -43,6 +49,21 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'staff', 'sale']),
     getCommissionReportByEmployeeId
-)
+);
+
+// Sales Report Route
+router.get (
+    '/sales-report',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'sales']),
+    getSalesReport
+);
+
+router.get (
+    '/sales-report/:employeeId',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'sales']),
+    getSalesReportByEmployeeId
+);
 
 module.exports = router;

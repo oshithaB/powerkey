@@ -11,7 +11,8 @@ const {
 } = reportController;
 
 const {
-    getCommissionReport
+    getCommissionReport,
+    getCommissionReportByEmployeeId
 } = commissionReportController;
 
 // Profit and Loss Report Routes
@@ -36,5 +37,12 @@ router.get(
     authorizedRoles(['admin', 'manager']),
     getCommissionReport
 );
+
+router.get(
+    '/commission-report/:employeeId',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sale']),
+    getCommissionReportByEmployeeId
+)
 
 module.exports = router;

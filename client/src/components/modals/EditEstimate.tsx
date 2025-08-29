@@ -276,7 +276,7 @@ useEffect(() => {
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((item.unit_price - item.actual_unit_price).toFixed(2));
+      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));
       item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
@@ -309,7 +309,7 @@ useEffect(() => {
       ? Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2))
       : 0;
     const totalTax = items.length > 0 
-      ? Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2))
+      ? Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2))
       : 0;
     const shippingCost = Number(formData.shipping_cost || 0);
     
@@ -709,7 +709,7 @@ useEffect(() => {
                                     const taxRate = updatedItems[index].tax_rate || (defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0);
                                     updatedItems[index].tax_rate = taxRate;
                                     const subtotal = updatedItems[index].quantity * updatedItems[index].unit_price;
-                                    updatedItems[index].tax_amount = Number((subtotal * taxRate / 100).toFixed(2));
+                                    updatedItems[index].tax_amount = Number((item.actual_unit_price * taxRate / 100).toFixed(2));
                                     updatedItems[index].actual_unit_price = Number(((updatedItems[index].unit_price * 100) / (100 + updatedItems[index].tax_rate)).toFixed(2));
                                     updatedItems[index].total_price = Number(subtotal.toFixed(2));
                                     setItems(updatedItems);

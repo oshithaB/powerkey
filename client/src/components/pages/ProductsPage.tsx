@@ -150,6 +150,16 @@ export default function ProductsPage() {
     }
   }, [showVendorModal]);
 
+  // Sync manual_count with quantity_on_hand for new products
+  useEffect(() => {
+    if (!editingProduct) {
+      setProductFormData(prev => ({
+        ...prev,
+        manual_count: prev.quantity_on_hand
+      }));
+    }
+  }, [productFormData.quantity_on_hand, editingProduct]);
+
   const fetchProducts = async () => {
     try {
       const response = await axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`);
@@ -320,7 +330,7 @@ export default function ProductsPage() {
       unit_price: product.unit_price || 0,
       cost_price: product.cost_price || 0,
       quantity_on_hand: product.quantity_on_hand || 0,
-      manual_count: product.manual_count || 0,
+      manual_count: product.manual_count || product.quantity_on_hand || 0,
       reorder_level: product.reorder_level || 0,
       commission: product.commission || 0.00,
     });
@@ -788,9 +798,10 @@ export default function ProductsPage() {
                       className="input"
                       placeholder="For manual stock adjustments"
                       value={productFormData.manual_count}
-                      onChange={(e) =>
-                        setProductFormData({ ...productFormData, manual_count: parseInt(e.target.value) || 0 })
-                      }
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        setProductFormData({ ...productFormData, manual_count: value });
+                      }}
                     />
                   </div>
                   <div>

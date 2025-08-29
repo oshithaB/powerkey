@@ -93,8 +93,8 @@ class ReportController {
                 SELECT 
                     COALESCE(SUM(
                         CASE 
-                            WHEN p.quantity_on_hand < p.reorder_level 
-                            THEN (p.reorder_level - p.quantity_on_hand) * p.cost_price 
+                            WHEN p.quantity_on_hand > p.manual_count 
+                            THEN (p.quantity_on_hand - p.manual_count) * p.cost_price 
                             ELSE 0 
                         END
                     ), 0) as inventory_shrinkage

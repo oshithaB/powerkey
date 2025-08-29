@@ -1,4 +1,4 @@
-# Powerkey ERP System
+# ERP System
 
 A comprehensive multi-company Enterprise Resource Planning (ERP) system built with React, Node.js, and MySQL. This system provides complete business management capabilities including sales, inventory, accounting, and reporting features.
 

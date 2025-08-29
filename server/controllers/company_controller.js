@@ -146,7 +146,7 @@ const getDashboardData = async (req, res) => {
         console.log('Get dashboard data for companyId:', companyId);
 
         // Get basic metrics
-        const [cheques] = await db.query('SELECT COUNT(*) as count FROM cheques WHERE company_id = ? AND status = "pending" AND cheque_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)', [companyId]);
+        const [cheques] = await db.query(`SELECT COUNT(*) as count FROM cheques WHERE company_id = ? AND status = "pending" AND (cheque_date < CURDATE() OR cheque_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY))`,[companyId]);
         const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ? AND quantity_on_hand <= reorder_level', [companyId]);
         const [overdue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status = "overdue"', [companyId]);
         const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);

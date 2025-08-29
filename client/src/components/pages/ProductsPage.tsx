@@ -19,6 +19,7 @@ interface Product {
   unit_price: number;
   cost_price: number;
   quantity_on_hand: number;
+  manual_count: number;
   reorder_level: number;
   commission: number;
   is_active: boolean;
@@ -88,6 +89,7 @@ export default function ProductsPage() {
     unit_price: 0,
     cost_price: 0,
     quantity_on_hand: 0,
+    manual_count: 0,
     reorder_level: 0,
     commission: 0,
   });
@@ -249,6 +251,7 @@ export default function ProductsPage() {
       data.append('unit_price', productFormData.unit_price.toString());
       data.append('cost_price', productFormData.cost_price.toString());
       data.append('quantity_on_hand', productFormData.quantity_on_hand.toString());
+      data.append('manual_count', productFormData.manual_count.toString());
       data.append('reorder_level', productFormData.reorder_level.toString());
       data.append('commission', productFormData.commission.toString());
 
@@ -317,6 +320,7 @@ export default function ProductsPage() {
       unit_price: product.unit_price || 0,
       cost_price: product.cost_price || 0,
       quantity_on_hand: product.quantity_on_hand || 0,
+      manual_count: product.manual_count || 0,
       reorder_level: product.reorder_level || 0,
       commission: product.commission || 0.00,
     });
@@ -376,6 +380,7 @@ export default function ProductsPage() {
       unit_price: 0,
       cost_price: 0,
       quantity_on_hand: 0,
+      manual_count: 0,
       reorder_level: 0,
       commission: 0.00,
     });
@@ -764,7 +769,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Quantity on Hand</label>
                     <input
@@ -773,6 +778,18 @@ export default function ProductsPage() {
                       value={productFormData.quantity_on_hand}
                       onChange={(e) =>
                         setProductFormData({ ...productFormData, quantity_on_hand: parseInt(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Manual Count</label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="For manual stock adjustments"
+                      value={productFormData.manual_count}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, manual_count: parseInt(e.target.value) || 0 })
                       }
                     />
                   </div>

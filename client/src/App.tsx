@@ -29,6 +29,7 @@ import EditCheques from './components/modals/EditCheques';
 // Reports
 import ProfitAndLossReport from './components/reports/ProfitAndLossReport';
 import CommissionReport from './components/reports/CommissionReport';
+import CommissionReportByEmployees from './components/reports/CommissionReportByEmployees';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -234,6 +235,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CommissionReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/commission-by-employee/:employeeId"
+          element={
+            <ProtectedRoute>
+              <CommissionReportByEmployees />
             </ProtectedRoute>
           }
         />

@@ -413,7 +413,7 @@ const ProfitAndLossReport: React.FC = () => {
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      Period: {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data.period.end_date || 'August 28, 2025'}
+                      Period: {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data.period.end_date}
                     </p>
                   </div>
                   {selectedCompany?.company_logo && (

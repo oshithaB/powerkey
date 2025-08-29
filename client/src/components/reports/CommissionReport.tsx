@@ -51,7 +51,7 @@ const CommissionReport: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
-      const today = new Date('2025-08-29');
+      const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
 
@@ -79,6 +79,10 @@ const CommissionReport: React.FC = () => {
 
   const handlePrint = () => {
     setShowPrintPreview(true);
+  };
+
+  const handleEmployeeClick = (employeeId: string) => {
+    navigate(`/reports/commission-by-employee/${employeeId}`);
   };
 
   const handleDownloadPDF = async () => {
@@ -161,7 +165,7 @@ const CommissionReport: React.FC = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold mb-4">Commission Report</h1>
+              <h1 className="text-2xl font-bold mb-4">Commission Report - All Employees</h1>
               <div className="flex space-x-2">
                 <select
                   value={filter}
@@ -209,7 +213,11 @@ const CommissionReport: React.FC = () => {
                   </thead>
                   <tbody>
                     {data.map((employee, index) => (
-                      <tr key={employee.employeeId}>
+                      <tr 
+                        key={employee.employeeId}
+                        onClick={() => handleEmployeeClick(employee.employeeId)}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
                         <td className="p-2 border-b">{employee.employeeName}</td>
                         <td className="p-2 border-b">{employee.employeeEmail}</td>
                         <td className="p-2 border-b text-right">{formatCurrency(employee.totalCommission)}</td>
@@ -258,20 +266,20 @@ const CommissionReport: React.FC = () => {
                     <h1 className="text-3xl font-bold mb-2">Commission Report</h1>
                     <h2 className="text-xl text-gray-600 mb-2">Employee Commission Summary</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
-                      {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
+                      {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>
                     <p className="text-sm text-gray-600">
                       Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
                     </p>
                   </div>
 
-                  {selectedCompany?.company_logo && (
+                  {/* {selectedCompany?.company_logo && (
                     <img
                       src={`http://localhost:3000${selectedCompany.company_logo}`}
                       alt={`${selectedCompany.name} Logo`}
                       className="h-20 w-auto max-w-[200px] object-contain"
                     />
-                  )}
+                  )} */}
                 </div>
 
                 {/* Report Content */}

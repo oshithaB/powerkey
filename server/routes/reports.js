@@ -34,7 +34,7 @@ router.get(
 router.get(
     '/commission-report',
     verifyToken,
-    authorizedRoles(['admin', 'manager']),
+    authorizedRoles(['admin', 'staff']),
     getCommissionReport
 );
 

@@ -55,7 +55,7 @@ interface Invoice {
   total_amount: number;
   paid_amount: number;
   balance_due: number;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   notes: string;
   terms: string;
   created_at: string;

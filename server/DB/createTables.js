@@ -334,7 +334,27 @@ async function createTables(db) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
-        )`
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS payments (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            invoice_id int(11) NOT NULL,
+            customer_id int(11) NOT NULL,
+            company_id int(11) NOT NULL,
+            payment_amount decimal(10,2) NOT NULL,
+            payment_date date NOT NULL,
+            payment_method varchar(50) NOT NULL,
+            deposit_to varchar(100) NOT NULL,
+            notes text DEFAULT NULL,
+            created_at timestamp NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (id),
+            KEY invoice_id (invoice_id),
+            KEY customer_id (customer_id),
+            KEY company_id (company_id),
+            CONSTRAINT payments_ibfk_1 FOREIGN KEY (invoice_id) REFERENCES invoices (id),
+            CONSTRAINT payments_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer (id),
+            CONSTRAINT payments_ibfk_3 FOREIGN KEY (company_id) REFERENCES company (company_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`,
         // `CREATE TABLE IF NOT EXISTS categories (
         //     id INT AUTO_INCREMENT PRIMARY KEY,
         //     name VARCHAR(100) NOT NULL UNIQUE,

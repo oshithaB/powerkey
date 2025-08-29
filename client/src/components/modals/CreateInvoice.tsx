@@ -29,6 +29,7 @@ interface Customer {
   shipping_address?: string;
   billing_address?: string;
   credit_limit: number;
+  current_balance: number;
 }
 
 interface TaxRate {
@@ -420,27 +421,46 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       } else {
         const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
         console.log('User role:', userRole);
-        if (userRole !== 'admin' && submitData.status !== 'proforma') {
-          try {
+
+        try {
+          // If not admin and not proforma, run eligibility check
+          if (userRole !== 'admin' && submitData.status !== 'proforma') {
             const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
               company_id: selectedCompany?.company_id,
-              customer_id: parseInt(formData.customer_id)
+              customer_id: parseInt(formData.customer_id),
+              invoice_total: total
             });
+
             console.log('Eligibility response:', eligibilityRes.data);
+
             if (!eligibilityRes.data.eligible) {
               throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
             }
+
             console.log('Customer is eligible to create invoice');
-          } catch (eligibilityError: any) {
-            console.error('Eligibility check failed:', eligibilityError);
-            throw new Error(eligibilityError.response?.data?.reason || 'Failed to verify customer eligibility');
           }
-        }
-        response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
-        if (formData.estimate_id) {
-          await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
-            invoice_id: response.data.id,
-          });
+
+          // ✅ Only runs if:
+          // - User is admin OR
+          // - Status is proforma OR
+          // - Customer passed eligibility
+          const response = await axiosInstance.post(
+            `/api/createInvoice/${selectedCompany?.company_id}`,
+            submitData
+          );
+
+          if (formData.estimate_id) {
+            await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
+              invoice_id: response.data.id,
+            });
+          }
+
+          console.log('Invoice created:', response.data);
+          return response.data;
+
+        } catch (error: any) {
+          console.error('Invoice creation failed:', error);
+          throw new Error(error.response?.data?.reason || error.message || 'Failed to create invoice');
         }
       }
   

@@ -371,6 +371,26 @@ const updateInvoice = asyncHandler(async (req, res) => {
       updated_at: new Date()
     };
 
+    if (status === 'opened') {
+      const [customerRows] = await connection.query(
+      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+      [customer_id, company_id]
+      );
+
+      if (customerRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const currentBalance = Number(customerRows[0].current_balance) || 0;
+      const newBalance = currentBalance + (invoiceData.balance_due || 0);
+
+      await connection.query(
+      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+      [newBalance, customer_id, company_id]
+      );
+    }
+
     // Update existing invoice
     const [updateResult] = await connection.query(
       `UPDATE invoices SET ? WHERE id = ? AND company_id = ?`,

@@ -112,6 +112,7 @@ export default function EditInvoice() {
     shipping_date: invoice?.shipping_date ? invoice.shipping_date.split('T')[0] : '',
     tracking_number: invoice?.tracking_number || '',
     status: invoice?.status,
+    invoice_type: invoice?.status === 'proforma' ? 'proforma' : 'invoice',
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -335,7 +336,10 @@ export default function EditInvoice() {
         shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         paid_amount: invoice?.paid_amount || 0,
-        balance_due: Number(balanceDue),
+        balance_due:
+          formData.invoice_type === "proforma" && formData.status === "proforma"
+        ? 0
+        : Number(balanceDue),
         status: formData.status,
         notes: formData.notes || null,
         terms: formData.terms || null,
@@ -358,9 +362,38 @@ export default function EditInvoice() {
       };
   
       console.log('Submitting invoice update:', submitData);
-  
-      await axiosInstance.put(`/api/updateInvoice/${selectedCompany?.company_id}/${invoice.id}`, submitData);
-  
+
+      const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
+      console.log('User role:', userRole);
+
+      try {
+          if (userRole !== 'admin' && submitData.status !== 'proforma' && initialFormData.invoice_type !== 'proforma') {
+            const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
+              company_id: selectedCompany?.company_id,
+              customer_id: parseInt(formData.customer_id),
+              invoice_total: total
+            });
+
+            console.log('Eligibility response:', eligibilityRes.data);
+
+            if (!eligibilityRes.data.eligible) {
+              throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
+            }
+
+            console.log('Customer is eligible to update invoice');
+          }
+
+          console.log('Submitting invoice data:', submitData);
+
+          await axiosInstance.put(`/api/updateInvoice/${selectedCompany?.company_id}/${invoice.id}`, submitData);
+
+          console.log('Invoice updated:');
+
+      } catch (error: any) {
+        console.error('Invoice update failed:', error);
+        throw new Error(error.response?.data?.reason || error.message || 'Failed to update invoice');
+      }
+
       setFormData(initialFormData);
       setItems([
         {

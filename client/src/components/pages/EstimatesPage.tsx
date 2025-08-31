@@ -184,13 +184,9 @@ export default function EstimatesPage() {
     });
   };
 
-  // useEffect(() => {
-  //   convertEstimatesToLocked();
-  // }, [lockedEstimates, estimates]);
-
-    useEffect(() => {
+  useEffect(() => {
     convertEstimatesToLocked();
-  }, [lockedEstimates]);
+  }, [lockedEstimates, estimates]);
 
   const fetchEstimateItems = async (estimateId: number) => {
     try {
@@ -575,13 +571,15 @@ export default function EstimatesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEdit(estimate)}
-                            className="text-primary-600 hover:text-primary-900"
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
+                          {estimate.status !== "closed" && (
+                            <button
+                              onClick={() => handleEdit(estimate)}
+                              className="text-primary-600 hover:text-primary-900"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handlePrint(estimate)}
                             className="text-gray-600 hover:text-gray-900"
@@ -589,7 +587,7 @@ export default function EstimatesPage() {
                           >
                             <Printer className="h-4 w-4" />
                           </button>
-                          {estimate.status !== "converted" && (
+                          {(estimate.status !== "converted" && estimate.status !== "closed") && (
                             <button
                               onClick={() =>
                                 handleConvertToInvoice(estimate)

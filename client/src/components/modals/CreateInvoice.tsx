@@ -29,6 +29,7 @@ interface Customer {
   shipping_address?: string;
   billing_address?: string;
   credit_limit: number;
+  current_balance: number;
 }
 
 interface TaxRate {
@@ -420,27 +421,53 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       } else {
         const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
         console.log('User role:', userRole);
-        if (userRole !== 'admin' && submitData.status !== 'proforma') {
-          try {
+
+        try {
+          // If not admin and not proforma, run eligibility check
+          if (userRole !== 'admin' && submitData.status !== 'proforma') {
             const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
               company_id: selectedCompany?.company_id,
-              customer_id: parseInt(formData.customer_id)
+              customer_id: parseInt(formData.customer_id),
+              invoice_total: total
             });
+
             console.log('Eligibility response:', eligibilityRes.data);
+
             if (!eligibilityRes.data.eligible) {
               throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
             }
+
             console.log('Customer is eligible to create invoice');
-          } catch (eligibilityError: any) {
-            console.error('Eligibility check failed:', eligibilityError);
-            throw new Error(eligibilityError.response?.data?.reason || 'Failed to verify customer eligibility');
           }
-        }
-        response = await axiosInstance.post(`/api/createInvoice/${selectedCompany?.company_id}`, submitData);
-        if (formData.estimate_id) {
-          await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
-            invoice_id: response.data.id,
-          });
+
+          // ✅ Only runs if:
+          // - User is admin OR
+          // - Status is proforma OR
+          // - Customer passed eligibility
+
+          console.log('Submitting invoice data:', submitData);
+
+          const response = await axiosInstance.post(
+            `/api/createInvoice/${selectedCompany?.company_id}`,
+            submitData
+          );
+
+          console.log('Create invoice response:', response.data);
+
+          if (formData.estimate_id) {
+            await axiosInstance.post(`/api/updateEstimateAfterInvoice/${selectedCompany?.company_id}/${formData.estimate_id}`, {
+              invoice_id: response.data.id,
+            });
+          }
+
+          
+
+          console.log('Invoice created:', response.data);
+          return response.data;
+
+        } catch (error: any) {
+          console.error('Invoice creation failed:', error);
+          throw new Error(error.response?.data?.reason || error.message || 'Failed to create invoice');
         }
       }
   
@@ -559,7 +586,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
-        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
               {invoice ? 'Edit Invoice' : 'Create New Invoice'}
@@ -1015,6 +1042,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
@@ -1026,6 +1054,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."
@@ -1133,19 +1162,19 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   </button>
                 </div>
                 {showInvoiceTypeDropdown && (
-                  <div className="right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                    <div className="absolute left-10 mt-1 bg-white rounded-md shadow-lg z-10 w-auto min-w-max">
                     <button
                       type="button"
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                      className="btn btn-primary btn-md px-3 rounded"
                       onClick={(e) => {
-                        e.preventDefault();
-                        setShowInvoiceTypeDropdown(false);
-                        handleSubmit(e, 'proforma');
+                      e.preventDefault();
+                      setShowInvoiceTypeDropdown(false);
+                      handleSubmit(e, 'proforma');
                       }}
                     >
                       Create Proforma Invoice
                     </button>
-                  </div>
+                    </div>
                 )}
               </div>
             </div>

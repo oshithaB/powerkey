@@ -433,7 +433,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
-        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
               Create New Estimate
@@ -719,7 +719,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 0,
+                                      quantity: 1,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',
@@ -831,6 +831,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
@@ -838,10 +839,11 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Terms & Conditions
+                  Terms & Conditions
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."

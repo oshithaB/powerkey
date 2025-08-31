@@ -56,6 +56,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "Invalid invoice status" });
   }
 
+  console.log('Validated required fields successfully');
+
   // Validate items
   for (const item of items) {
     if (!item.product_id || item.product_id === 0) {
@@ -80,6 +82,8 @@ const createInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Total price cannot be negative" });
     }
   }
+
+  console.log('Validated items successfully');
 
   const connection = await db.getConnection();
   try {
@@ -119,16 +123,39 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount: discount_amount || 0,
       shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
+      balance_due: status === 'proforma' ? 0 : (total_amount || 0), // If proforma, balance_due = 0
       status, // Use provided status
       created_at: new Date(),
       updated_at: new Date()
     };
+
+    // Only update customer balance if invoice is NOT proforma
+    if (status !== 'proforma') {
+      const [customerRows] = await connection.query(
+      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+      [customer_id, company_id]
+      );
+
+      if (customerRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const currentBalance = Number(customerRows[0].current_balance) || 0;
+      const newBalance = currentBalance + (invoiceData.balance_due || 0);
+
+      await connection.query(
+      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+      [newBalance, customer_id, company_id]
+      );
+    }
 
     // Create new invoice
     const [result] = await connection.query(
       `INSERT INTO invoices SET ?`,
       invoiceData
     );
+
     const invoiceId = result.insertId;
 
     // Insert invoice items
@@ -343,6 +370,26 @@ const updateInvoice = asyncHandler(async (req, res) => {
       status,
       updated_at: new Date()
     };
+
+    if (status === 'opened') {
+      const [customerRows] = await connection.query(
+      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+      [customer_id, company_id]
+      );
+
+      if (customerRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const currentBalance = Number(customerRows[0].current_balance) || 0;
+      const newBalance = currentBalance + (invoiceData.balance_due || 0);
+
+      await connection.query(
+      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+      [newBalance, customer_id, company_id]
+      );
+    }
 
     // Update existing invoice
     const [updateResult] = await connection.query(
@@ -919,72 +966,51 @@ const recordPayment = asyncHandler(async (req, res) => {
 });
 
 const checkCustomerEligibility = asyncHandler(async (req, res) => {
-  const { customer_id, company_id } = req.body;
+  const { customer_id, company_id, invoice_total } = req.body;
 
   console.log('Checking customer eligibility:', { customer_id, company_id });
 
-  if (!customer_id || !company_id) {
-    return res.status(400).json({ error: "Customer ID and Company ID are required" });
+  if (!customer_id || !company_id || !invoice_total) {
+    return res.status(400).json({ error: "Customer ID, Company ID, and Invoice Total are required" });
   }
 
   const connection = await db.getConnection();
   try {
-    // Get customer's credit limit
+    // Get customer's credit limit and current balance
     const [customerRows] = await connection.query(
-      `SELECT credit_limit FROM customer WHERE id = ? AND company_id = ?`,
+      `SELECT credit_limit, current_balance FROM customer WHERE id = ? AND company_id = ?`,
       [customer_id, company_id]
     );
+
     if (customerRows.length === 0) {
       connection.release();
       return res.status(404).json({ error: "Customer not found" });
     }
-    const creditLimit = Number(customerRows[0].credit_limit) || 0;
 
-    // Get all relevant invoices for the customer
-    const [invoiceRows] = await connection.query(
-      `SELECT status, balance_due, due_date FROM invoices 
-       WHERE customer_id = ? AND company_id = ? 
-       AND status IN ('opened', 'sent', 'partially_paid', 'overdue')`,
+    const creditLimit = Number(customerRows[0].credit_limit) || 0;
+    const currentBalance = Number(customerRows[0].current_balance) || 0;
+
+    const [hasOverdue] = await connection.query(
+      `SELECT * FROM invoices 
+       WHERE customer_id = ? AND company_id = ? AND status = 'overdue'`,
       [customer_id, company_id]
     );
 
-    let totalBalanceDue = 0;
-    let hasOverdue = false;
-    let hasOverdue60Days = false;
-    const currentDate = new Date();
-
-    for (const invoice of invoiceRows) {
-      totalBalanceDue += Number(invoice.balance_due) || 0;
-      if (invoice.status === 'overdue') {
-        hasOverdue = true;
-        const dueDate = new Date(invoice.due_date);
-        const daysOverdue = Math.floor((currentDate - dueDate) / (1000 * 60 * 60 * 24));
-        if (daysOverdue > 60) {
-          hasOverdue60Days = true;
-        }
-      }
-    }
-
-    if (hasOverdue60Days) {
-      connection.release();
-      return res.status(403).json({ 
-        eligible: false, 
-        reason: "Customer has invoices overdue by more than 60 days. Only admins can create invoices for this customer."
-      });
-    }
-
-    if (hasOverdue) {
+    if (hasOverdue.length > 0) {
       connection.release();
       return res.status(403).json({ eligible: false, reason: "Customer has overdue invoices" });
     }
 
-    if (creditLimit < totalBalanceDue) {
+    let totalBalanceDue = currentBalance + invoice_total;
+
+    if (creditLimit <= totalBalanceDue) {
       connection.release();
       return res.status(403).json({ eligible: false, reason: "Customer's credit limit exceeded" });
     }
 
     connection.release();
     res.status(200).json({ eligible: true, credit_limit: creditLimit, total_balance_due: totalBalanceDue });
+
   } catch (error) {
     connection.release();
     console.error('Error checking customer eligibility:', error);

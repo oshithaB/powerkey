@@ -424,7 +424,7 @@ useEffect(() => {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
-        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
               Edit Estimate #{estimate?.estimate_number}
@@ -811,6 +811,7 @@ useEffect(() => {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
@@ -822,6 +823,7 @@ useEffect(() => {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."

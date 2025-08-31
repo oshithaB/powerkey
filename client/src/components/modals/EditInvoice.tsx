@@ -55,7 +55,7 @@ interface Invoice {
   total_amount: number;
   paid_amount: number;
   balance_due: number;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   notes: string;
   terms: string;
   created_at: string;
@@ -112,6 +112,7 @@ export default function EditInvoice() {
     shipping_date: invoice?.shipping_date ? invoice.shipping_date.split('T')[0] : '',
     tracking_number: invoice?.tracking_number || '',
     status: invoice?.status,
+    invoice_type: invoice?.status === 'proforma' ? 'proforma' : 'invoice',
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -335,7 +336,10 @@ export default function EditInvoice() {
         shipping_cost: Number(shippingCost),
         total_amount: Number(total),
         paid_amount: invoice?.paid_amount || 0,
-        balance_due: Number(balanceDue),
+        balance_due:
+          formData.invoice_type === "proforma" && formData.status === "proforma"
+        ? 0
+        : Number(balanceDue),
         status: formData.status,
         notes: formData.notes || null,
         terms: formData.terms || null,
@@ -358,9 +362,38 @@ export default function EditInvoice() {
       };
   
       console.log('Submitting invoice update:', submitData);
-  
-      await axiosInstance.put(`/api/updateInvoice/${selectedCompany?.company_id}/${invoice.id}`, submitData);
-  
+
+      const userRole = JSON.parse(localStorage.getItem('user') || '{}')?.role;
+      console.log('User role:', userRole);
+
+      try {
+          if (userRole !== 'admin' && submitData.status !== 'proforma' && initialFormData.invoice_type !== 'proforma') {
+            const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
+              company_id: selectedCompany?.company_id,
+              customer_id: parseInt(formData.customer_id),
+              invoice_total: total
+            });
+
+            console.log('Eligibility response:', eligibilityRes.data);
+
+            if (!eligibilityRes.data.eligible) {
+              throw new Error(eligibilityRes.data.reason || 'Customer is not eligible to create more invoices');
+            }
+
+            console.log('Customer is eligible to update invoice');
+          }
+
+          console.log('Submitting invoice data:', submitData);
+
+          await axiosInstance.put(`/api/updateInvoice/${selectedCompany?.company_id}/${invoice.id}`, submitData);
+
+          console.log('Invoice updated:');
+
+      } catch (error: any) {
+        console.error('Invoice update failed:', error);
+        throw new Error(error.response?.data?.reason || error.message || 'Failed to update invoice');
+      }
+
       setFormData(initialFormData);
       setItems([
         {
@@ -398,12 +431,12 @@ export default function EditInvoice() {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto px-4 py-8">
-        <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-gray-900">
               Edit Invoice #{invoice?.invoice_number}
             </h3>
-            <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })}>
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -603,8 +636,14 @@ export default function EditInvoice() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   <option value="">Select Status</option>
-                  <option value="sent">Sent</option>
-                  <option value="cancelled">Cancelled</option>
+                  {formData.status === 'proforma' ? (
+                    <>
+                      <option value="sent">Opened</option>
+                      <option value="cancelled">Cancelled</option>
+                    </>
+                  ) : formData.status !== 'cancelled' ? (
+                    <option value="cancelled">Cancelled</option>
+                  ) : null}
                 </select>
               </div>
             </div>
@@ -800,6 +839,7 @@ export default function EditInvoice() {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
@@ -811,6 +851,7 @@ export default function EditInvoice() {
                   </label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={formData.terms}
                     onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
                     placeholder="Terms and conditions..."

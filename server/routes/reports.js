@@ -9,6 +9,8 @@ const authorizedRoles = require('../middleware/authorized-roles');
 const {
     getProfitAndLossData,
     getMonthlyProfitAndLoss,
+    getProfitAndLossByEmployeeId,
+    getProfitAndLossByCustomerId,
 } = reportController;
 
 const {
@@ -34,6 +36,20 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'manager', 'accountant']),
     getMonthlyProfitAndLoss
+);
+
+router.get(
+    '/profit-and-loss-by-emp/:company_id/:employee_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getProfitAndLossByEmployeeId
+);
+
+router.get(
+    '/profit-and-loss-by-cust/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getProfitAndLossByCustomerId
 );
 
 // Commission Report Route

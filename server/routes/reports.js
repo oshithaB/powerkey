@@ -3,6 +3,7 @@ const router = express.Router();
 const reportController = require('../controllers/reports/profit&lossreport_controller');
 const commissionReportController = require('../controllers/reports/commissionreport_controller');
 const salesReportController = require('../controllers/reports/salesreport_controller');
+const aragingReportController = require('../controllers/reports/ar_aging_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -22,6 +23,10 @@ const {
     getSalesReport,
     getSalesReportByEmployeeId
 } = salesReportController;
+
+const {
+    getARAgingSummary
+} = aragingReportController;
 
 // Profit and Loss Report Routes
 router.get(
@@ -81,5 +86,14 @@ router.get (
     authorizedRoles(['admin', 'manager', 'sales']),
     getSalesReportByEmployeeId
 );
+
+// A/R Aging Summary Report Route
+router.get(
+    '/ar-aging-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getARAgingSummary
+);
+
 
 module.exports = router;

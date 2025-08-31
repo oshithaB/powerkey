@@ -567,6 +567,298 @@ class ReportController {
         }
     }
 
+    static async getProfitAndLossForAllEmployees(req, res) {
+        try {
+            const { company_id } = req.params;
+            const { start_date, end_date } = req.query;
+    
+            if (!company_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Company ID is required'
+                });
+            }
+    
+            // Build date filter condition
+            const today = new Date().toISOString().split('T')[0];
+            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+            let dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+            let dateParams = [startOfYear, today];
+    
+            if (start_date && end_date) {
+                dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+                dateParams = [start_date, end_date];
+            } else if (start_date) {
+                dateCondition = 'AND i.invoice_date >= ?';
+                dateParams = [start_date];
+            } else if (end_date) {
+                dateCondition = 'AND i.invoice_date <= ?';
+                dateParams = [end_date];
+            }
+    
+            // 1. INCOME CALCULATIONS PER EMPLOYEE
+            const [productIncomeResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(ii.quantity * ii.actual_unit_price), 0) as product_income
+                FROM invoices i
+                INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            const [shippingIncomeResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
+                FROM invoices i
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            const [discountsResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(i.discount_amount), 0) as discounts_given
+                FROM invoices i
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            const [taxIncomeResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(i.tax_amount), 0) as tax_income
+                FROM invoices i
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            // 2. COST OF SALES CALCULATIONS PER EMPLOYEE
+            const [costOfSalesResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(ii.quantity * p.cost_price), 0) as cost_of_sales
+                FROM invoices i
+                INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                LEFT JOIN products p ON ii.product_id = p.id
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            // 3. ADDITIONAL METRICS PER EMPLOYEE
+            const [totalPaidResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(i.paid_amount), 0) as total_paid
+                FROM invoices i
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid')
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            const [outstandingResult] = await db.execute(`
+                SELECT 
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    COALESCE(SUM(i.balance_due), 0) as outstanding_balance
+                FROM invoices i
+                INNER JOIN employees e ON i.employee_id = e.id
+                WHERE i.company_id = ?
+                AND e.is_active = TRUE
+                AND i.balance_due > 0
+                ${dateCondition}
+                GROUP BY e.id, e.name
+            `, [company_id, ...dateParams]);
+    
+            // 4. GET COMPANY DETAILS
+            const [companyResult] = await db.execute(`
+                SELECT name, address, email_address, contact_number
+                FROM company
+                WHERE company_id = ?
+            `, [company_id]);
+    
+            // Prepare data for all employees
+            const employeeData = {};
+            const resultsMap = {
+                productIncome: productIncomeResult,
+                shippingIncome: shippingIncomeResult,
+                discounts: discountsResult,
+                taxIncome: taxIncomeResult,
+                costOfSales: costOfSalesResult,
+                totalPaid: totalPaidResult,
+                outstanding: outstandingResult
+            };
+    
+            for (const [key, result] of Object.entries(resultsMap)) {
+                result.forEach(row => {
+                    if (!employeeData[row.employee_id]) {
+                        employeeData[row.employee_id] = {
+                            id: row.employee_id,
+                            name: row.employee_name,
+                            email: '',
+                            phone: ''
+                        };
+                    }
+                    if (key === 'productIncome') employeeData[row.employee_id].productIncome = parseFloat(row.product_income || 0);
+                    if (key === 'shippingIncome') employeeData[row.employee_id].shippingIncome = parseFloat(row.shipping_income || 0);
+                    if (key === 'discounts') employeeData[row.employee_id].discountsGiven = parseFloat(row.discounts_given || 0);
+                    if (key === 'taxIncome') employeeData[row.employee_id].taxIncome = parseFloat(row.tax_income || 0);
+                    if (key === 'costOfSales') employeeData[row.employee_id].costOfSales = parseFloat(row.cost_of_sales || 0);
+                    if (key === 'totalPaid') employeeData[row.employee_id].totalPaid = parseFloat(row.total_paid || 0);
+                    if (key === 'outstanding') employeeData[row.employee_id].outstandingBalance = parseFloat(row.outstanding_balance || 0);
+                });
+            }
+    
+            const employees = Object.values(employeeData).map(emp => {
+                const totalIncome = emp.productIncome + emp.shippingIncome + emp.taxIncome;
+                const netIncome = totalIncome - emp.discountsGiven;
+                const grossProfit = netIncome - emp.costOfSales;
+                const netEarnings = grossProfit;
+                const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+                const netProfitMargin = totalIncome > 0 ? (netEarnings / totalIncome) * 100 : 0;
+    
+                return {
+                    employee: {
+                        id: emp.id,
+                        name: emp.name,
+                        email: emp.email,
+                        phone: emp.phone
+                    },
+                    income: {
+                        sales_of_product_income: emp.productIncome,
+                        shipping_income: emp.shippingIncome,
+                        tax_income: emp.taxIncome,
+                        discounts_given: -emp.discountsGiven,
+                        total_income: totalIncome,
+                        net_income: netIncome
+                    },
+                    cost_of_sales: {
+                        cost_of_sales: emp.costOfSales,
+                        total_cost_of_sales: emp.costOfSales
+                    },
+                    profitability: {
+                        gross_profit: grossProfit,
+                        net_earnings: netEarnings,
+                        gross_profit_margin: parseFloat(grossProfitMargin.toFixed(2)),
+                        net_profit_margin: parseFloat(netProfitMargin.toFixed(2))
+                    },
+                    cash_flow: {
+                        total_invoiced: totalIncome,
+                        total_paid: emp.totalPaid,
+                        outstanding_balance: emp.outstandingBalance,
+                        collection_rate: totalIncome > 0 ? parseFloat(((emp.totalPaid / totalIncome) * 100).toFixed(2)) : 0
+                    }
+                };
+            });
+    
+            const companyInfo = companyResult[0] || {};
+    
+            return res.status(200).json({
+                success: true,
+                message: 'Profit and Loss data for all employees retrieved successfully',
+                data: {
+                    company: {
+                        id: company_id,
+                        name: companyInfo.name || 'Company Name',
+                        address: companyInfo.address,
+                        email: companyInfo.email_address,
+                        phone: companyInfo.contact_number
+                    },
+                    period: {
+                        start_date: startOfYear,
+                        end_date: today,
+                        generated_at: new Date().toISOString()
+                    },
+                    employees: employees
+                }
+            });
+    
+        } catch (error) {
+            console.error('Error in getProfitAndLossForAllEmployees:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+            });
+        }
+    };
+
+    static async getInventoryShrinkageByCompanyId(req, res) {
+        try {
+            const { company_id } = req.params;
+
+            if (!company_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Company ID is required'
+                });
+            }
+
+            const [inventoryShrinkageResult] = await db.execute(`
+                SELECT 
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN p.quantity_on_hand > p.manual_count 
+                            THEN (p.quantity_on_hand - p.manual_count) * p.cost_price 
+                            ELSE 0 
+                        END
+                    ), 0) as inventory_shrinkage
+                FROM products p
+                WHERE p.company_id = ?
+                AND p.is_active = TRUE
+            `, [company_id]);
+
+            const inventoryShrinkage = parseFloat(inventoryShrinkageResult[0]?.inventory_shrinkage || 0);
+
+            return res.status(200).json({
+                success: true,
+                message: 'Inventory Shrinkage data retrieved successfully',
+                data: {
+                    company_id: company_id,
+                    inventory_shrinkage: inventoryShrinkage
+                }
+            });
+
+        } catch (error) {
+            console.error('Error in getInventoryShrinkageByCompanyId:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+            });
+        }
+    };
+
 
     static async getProfitAndLossByCustomerId(req, res) {
         try {

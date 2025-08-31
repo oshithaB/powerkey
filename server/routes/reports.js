@@ -13,6 +13,8 @@ const {
     getMonthlyProfitAndLoss,
     getProfitAndLossByEmployeeId,
     getProfitAndLossByCustomerId,
+    getProfitAndLossForAllEmployees,
+    getInventoryShrinkageByCompanyId
 } = reportController;
 
 // Importing commission report controller functions
@@ -62,6 +64,20 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'manager', 'accountant']),
     getProfitAndLossByCustomerId
+);
+
+router.get(
+    '/profit-and-loss-all-employees/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getProfitAndLossForAllEmployees
+);
+
+router.get(
+    '/inventory-shrinkage/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getInventoryShrinkageByCompanyId
 );
 
 // Commission Report Route

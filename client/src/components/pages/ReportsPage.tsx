@@ -54,6 +54,11 @@ export default function ReportsPage() {
       name: 'Balance Sheet',
       description: 'Cash flow statement',
       path: '/reports/balance-sheet'
+    },
+    {
+      name: 'Profit & Loss By Class',
+      description: 'P&L statement segmented by Employee',
+      path: '/reports/profit&loss-by-class'
     }
   ];
 

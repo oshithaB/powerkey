@@ -3,9 +3,11 @@ const router = express.Router();
 const reportController = require('../controllers/reports/profit&lossreport_controller');
 const commissionReportController = require('../controllers/reports/commissionreport_controller');
 const salesReportController = require('../controllers/reports/salesreport_controller');
+const aragingReportController = require('../controllers/reports/ar_aging_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
+// Importing profit and loss report controller functions
 const {
     getProfitAndLossData,
     getMonthlyProfitAndLoss,
@@ -13,15 +15,25 @@ const {
     getProfitAndLossByCustomerId,
 } = reportController;
 
+// Importing commission report controller functions
 const {
     getCommissionReport,
     getCommissionReportByEmployeeId
 } = commissionReportController;
 
+// Importing sales report controller functions
 const {
     getSalesReport,
     getSalesReportByEmployeeId
 } = salesReportController;
+
+// Importing A/R Aging report controller functions
+const {
+    getARAgingSummary,
+    getCustomerInvoices,
+} = aragingReportController;
+
+//====================================================================================================================
 
 // Profit and Loss Report Routes
 router.get(
@@ -81,5 +93,21 @@ router.get (
     authorizedRoles(['admin', 'manager', 'sales']),
     getSalesReportByEmployeeId
 );
+
+// A/R Aging Summary Report Route
+router.get(
+    '/ar-aging-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getARAgingSummary
+);
+
+router.get(
+    '/customer-invoices/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getCustomerInvoices
+)
+
 
 module.exports = router;

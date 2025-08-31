@@ -74,6 +74,71 @@ const getARAgingSummary = async (req, res) => {
     }
 };
 
+const getCustomerInvoices = async (req, res) => {
+    try {
+        const { company_id } = req.params;
+        const { customer_id } = req.params;
+
+        const query = `
+            SELECT 
+                i.id AS invoice_id,
+                i.invoice_number,
+                i.invoice_date,
+                i.due_date,
+                i.total_amount,
+                i.paid_amount,
+                i.balance_due,
+                i.status
+            FROM 
+                invoices i
+            LEFT JOIN 
+                customer c ON i.customer_id = c.id
+            WHERE 
+                i.company_id = ?
+                AND i.customer_id = ?
+                AND i.balance_due > 0
+            ORDER BY 
+                i.due_date ASC
+        `;
+
+        const params = [company_id, customer_id];
+
+        const [results] = await db.execute(query, params);
+
+        const invoices = results.map(row => ({
+            invoiceId: row.invoice_id,
+            invoiceNumber: row.invoice_number,
+            invoiceDate: row.invoice_date,
+            dueDate: row.due_date,
+            totalAmount: parseFloat(row.total_amount).toFixed(2),
+            paidAmount: parseFloat(row.paid_amount).toFixed(2),
+            balanceDue: parseFloat(row.balance_due).toFixed(2),
+            status: row.status
+        }));
+
+        if (invoices.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No invoices found for the specified customer'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: invoices,
+            message: 'Customer invoices retrieved successfully'
+        });
+    } catch (error) {
+        console.error('Error fetching customer invoices:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch customer invoices',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
-    getARAgingSummary
+    getARAgingSummary,
+    getCustomerInvoices
 };

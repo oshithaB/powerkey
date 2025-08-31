@@ -7,6 +7,7 @@ const aragingReportController = require('../controllers/reports/ar_aging_control
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
+// Importing profit and loss report controller functions
 const {
     getProfitAndLossData,
     getMonthlyProfitAndLoss,
@@ -14,19 +15,25 @@ const {
     getProfitAndLossByCustomerId,
 } = reportController;
 
+// Importing commission report controller functions
 const {
     getCommissionReport,
     getCommissionReportByEmployeeId
 } = commissionReportController;
 
+// Importing sales report controller functions
 const {
     getSalesReport,
     getSalesReportByEmployeeId
 } = salesReportController;
 
+// Importing A/R Aging report controller functions
 const {
-    getARAgingSummary
+    getARAgingSummary,
+    getCustomerInvoices,
 } = aragingReportController;
+
+//====================================================================================================================
 
 // Profit and Loss Report Routes
 router.get(
@@ -94,6 +101,13 @@ router.get(
     authorizedRoles(['admin', 'manager', 'accountant']),
     getARAgingSummary
 );
+
+router.get(
+    '/customer-invoices/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getCustomerInvoices
+)
 
 
 module.exports = router;

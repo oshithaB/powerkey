@@ -36,6 +36,7 @@ import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
 import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
 import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
 import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossByCustomerInDetail';
+import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -300,6 +301,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SalesReportByEmployees />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ar-aging-summary"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryReport />
             </ProtectedRoute>
           }
         />

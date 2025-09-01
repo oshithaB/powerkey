@@ -1,55 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosInstance from '../../axiosInstance';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
-interface ProfitAndLossData {
-  employee: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-  };
-  income: {
-    sales_of_product_income: number;
-    shipping_income: number;
-    tax_income: number;
-    discounts_given: number;
-    total_income: number;
-    net_income: number;
-  };
-  cost_of_sales: {
-    cost_of_sales: number;
-    total_cost_of_sales: number;
-  };
-  profitability: {
-    gross_profit: number;
-    net_earnings: number;
-    gross_profit_margin: number;
-    net_profit_margin: number;
-  };
-  cash_flow: {
-    total_invoiced: number;
-    total_paid: number;
-    outstanding_balance: number;
-    collection_rate: number;
-  };
+interface ARAgingSummaryData {
+  companyName: string;
+  customerName: string;
+  dueToday: string;
+  due15Days: string;
+  due30Days: string;
+  due60Days: string;
+  over60Days: string;
+  total: string;
+  totalDue: string;
 }
 
-const ProfitAndLossByClass: React.FC = () => {
+const ARAgingSummaryReport: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<ProfitAndLossData[]>([]);
+  const [data, setData] = useState<ARAgingSummaryData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
-  const [inventoryShrinkage, setInventoryShrinkage] = useState<number>(0);
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +37,7 @@ const ProfitAndLossByClass: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchProfitAndLossData = async (startDate?: string, endDate?: string) => {
+  const fetchARAgingSummaryData = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -68,23 +46,19 @@ const ProfitAndLossByClass: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [profitResponse, shrinkageResponse] = await Promise.all([
-        axiosInstance.get(`/api/profit-and-loss-all-employees/${selectedCompany.company_id}`, {
-          params: { start_date: startDate, end_date: endDate }
-        }),
-        axiosInstance.get(`/api/inventory-shrinkage/${selectedCompany.company_id}`)
-      ]);
+      const response = await axiosInstance.get(`/api/ar-aging-summary/${selectedCompany.company_id}`, {
+        params: { start_date: startDate, end_date: endDate },
+      });
       
       // Validate response structure
-      if (profitResponse.data?.data?.employees && Array.isArray(profitResponse.data.data.employees)) {
-        setData(profitResponse.data.data.employees);
-        setInventoryShrinkage(shrinkageResponse.data?.data?.inventory_shrinkage || 0);
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        setData(response.data.data);
       } else {
         setData([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch profit and loss data. Please try again.');
+      setError('Failed to fetch A/R Aging Summary data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -98,26 +72,21 @@ const ProfitAndLossByClass: React.FC = () => {
       let endDate: string = today.toISOString().split('T')[0];
 
       if (filter === 'week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        startDate = weekAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        startDate = monthAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
         startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
       }
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchProfitAndLossData(startDate, endDate);
+      fetchARAgingSummaryData(startDate, endDate);
     }
   }, [selectedCompany?.company_id, filter]);
 
-  const formatCurrency = (value: number) => {
-    // Handle null/undefined values
-    const numValue = typeof value === 'number' ? value : 0;
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-LK', { 
       style: 'currency', 
       currency: 'LKR',
@@ -126,25 +95,11 @@ const ProfitAndLossByClass: React.FC = () => {
     }).format(numValue);
   };
 
-  const safeGetValue = (employee: ProfitAndLossData, path: string): number => {
-    try {
-      const keys = path.split('.');
-      let value: any = employee;
-      for (const key of keys) {
-        value = value?.[key];
-      }
-      return typeof value === 'number' ? value : 0;
-    } catch {
-      return 0;
-    }
-  };
-
-  const getTotal = (path: string) => {
-    return data.reduce((total, employee) => total + safeGetValue(employee, path), 0);
-  };
-
-  const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/reports/profit-and-loss-by-employee/${employeeId}`);
+  const getTotal = (field: keyof ARAgingSummaryData) => {
+    return data.reduce((total, customer) => {
+      const value = parseFloat(customer[field] as string) || 0;
+      return total + value;
+    }, 0);
   };
 
   const handlePrint = () => {
@@ -162,13 +117,13 @@ const ProfitAndLossByClass: React.FC = () => {
     }
 
     try {
-      const pdf = new jsPDF('l', 'mm', 'a4'); // Changed to landscape for better table fit
+      const pdf = new jsPDF('l', 'mm', 'a4'); // Landscape for better table fit
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 10;
       const maxContentHeight = pageHeight - 2 * margin;
 
-      const scale = 2; // Reduced scale for better performance
+      const scale = 2;
       const canvas = await html2canvas(printRef.current, {
         scale,
         useCORS: true,
@@ -208,7 +163,7 @@ const ProfitAndLossByClass: React.FC = () => {
         }
       }
 
-      const filename = `profit-and-loss-by-class-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `ar-aging-summary-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -225,12 +180,6 @@ const ProfitAndLossByClass: React.FC = () => {
         color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      .cost-section {
-        background-color: #f7fafc !important;
-        -webkit-print-color-adjust: exact !important;
-        color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
       table {
         page-break-inside: avoid;
       }
@@ -238,32 +187,13 @@ const ProfitAndLossByClass: React.FC = () => {
         page-break-inside: avoid;
       }
     }
-    .cost-section {
-      background-color: #f7fafc;
-    }
   `;
-
-  const renderTableRow = (label: string, getValue: (emp: ProfitAndLossData) => number, isTotal = false, isSection = false, sectionClass = '') => (
-    <tr key={label}>
-      <td className={`p-2 border-b ${isTotal ? 'font-bold' : 'font-medium'} ${sectionClass}`}>
-        {label}
-      </td>
-      {data.map((employee) => (
-        <td key={employee.employee.id} className={`p-2 border-b text-right ${isTotal ? 'font-bold' : ''} ${sectionClass}`}>
-          {formatCurrency(getValue(employee))}
-        </td>
-      ))}
-      <td className={`p-2 border-b text-right ${isTotal ? 'font-bold' : ''} ${sectionClass}`}>
-        {formatCurrency(data.reduce((total, emp) => total + getValue(emp), 0))}
-      </td>
-    </tr>
-  );
 
   if (!selectedCompany) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view profit and loss data.</p>
+          <p className="text-gray-600">Please select a company to view A/R Aging Summary data.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -287,7 +217,16 @@ const ProfitAndLossByClass: React.FC = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold mb-4">Profit and Loss by Class</h1>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="text-gray-400 hover:text-gray-600"
+                  title="Go Back"
+                >
+                  <ArrowLeft className="h-6 w-6" />
+                </button>
+                <h1 className="text-2xl font-bold mb-4">A/R Aging Summary</h1>
+              </div>
               <div className="flex space-x-2">
                 <select
                   value={filter}
@@ -319,7 +258,7 @@ const ProfitAndLossByClass: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Profit and Loss Summary</p>
+                <p className="text-sm font-medium">Accounts Receivable Aging Summary</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -342,7 +281,7 @@ const ProfitAndLossByClass: React.FC = () => {
               
               {!loading && !error && data.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No data available for the selected period.
+                  No aging data available.
                 </div>
               )}
               
@@ -353,16 +292,28 @@ const ProfitAndLossByClass: React.FC = () => {
                       <tr>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Account
+                          Customer
                         </th>
-                        {data.map((employee) => (
-                          <th key={employee.employee.id} 
-                              onClick={() => handleEmployeeClick(employee.employee.id)}
-                              className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px] cursor-pointer hover:underline"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            {employee.employee.name}
-                          </th>
-                        ))}
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Due Today
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          1-15 Days
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          16-30 Days
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          31-60 Days
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Over 60 Days
+                        </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Total
@@ -370,54 +321,52 @@ const ProfitAndLossByClass: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Income Section */}
-                      {renderTableRow('Discounts given', (emp) => -safeGetValue(emp, 'income.discounts_given'))}
-                      {renderTableRow('Sales of Product Income', (emp) => safeGetValue(emp, 'income.sales_of_product_income'))}
-                      {renderTableRow('Shipping Income', (emp) => safeGetValue(emp, 'income.shipping_income'))}
-                      {renderTableRow('Tax Income', (emp) => safeGetValue(emp, 'income.tax_income'))}
-                      {renderTableRow('Total for Income', (emp) => safeGetValue(emp, 'income.total_income'), true)}
-                      
-                      {/* Cost of Sales Section */}
-                      {renderTableRow('Cost of Sales', (emp) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), false, true, 'cost-section')}
-                      <tr>
-                        <td className="p-2 border-b font-medium cost-section">Inventory Shrinkage</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
-                            {formatCurrency(0)}
+                      {data.map((customer, index) => (
+                        <tr key={index}>
+                          <td className="p-2 border-b font-medium">
+                            {customer.customerName}
                           </td>
-                        ))}
-                        <td className="p-2 border-b text-right cost-section">
-                          {formatCurrency(inventoryShrinkage)}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 border-b font-bold cost-section">Total for Cost of Sales</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
-                            {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(customer.dueToday)}
                           </td>
-                        ))}
-                        <td className="p-2 border-b text-right font-bold cost-section">
-                          {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
-                        </td>
-                      </tr>
-                      
-                      {/* Profit Section */}
-                      {renderTableRow('Gross Profit', (emp) => safeGetValue(emp, 'profitability.gross_profit'), true)}
-                      {renderTableRow('Other Income', () => 0)}
-                      {renderTableRow('Expenses', () => 0)}
-                      {renderTableRow('Other Expenses', () => 0)}
-                      
-                      {/* Final Net Earnings */}
-                      <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold">Net Earnings</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                            {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(customer.due15Days)}
                           </td>
-                        ))}
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(customer.due30Days)}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(customer.due60Days)}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(customer.over60Days)}
+                          </td>
+                          <td className="p-2 border-b text-right font-bold">
+                            {formatCurrency(customer.total)}
+                          </td>
+                        </tr>
+                      ))}
+                      
+                      {/* Total Row */}
+                      <tr>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold">Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
+                          {formatCurrency(getTotal('dueToday'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('due15Days'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('due30Days'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('due60Days'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('over60Days'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('total'))}
                         </td>
                       </tr>
                     </tbody>
@@ -439,7 +388,7 @@ const ProfitAndLossByClass: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Profit and Loss by Class
+                Print Preview - A/R Aging Summary
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -455,13 +404,15 @@ const ProfitAndLossByClass: React.FC = () => {
                 {/* Header */}
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Profit and Loss by Class</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Profit and Loss Summary</h2>
+                    <h1 className="text-3xl font-bold mb-2">A/R Aging Summary</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Accounts Receivable Aging Summary</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
+                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                     </p>
                   </div>
 
@@ -480,15 +431,28 @@ const ProfitAndLossByClass: React.FC = () => {
                     <tr>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Account
+                        Customer
                       </th>
-                      {data.map((employee) => (
-                        <th key={employee.employee.id} 
-                            className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          {employee.employee.name}
-                        </th>
-                      ))}
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Due Today
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        1-15 Days
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        16-30 Days
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        31-60 Days
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Over 60 Days
+                      </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Total
@@ -496,54 +460,52 @@ const ProfitAndLossByClass: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Income Section */}
-                    {renderTableRow('Discounts given', (emp) => -safeGetValue(emp, 'income.discounts_given'))}
-                    {renderTableRow('Sales of Product Income', (emp) => safeGetValue(emp, 'income.sales_of_product_income'))}
-                    {renderTableRow('Shipping Income', (emp) => safeGetValue(emp, 'income.shipping_income'))}
-                    {renderTableRow('Tax Income', (emp) => safeGetValue(emp, 'income.tax_income'))}
-                    {renderTableRow('Total for Income', (emp) => safeGetValue(emp, 'income.total_income'), true)}
-                    
-                    {/* Cost of Sales Section */}
-                    {renderTableRow('Cost of Sales', (emp) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), false, true, 'cost-section')}
-                    <tr>
-                      <td className="p-2 border-b font-medium cost-section">Inventory Shrinkage</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
-                          {formatCurrency(0)}
+                    {data.map((customer, index) => (
+                      <tr key={index}>
+                        <td className="p-2 border-b font-medium">
+                          {customer.customerName}
                         </td>
-                      ))}
-                      <td className="p-2 border-b text-right cost-section">
-                        {formatCurrency(inventoryShrinkage)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 border-b font-bold cost-section">Total for Cost of Sales</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
-                          {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(customer.dueToday)}
                         </td>
-                      ))}
-                      <td className="p-2 border-b text-right font-bold cost-section">
-                        {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
-                      </td>
-                    </tr>
-                    
-                    {/* Profit Section */}
-                    {renderTableRow('Gross Profit', (emp) => safeGetValue(emp, 'profitability.gross_profit'), true)}
-                    {renderTableRow('Other Income', () => 0)}
-                    {renderTableRow('Expenses', () => 0)}
-                    {renderTableRow('Other Expenses', () => 0)}
-                    
-                    {/* Final Net Earnings */}
-                    <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold">Net Earnings</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(customer.due15Days)}
                         </td>
-                      ))}
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(customer.due30Days)}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(customer.due60Days)}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(customer.over60Days)}
+                        </td>
+                        <td className="p-2 border-b text-right font-bold">
+                          {formatCurrency(customer.total)}
+                        </td>
+                      </tr>
+                    ))}
+                    
+                    {/* Total Row */}
+                    <tr>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold">Total</td>
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
+                        {formatCurrency(getTotal('dueToday'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('due15Days'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('due30Days'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('due60Days'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('over60Days'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('total'))}
                       </td>
                     </tr>
                   </tbody>
@@ -559,7 +521,7 @@ const ProfitAndLossByClass: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Profit and Loss by Class
+                        A/R Aging Summary
                       </p>
                     </div>
                   </div>
@@ -588,4 +550,4 @@ const ProfitAndLossByClass: React.FC = () => {
   );
 };
 
-export default ProfitAndLossByClass;
+export default ARAgingSummaryReport;

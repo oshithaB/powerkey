@@ -60,7 +60,7 @@ const SalesReport: React.FC = () => {
       } else if (filter === 'month') {
         startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
-        startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
 
       setPeriodStart(startDate || '');

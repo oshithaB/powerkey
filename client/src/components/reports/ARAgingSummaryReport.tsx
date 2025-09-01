@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
 interface ARAgingSummaryData {
+  customerId: string;
   companyName: string;
   customerName: string;
   dueToday: string;
@@ -76,7 +77,7 @@ const ARAgingSummaryReport: React.FC = () => {
       } else if (filter === 'month') {
         startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
-        startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
 
       setPeriodStart(startDate || '');
@@ -170,6 +171,10 @@ const ARAgingSummaryReport: React.FC = () => {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     }
+  };
+
+  const handleCustomerClick = (employeeId: string) => {
+    navigate(`/reports/ar-aging-in-detail/${employeeId}`);
   };
 
   const printStyles = `
@@ -322,7 +327,11 @@ const ARAgingSummaryReport: React.FC = () => {
                     </thead>
                     <tbody>
                       {data.map((customer, index) => (
-                        <tr key={index}>
+                        <tr 
+                            key={index}
+                            onClick={() => handleCustomerClick(customer.customerId)}
+                            className="hover:bg-gray-50 cursor-pointer"
+                        >
                           <td className="p-2 border-b font-medium">
                             {customer.customerName}
                           </td>

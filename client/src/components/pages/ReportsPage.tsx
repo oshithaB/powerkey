@@ -70,7 +70,7 @@ export default function ReportsPage() {
     {
       name: 'Accounts receivable ageing summary',
       description: 'Current month P&L statement',
-      path: '/reports/profit&loss'
+      path: '/reports/ar-aging-summary'
     },
     {
       name: 'Commissions Report',

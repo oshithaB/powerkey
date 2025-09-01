@@ -2,7 +2,24 @@ const db = require('../../DB/db');
 
 const getARAgingSummary = async (req, res) => {
     try {
-        const currentDate = new Date();
+        const { company_id } = req.params;
+        const { start_date, end_date } = req.query;
+
+        let currentDate = end_date ? new Date(end_date) : new Date();
+        let startDate = start_date ? new Date(start_date) : null;
+
+        if (!startDate) {
+            if (req.query.filter === 'week') {
+                startDate = new Date(currentDate);
+                startDate.setDate(currentDate.getDate() - 7);
+            } else if (req.query.filter === 'month') {
+                startDate = new Date(currentDate);
+                startDate.setMonth(currentDate.getMonth() - 1);
+            } else {
+                startDate = new Date(currentDate.getFullYear(), 0, 1);
+            }
+        }
+
         const next15Days = new Date(currentDate);
         next15Days.setDate(currentDate.getDate() + 15);
         const next30Days = new Date(currentDate);
@@ -10,17 +27,16 @@ const getARAgingSummary = async (req, res) => {
         const next60Days = new Date(currentDate);
         next60Days.setDate(currentDate.getDate() + 60);
 
-        const { company_id } = req.params;
-
         const query = `
             SELECT 
                 co.name AS company_name,
                 c.name AS customer_name,
-                SUM(CASE WHEN i.due_date = ? THEN i.balance_due ELSE 0 END) AS due_today,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_15_days,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_30_days,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_60_days,
-                SUM(CASE WHEN i.due_date < ? OR i.due_date IS NULL THEN i.balance_due ELSE 0 END) AS over_60_days
+                SUM(CASE WHEN i.due_date = ? THEN i.total_amount ELSE 0 END) AS due_today,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_15_days,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_30_days,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_60_days,
+                SUM(CASE WHEN i.due_date < ? OR i.due_date IS NULL THEN i.total_amount ELSE 0 END) AS over_60_days,
+                SUM(i.balance_due) AS total_due
             FROM 
                 invoices i
             LEFT JOIN 
@@ -31,6 +47,8 @@ const getARAgingSummary = async (req, res) => {
                 i.status IN ('opened', 'sent', 'partially_paid', 'overdue')
                 AND i.balance_due > 0
                 AND i.company_id = ?
+                AND i.invoice_date >= ?
+                AND i.invoice_date <= ?
             GROUP BY 
                 co.name, c.name
             ORDER BY 
@@ -43,7 +61,9 @@ const getARAgingSummary = async (req, res) => {
             next15Days.toISOString().split('T')[0], next30Days.toISOString().split('T')[0],
             next30Days.toISOString().split('T')[0], next60Days.toISOString().split('T')[0],
             currentDate.toISOString().split('T')[0],
-            company_id
+            company_id,
+            startDate.toISOString().split('T')[0],
+            currentDate.toISOString().split('T')[0]
         ];
 
         const [results] = await db.execute(query, params);
@@ -56,7 +76,8 @@ const getARAgingSummary = async (req, res) => {
             due30Days: parseFloat(row.due_30_days).toFixed(2),
             due60Days: parseFloat(row.due_60_days).toFixed(2),
             over60Days: parseFloat(row.over_60_days).toFixed(2),
-            total: parseFloat(parseFloat(row.due_today) + parseFloat(row.due_15_days) + parseFloat(row.due_30_days) + parseFloat(row.due_60_days) + parseFloat(row.over_60_days)).toFixed(2)
+            total: parseFloat(parseFloat(row.due_today) + parseFloat(row.due_15_days) + parseFloat(row.due_30_days) + parseFloat(row.due_60_days) + parseFloat(row.over_60_days)).toFixed(2),
+            totalDue: parseFloat(row.total_due).toFixed(2)
         }));
 
         res.status(200).json({

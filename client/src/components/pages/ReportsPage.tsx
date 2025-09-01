@@ -55,13 +55,13 @@ export default function ReportsPage() {
       path: '/reports/balance-sheet'
     },
     {
-      name: 'Profit & Loss By Class',
-      description: 'P&L statement segmented by Employee',
+      name: 'Profit & Loss By All Classes',
+      description: 'P&L statement segmented by Employees',
       path: '/reports/profit&loss-by-class'
     },
     {
-      name: 'Profit & Loss By Customer',
-      description: 'P&L statement segmented by Customer',
+      name: 'Profit & Loss By All Customer',
+      description: 'P&L statement segmented by Customers',
       path: '/reports/profit&loss-by-customer'
     }
   ];

@@ -34,6 +34,7 @@ import SalesReport from './components/reports/SalesReport';
 import SalesReportByEmployees from './components/reports/SalesReportByEmployees';
 import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
 import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
+import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -246,6 +247,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ProfitAndLossByClassInDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/profit&loss-by-customer"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByCustomer />
             </ProtectedRoute>
           }
         />

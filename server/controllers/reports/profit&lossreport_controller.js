@@ -969,6 +969,266 @@ class ReportController {
         }
     };
 
+    static async getProfitAndLossForAllCustomers(req, res) {
+        try {
+            const { company_id } = req.params;
+            const { start_date, end_date } = req.query;
+    
+            if (!company_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Company ID is required'
+                });
+            }
+    
+            // Build date filter condition
+            const today = new Date().toISOString().split('T')[0];
+            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+            let dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+            let dateParams = [startOfYear, today];
+    
+            if (start_date && end_date) {
+                dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+                dateParams = [start_date, end_date];
+            } else if (start_date) {
+                dateCondition = 'AND i.invoice_date >= ?';
+                dateParams = [start_date];
+            } else if (end_date) {
+                dateCondition = 'AND i.invoice_date <= ?';
+                dateParams = [end_date];
+            }
+    
+            // 1. INCOME CALCULATIONS PER CUSTOMER
+            const [productIncomeResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(ii.quantity * ii.actual_unit_price), 0) as product_income
+                FROM invoices i
+                INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            const [shippingIncomeResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
+                FROM invoices i
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            const [discountsResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(i.discount_amount), 0) as discounts_given
+                FROM invoices i
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            const [taxIncomeResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(i.tax_amount), 0) as tax_income
+                FROM invoices i
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            // 2. COST OF SALES CALCULATIONS PER CUSTOMER
+            const [costOfSalesResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(ii.quantity * p.cost_price), 0) as cost_of_sales
+                FROM invoices i
+                INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                LEFT JOIN products p ON ii.product_id = p.id
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            // 3. ADDITIONAL METRICS PER CUSTOMER
+            const [totalPaidResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(i.paid_amount), 0) as total_paid
+                FROM invoices i
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.status IN ('paid', 'partially_paid')
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            const [outstandingResult] = await db.execute(`
+                SELECT 
+                    c.id AS customer_id,
+                    c.name AS customer_name,
+                    c.email AS customer_email,
+                    c.phone AS customer_phone,
+                    COALESCE(SUM(i.balance_due), 0) as outstanding_balance
+                FROM invoices i
+                INNER JOIN customer c ON i.customer_id = c.id
+                WHERE i.company_id = ?
+                AND c.is_active = TRUE
+                AND i.balance_due > 0
+                ${dateCondition}
+                GROUP BY c.id, c.name, c.email, c.phone
+            `, [company_id, ...dateParams]);
+    
+            // 4. GET COMPANY DETAILS
+            const [companyResult] = await db.execute(`
+                SELECT name, address, email_address, contact_number
+                FROM company
+                WHERE company_id = ?
+            `, [company_id]);
+    
+            // Prepare data for all customers
+            const customerData = {};
+            const resultsMap = {
+                productIncome: productIncomeResult,
+                shippingIncome: shippingIncomeResult,
+                discounts: discountsResult,
+                taxIncome: taxIncomeResult,
+                costOfSales: costOfSalesResult,
+                totalPaid: totalPaidResult,
+                outstanding: outstandingResult
+            };
+    
+            for (const [key, result] of Object.entries(resultsMap)) {
+                result.forEach(row => {
+                    if (!customerData[row.customer_id]) {
+                        customerData[row.customer_id] = {
+                            id: row.customer_id,
+                            name: row.customer_name,
+                            email: row.customer_email || '',
+                            phone: row.customer_phone || ''
+                        };
+                    }
+                    if (key === 'productIncome') customerData[row.customer_id].productIncome = parseFloat(row.product_income || 0);
+                    if (key === 'shippingIncome') customerData[row.customer_id].shippingIncome = parseFloat(row.shipping_income || 0);
+                    if (key === 'discounts') customerData[row.customer_id].discountsGiven = parseFloat(row.discounts_given || 0);
+                    if (key === 'taxIncome') customerData[row.customer_id].taxIncome = parseFloat(row.tax_income || 0);
+                    if (key === 'costOfSales') customerData[row.customer_id].costOfSales = parseFloat(row.cost_of_sales || 0);
+                    if (key === 'totalPaid') customerData[row.customer_id].totalPaid = parseFloat(row.total_paid || 0);
+                    if (key === 'outstanding') customerData[row.customer_id].outstandingBalance = parseFloat(row.outstanding_balance || 0);
+                });
+            }
+    
+            const customers = Object.values(customerData).map(customer => {
+                const totalIncome = customer.productIncome + customer.shippingIncome + customer.taxIncome;
+                const netIncome = totalIncome - customer.discountsGiven;
+                const grossProfit = netIncome - customer.costOfSales;
+                const netEarnings = grossProfit;
+                const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+                const netProfitMargin = totalIncome > 0 ? (netEarnings / totalIncome) * 100 : 0;
+    
+                return {
+                    customer: {
+                        id: customer.id,
+                        name: customer.name,
+                        email: customer.email,
+                        phone: customer.phone
+                    },
+                    income: {
+                        sales_of_product_income: customer.productIncome,
+                        shipping_income: customer.shippingIncome,
+                        tax_income: customer.taxIncome,
+                        discounts_given: -customer.discountsGiven,
+                        total_income: totalIncome,
+                        net_income: netIncome
+                    },
+                    cost_of_sales: {
+                        cost_of_sales: customer.costOfSales,
+                        total_cost_of_sales: customer.costOfSales
+                    },
+                    profitability: {
+                        gross_profit: grossProfit,
+                        net_earnings: netEarnings,
+                        gross_profit_margin: parseFloat(grossProfitMargin.toFixed(2)),
+                        net_profit_margin: parseFloat(netProfitMargin.toFixed(2))
+                    },
+                    cash_flow: {
+                        total_invoiced: totalIncome,
+                        total_paid: customer.totalPaid,
+                        outstanding_balance: customer.outstandingBalance,
+                        collection_rate: totalIncome > 0 ? parseFloat(((customer.totalPaid / totalIncome) * 100).toFixed(2)) : 0
+                    }
+                };
+            });
+    
+            const companyInfo = companyResult[0] || {};
+    
+            return res.status(200).json({
+                success: true,
+                message: 'Profit and Loss data for all customers retrieved successfully',
+                data: {
+                    company: {
+                        id: company_id,
+                        name: companyInfo.name || 'Company Name',
+                        address: companyInfo.address,
+                        email: companyInfo.email_address,
+                        phone: companyInfo.contact_number
+                    },
+                    period: {
+                        start_date: dateParams[0],
+                        end_date: dateParams[dateParams.length - 1],
+                        generated_at: new Date().toISOString()
+                    },
+                    customers: customers
+                }
+            });
+    
+        } catch (error) {
+            console.error('Error in getProfitAndLossForAllCustomers:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+            });
+        }
+    };
+
 
     static async getProfitAndLossByCustomerId(req, res) {
         try {

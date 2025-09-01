@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart3, FileText, TrendingUp, Download, Star } from 'lucide-react';
-import path from 'path';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -59,6 +58,11 @@ export default function ReportsPage() {
       name: 'Profit & Loss By Class',
       description: 'P&L statement segmented by Employee',
       path: '/reports/profit&loss-by-class'
+    },
+    {
+      name: 'Profit & Loss By Customer',
+      description: 'P&L statement segmented by Customer',
+      path: '/reports/profit&loss-by-customer'
     }
   ];
 

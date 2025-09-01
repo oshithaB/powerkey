@@ -405,17 +405,6 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                   </table>
 
                   <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-2">Cash Flow Summary</h3>
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        {renderTableRow('Total Invoiced', data.cash_flow.total_invoiced)}
-                        {renderTableRow('Total Paid', data.cash_flow.total_paid)}
-                        {renderTableRow('Outstanding Balance', data.cash_flow.outstanding_balance)}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-2">Invoices</h3>
                     {salesData.invoices.length > 0 ? (
                       <table className="w-full border-collapse">
@@ -424,10 +413,6 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                               Invoice Number
-                            </th>
-                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Company
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -443,6 +428,10 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                              Paid Amount
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                               Total Amount
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
@@ -455,10 +444,10 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                           {salesData.invoices.map((invoice) => (
                             <tr key={invoice.invoiceId}>
                               <td className="p-2 border-b">{invoice.invoiceNumber}</td>
-                              <td className="p-2 border-b">{invoice.companyName}</td>
                               <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
                               <td className="p-2 border-b">{invoice.customerName}</td>
                               <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
+                              <td className='p-2 border-b text-right'>{formatCurrency(data.cash_flow.total_paid)}</td>
                               <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
                               <td className="p-2 border-b ">{invoice.status}</td>
                             </tr>
@@ -572,10 +561,6 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                           </th>
                           <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                               style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Company
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             Date
                           </th>
                           <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
@@ -585,6 +570,10 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                           <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                               style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             Discount
+                          </th>
+                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Paid Amount
                           </th>
                           <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                               style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -600,10 +589,10 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                         {salesData.invoices.map((invoice) => (
                           <tr key={invoice.invoiceId}>
                             <td className="p-2 border-b">{invoice.invoiceNumber}</td>
-                            <td className="p-2 border-b">{invoice.companyName}</td>
                             <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
                             <td className="p-2 border-b">{invoice.customerName}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
+                            <td className='p-2 border-b text-right'>{formatCurrency(data.cash_flow.total_paid)}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
                             <td className="p-2 border-b">{invoice.status}</td>
                           </tr>

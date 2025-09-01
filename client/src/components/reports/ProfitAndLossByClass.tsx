@@ -143,6 +143,10 @@ const ProfitAndLossByClass: React.FC = () => {
     return data.reduce((total, employee) => total + safeGetValue(employee, path), 0);
   };
 
+  const handleEmployeeClick = (employeeId: string) => {
+    navigate(`/reports/profit-and-loss-by-employee/${employeeId}`);
+  };
+
   const handlePrint = () => {
     if (data.length === 0) {
       alert('No data available to print');
@@ -353,7 +357,8 @@ const ProfitAndLossByClass: React.FC = () => {
                         </th>
                         {data.map((employee) => (
                           <th key={employee.employee.id} 
-                              className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              onClick={() => handleEmployeeClick(employee.employee.id)}
+                              className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px] cursor-pointer hover:underline"
                               style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             {employee.employee.name}
                           </th>

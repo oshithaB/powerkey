@@ -33,6 +33,7 @@ import CommissionReportByEmployees from './components/reports/CommissionReportBy
 import SalesReport from './components/reports/SalesReport';
 import SalesReportByEmployees from './components/reports/SalesReportByEmployees';
 import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
+import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -237,6 +238,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ProfitAndLossByClass />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/profit-and-loss-by-employee/:employeeId"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByClassInDetail />
             </ProtectedRoute>
           }
         />

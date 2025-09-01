@@ -13,19 +13,13 @@ interface Invoice {
   companyName: string;
   invoiceNumber: string;
   invoiceDate: string;
+  dueDate: string;
   discountAmount: string;
+  paidAmount: string;
   totalAmount: string;
   status: string;
   customerId: string;
   customerName: string;
-}
-
-interface SalesReport {
-  employeeId: string;
-  employeeName: string;
-  employeeEmail: string;
-  totalSalesAmount: string;
-  invoices: Invoice[];
 }
 
 interface ProfitAndLossData {
@@ -36,7 +30,7 @@ interface ProfitAndLossData {
     email: string | null;
     phone: string | null;
   };
-  employee: {
+  customer: {
     id: string;
     name: string;
     email: string | null;
@@ -88,7 +82,7 @@ interface ProfitAndLossData {
 const ProfitAndLossByClassInDetail: React.FC = () => {
   const { selectedCompany } = useCompany();
   const [data, setData] = useState<ProfitAndLossData | null>(null);
-  const [salesData, setSalesData] = useState<SalesReport | null>(null);
+  const [salesData, setSalesData] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -97,7 +91,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-  const { employeeId } = useParams<{ employeeId: string }>();
+  const { customerId } = useParams<{ customerId: string }>();
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -105,11 +99,11 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchProfitAndLossData = async (employeeId: string, startDate?: string, endDate?: string) => {
+  const fetchProfitAndLossData = async (customerId: string, startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/profit-and-loss-by-emp/${selectedCompany?.company_id}/${employeeId}`, {
+      const response = await axiosInstance.get(`/api/profit-and-loss-by-cust/${selectedCompany?.company_id}/${customerId}`, {
         params: { start_date: startDate, end_date: endDate },
       });
       setData(response.data.data);
@@ -121,20 +115,21 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
     }
   };
 
-  const fetchInvoicesByEmployee = async (employeeId: string, startDate?: string, endDate?: string) => {
+  const fetchInvoicesByCustomer = async (customerId: string, startDate?: string, endDate?: string) => {
     try {
-      const response = await axiosInstance.get(`/api/invoices-by-employee/${selectedCompany?.company_id}/${employeeId}`, {
+      const response = await axiosInstance.get(`/api/customer-invoices/${selectedCompany?.company_id}/${customerId}`, {
         params: { start_date: startDate, end_date: endDate },
       });
       setSalesData(response.data.data);
+      console.log('Fetched Invoices Data:', response.data.data);
     } catch (err) {
       setError('Failed to fetch invoices data. Please try again.');
-      console.error('Error fetching invoices by employee:', err);
+      console.error('Error fetching invoices by customer:', err);
     }
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id && employeeId) {
+    if (selectedCompany?.company_id && customerId) {
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
@@ -149,13 +144,13 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchProfitAndLossData(employeeId, startDate, endDate);
-      fetchInvoicesByEmployee(employeeId, startDate, endDate);
+      fetchProfitAndLossData(customerId, startDate, endDate);
+      fetchInvoicesByCustomer(customerId, startDate, endDate);
     } else {
-      setError('Missing company or employee information');
+      setError('Missing company or customer information');
       setLoading(false);
     }
-  }, [selectedCompany?.company_id, employeeId, filter]);
+  }, [selectedCompany?.company_id, customerId, filter]);
 
   const formatCurrency = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -225,7 +220,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
         }
       }
 
-      const filename = `profit-and-loss-${data?.employee.name || 'employee'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `profit-and-loss-by-customer-${data?.customer.name || 'customer'}-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -305,7 +300,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold">Employee Profit and Loss Report</h1>
+                <h1 className="text-2xl font-bold">Customer Profit and Loss Report</h1>
               </div>
               <div className="flex space-x-2">
                 <select
@@ -338,7 +333,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Employee Profit and Loss Details</p>
+                <p className="text-sm font-medium">Customer Profit and Loss Details</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -363,8 +358,8 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                 <>
                   <div className="mb-6 flex">
                     <div>
-                      <h2 className="text-lg font-semibold">{data.employee.name}</h2>
-                      <p className="text-sm text-gray-600">Email: {data.employee.email || 'N/A'}</p>
+                      <h2 className="text-lg font-semibold">{data.customer.name}</h2>
+                      <p className="text-sm text-gray-600">Email: {data.customer.email || 'N/A'}</p>
                       <p className="text-sm text-gray-600">Total Net Earnings: {formatCurrency(data.profitability.net_earnings)}</p>
                     </div>
                     <div className="ml-auto text-right">
@@ -406,56 +401,56 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
 
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-2">Invoices</h3>
-                    {salesData.invoices.length > 0 ? (
-                      <table className="w-full border-collapse">
+                    {salesData && salesData.length > 0 ? (
+                        <table className="w-full border-collapse">
                         <thead>
-                          <tr>
+                            <tr>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Invoice Number
+                                Invoice Number
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Date
+                                Date
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Customer
+                                Due Date
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Discount
+                                Paid Amount
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Paid Amount
+                                Balance Due
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Total Amount
+                                Total Amount
                             </th>
                             <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
                                 style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                              Status
+                                Status
                             </th>
-                          </tr>
+                            </tr>
                         </thead>
                         <tbody>
-                          {salesData.invoices.map((invoice) => (
+                            {salesData.map((invoice: any) => (
                             <tr key={invoice.invoiceId}>
-                              <td className="p-2 border-b">{invoice.invoiceNumber}</td>
-                              <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
-                              <td className="p-2 border-b">{invoice.customerName}</td>
-                              <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
-                              <td className='p-2 border-b text-right'>{formatCurrency(data.cash_flow.total_paid)}</td>
-                              <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
-                              <td className="p-2 border-b ">{invoice.status}</td>
+                                <td className="p-2 border-b">{invoice.invoiceNumber}</td>
+                                <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                                <td className="p-2 border-b">{formatDate(invoice.dueDate)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.paidAmount)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.balanceDue)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
+                                <td className="p-2 border-b">{invoice.status}</td>
                             </tr>
-                          ))}
+                            ))}
                         </tbody>
-                      </table>
+                        </table>
                     ) : (
-                      <p className="text-sm text-gray-600">No invoices found for this employee.</p>
+                        <p className="text-sm text-gray-600">No invoices found for this customer.</p>
                     )}
                   </div>
 
@@ -474,7 +469,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Employee Profit and Loss Report
+                Print Preview - Customer Profit and Loss Report
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -489,14 +484,14 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Employee Profit and Loss Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Profit and Loss Details</h2>
+                    <h1 className="text-3xl font-bold mb-2">Customer Profit and Loss Report</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Customer Profit and Loss Details</h2>
                     <h2 className="text-xl text-gray-600 mb-2">{data.company.name} (Pvt) Ltd.</h2>
                     <p className="text-sm text-gray-600">
                       Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
                     </p>
-                    <p className="text-sm text-gray-600 mt-2">Employee: {data.employee.name}</p>
-                    <p className="text-sm text-gray-600">Email: {data.employee.email || 'N/A'}</p>
+                    <p className="text-sm text-gray-600 mt-2">Customer: {data.customer.name}</p>
+                    <p className="text-sm text-gray-600">Email: {data.customer.email || 'N/A'}</p>
                   </div>
 
                   {selectedCompany?.company_logo && (
@@ -550,59 +545,58 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                 </div>
 
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">Invoices</h3>
-                  {salesData.invoices.length > 0 ? (
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Invoice Number
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Date
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Customer
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Discount
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Paid Amount
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total Amount
-                          </th>
-                          <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {salesData.invoices.map((invoice) => (
-                          <tr key={invoice.invoiceId}>
-                            <td className="p-2 border-b">{invoice.invoiceNumber}</td>
-                            <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
-                            <td className="p-2 border-b">{invoice.customerName}</td>
-                            <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
-                            <td className='p-2 border-b text-right'>{formatCurrency(data.cash_flow.total_paid)}</td>
-                            <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
-                            <td className="p-2 border-b">{invoice.status}</td>
-                          </tr>
-                        ))}
-                        
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="text-sm text-gray-600">No invoices found for this employee.</p>
-                  )}
+                    <h3 className="text-lg font-semibold mb-2">Invoices</h3>
+                    {salesData && salesData.length > 0 ? (
+                        <table className="w-full border-collapse">
+                        <thead>
+                            <tr>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Invoice Number
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Date
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Due Date
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Paid Amount
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Balance Due
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Total Amount
+                            </th>
+                            <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                                Status
+                            </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {salesData.map((invoice: any) => (
+                            <tr key={invoice.invoiceId}>
+                                <td className="p-2 border-b">{invoice.invoiceNumber}</td>
+                                <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                                <td className="p-2 border-b">{formatDate(invoice.dueDate)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.paidAmount)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.balanceDue)}</td>
+                                <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
+                                <td className="p-2 border-b">{invoice.status}</td>
+                            </tr>
+                            ))}
+                        </tbody>
+                        </table>
+                    ) : (
+                        <p className="text-sm text-gray-600">No invoices found for this customer.</p>
+                    )}
                 </div>
 
                 <div className="border-t pt-2 mt-6">
@@ -611,7 +605,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                       Report generated at: {new Date().toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Employee Profit and Loss Report
+                      Customer Profit and Loss Report
                     </p>
                   </div>
                 </div>

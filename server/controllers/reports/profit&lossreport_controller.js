@@ -567,6 +567,116 @@ class ReportController {
         }
     }
 
+    static async getInvoicesByEmployeeId(req, res) {
+        const { employee_id: employeeId, company_id: companyId } = req.params;
+        const { start_date, end_date } = req.query;
+        try {
+            let sumExpression = 'COALESCE(SUM(i.total_amount), 0)';
+            let paramsTotal = [companyId, employeeId];
+            if (start_date && end_date) {
+                sumExpression = 'COALESCE(SUM(CASE WHEN i.invoice_date >= ? AND i.invoice_date <= ? THEN i.total_amount ELSE 0 END), 0)';
+                paramsTotal = [companyId, start_date, end_date, employeeId];
+            }
+    
+            // Query to calculate total sales amount for a specific employee within a company (only paid/partially_paid)
+            const totalSalesQuery = `
+                SELECT
+                    e.id AS employee_id,
+                    e.name AS employee_name,
+                    e.email AS employee_email,
+                    ${sumExpression} AS total_sales_amount
+                FROM
+                    employees e
+                LEFT JOIN
+                    invoices i ON e.id = i.employee_id AND i.company_id = ? AND i.status IN ('paid', 'partially_paid', 'opened')
+                WHERE
+                    e.is_active = TRUE AND e.id = ?
+                GROUP BY
+                    e.id, e.name, e.email
+            `;
+    
+            let whereDate = '';
+            let paramsInvoices = [companyId, employeeId, companyId];
+            if (start_date && end_date) {
+                whereDate = ' AND i.invoice_date >= ? AND i.invoice_date <= ?';
+                paramsInvoices = [companyId, employeeId, companyId, start_date, end_date];
+            }
+    
+            // Query to fetch invoice details for the employee within a specific company (only paid/partially_paid)
+            const invoicesQuery = `
+                SELECT
+                    i.id AS invoice_id,
+                    i.invoice_number,
+                    i.invoice_date,
+                    i.customer_id,
+                    i.company_id,
+                    i.total_amount,
+                    i.discount_amount,
+                    i.status,
+                    co.name AS company_name,
+                    c.name AS customer_name
+                FROM
+                    employees e
+                LEFT JOIN
+                    invoices i ON e.id = i.employee_id AND i.company_id = ?
+                LEFT JOIN
+                    customer c ON i.customer_id = c.id
+                LEFT JOIN
+                    company co ON i.company_id = co.company_id
+                WHERE
+                    e.is_active = TRUE AND e.id = ? AND i.company_id = ? AND i.id IS NOT NULL 
+                    AND i.status IN ('paid', 'partially_paid', 'opened')${whereDate}
+                ORDER BY
+                    i.invoice_date DESC
+            `;
+    
+            // Execute the queries
+            const [totalSalesResults] = await db.execute(totalSalesQuery, paramsTotal);
+            const [invoicesResults] = await db.execute(invoicesQuery, paramsInvoices);
+    
+            if (totalSalesResults.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Employee not found or no sales data available for this company'
+                });
+            }
+    
+            const row = totalSalesResults[0];
+            const salesReport = {
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                employeeEmail: row.employee_email,
+                totalSalesAmount: parseFloat(row.total_sales_amount).toFixed(2),
+                invoices: invoicesResults.map(invoice => ({
+                    invoiceId: invoice.invoice_id,
+                    companyId: invoice.company_id,
+                    companyName: invoice.company_name,
+                    invoiceNumber: invoice.invoice_number,
+                    invoiceDate: invoice.invoice_date,
+                    discountAmount: parseFloat(invoice.discount_amount).toFixed(2),
+                    totalAmount: parseFloat(invoice.total_amount).toFixed(2),
+                    status: invoice.status,
+                    customerId: invoice.customer_id,
+                    customerName: invoice.customer_name
+                }))
+            };
+    
+            // Send the response
+            res.status(200).json({
+                success: true,
+                data: salesReport,
+                message: 'Sales report for the employee retrieved successfully'
+            });
+        } catch (error) {
+            console.error('Error generating sales report for the employee:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to generate sales report for the employee',
+                error: error.message
+            });
+        }
+    };
+
     static async getProfitAndLossForAllEmployees(req, res) {
         try {
             const { company_id } = req.params;

@@ -106,7 +106,7 @@ const ProfitAndLossByClass: React.FC = () => {
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         startDate = monthAgo.toISOString().split('T')[0];
       } else if (filter === 'year') {
-        startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
 
       setPeriodStart(startDate || '');

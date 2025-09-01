@@ -35,6 +35,7 @@ const {
 const {
     getARAgingSummary,
     getCustomerInvoices,
+    getARAgingSummaryInDetails,
 } = aragingReportController;
 
 //====================================================================================================================
@@ -139,7 +140,14 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'manager', 'accountant']),
     getCustomerInvoices
-)
+);
+
+router.get(
+    '/ar-aging-summary-details/:customer_id/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getARAgingSummaryInDetails
+);
 
 
 module.exports = router;

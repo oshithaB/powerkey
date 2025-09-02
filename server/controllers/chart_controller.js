@@ -81,7 +81,7 @@ async function getCustomerPurchaseFrequency(companyId) {
             WHERE c.company_id = ?
             GROUP BY c.id, c.name, c.email
             ORDER BY purchase_count DESC
-            LIMIT 10
+            LIMIT 5
         `, [companyId]);
         return rows;
     } catch (error) {
@@ -134,11 +134,45 @@ async function getPaymentMethodDistribution(companyId) {
     }
 }
 
+// Get Monthly Sales Trend Comparison with previous month
+async function getMonthlySalesTrendComparison(companyId) {
+    try {
+        const [currentMonthRows] = await db.execute(`
+            SELECT 
+                SUM(total_amount) as total_sales,
+                COUNT(id) as invoice_count
+            FROM invoices
+            WHERE company_id = ?
+            AND YEAR(invoice_date) = YEAR(CURDATE())
+            AND MONTH(invoice_date) = MONTH(CURDATE())
+        `, [companyId]);
+
+        const [previousMonthRows] = await db.execute(`
+            SELECT 
+                SUM(total_amount) as total_sales,
+                COUNT(id) as invoice_count
+            FROM invoices
+            WHERE company_id = ?
+            AND YEAR(invoice_date) = YEAR(CURDATE())
+            AND MONTH(invoice_date) = MONTH(CURDATE()) - 1
+        `, [companyId]);
+
+        return {
+            currentMonth: currentMonthRows[0],
+            previousMonth: previousMonthRows[0]
+        };
+    } catch (error) {
+        console.error('Error fetching monthly sales trend comparison:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     getTop10Products,
     getTop5Salespersons,
     getMonthlySalesTrend,
     getCustomerPurchaseFrequency,
     getCategorySalesDistribution,
-    getPaymentMethodDistribution
+    getPaymentMethodDistribution,
+    getMonthlySalesTrendComparison,
 };

@@ -8,7 +8,8 @@ const {
     getMonthlySalesTrend,
     getCustomerPurchaseFrequency,
     getCategorySalesDistribution,
-    getPaymentMethodDistribution
+    getPaymentMethodDistribution,
+    getMonthlySalesTrendComparison,
 } = require('../controllers/chart_controller');
 
 // Route for top 10 products
@@ -101,6 +102,22 @@ router.get(
             const companyId = req.params.company_id;
             const paymentDistribution = await getPaymentMethodDistribution(companyId);
             res.json({ success: true, data: paymentDistribution });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Route for monthly sales trend comparison
+router.get(
+    '/monthlySalesTrendComparison/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sale']),
+    async (req, res, next) => {
+        try {
+            const companyId = req.params.company_id;
+            const salesTrendComparison = await getMonthlySalesTrendComparison(companyId);
+            res.json({ success: true, data: salesTrendComparison });
         } catch (error) {
             next(error);
         }

@@ -112,7 +112,14 @@ export default function EditInvoice() {
     shipping_date: invoice?.shipping_date ? invoice.shipping_date.split('T')[0] : '',
     tracking_number: invoice?.tracking_number || '',
     status: invoice?.status,
-    invoice_type: invoice?.status === 'proforma' ? 'proforma' : 'invoice',
+    invoice_type:
+      invoice?.status === 'proforma'
+        ? 'proforma'
+        : invoice?.status === 'cancelled'
+        ? 'cancelled'
+        : invoice?.status === 'paid'
+        ? 'paid'
+        : 'invoice',
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -296,7 +303,7 @@ export default function EditInvoice() {
     return { subtotal, totalTax, discountAmount, shippingCost, total, balanceDue };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -367,11 +374,12 @@ export default function EditInvoice() {
       console.log('User role:', userRole);
 
       try {
-          if (userRole !== 'admin' && submitData.status !== 'proforma' && initialFormData.invoice_type !== 'proforma') {
+          if (userRole !== 'admin' && submitData.status === 'opened' && initialFormData.invoice_type === 'proforma') {
             const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
-              company_id: selectedCompany?.company_id,
+              company_id: selectedCompany?.company_id, 
               customer_id: parseInt(formData.customer_id),
-              invoice_total: total
+              invoice_total: total,
+              operation_type: 'create'
             });
 
             console.log('Eligibility response:', eligibilityRes.data);
@@ -584,6 +592,7 @@ export default function EditInvoice() {
                   className="input"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  disabled
                 />
               </div>
 
@@ -634,16 +643,17 @@ export default function EditInvoice() {
                   className="input"
                   value={formData.status || ''}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  disabled={formData.invoice_type === 'cancelled' || formData.invoice_type === 'paid' || formData.invoice_type === 'partially_paid'}
                 >
                   <option value="">Select Status</option>
-                  {formData.status === 'proforma' ? (
+                  {formData.invoice_type === 'proforma' ? (
                     <>
-                      <option value="sent">Opened</option>
+                      <option value="opened">Opened</option>
                       <option value="cancelled">Cancelled</option>
                     </>
-                  ) : formData.status !== 'cancelled' ? (
+                  ) : (
                     <option value="cancelled">Cancelled</option>
-                  ) : null}
+                  )}
                 </select>
               </div>
             </div>

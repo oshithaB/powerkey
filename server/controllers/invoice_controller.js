@@ -35,25 +35,25 @@ const createInvoice = asyncHandler(async (req, res) => {
 
   // Validate required fields
   if (!invoice_number) {
-    return res.status(400).json({ error: "Invoice number is required" });
+    return res.status(422).json({ error: "Invoice number is required" });
   }
   if (!company_id) {
-    return res.status(400).json({ error: "Company ID is required" });
+    return res.status(422).json({ error: "Company ID is required" });
   }
   if (!customer_id) {
-    return res.status(400).json({ error: "Customer ID is required" });
+    return res.status(422).json({ error: "Customer ID is required" });
   }
   if (!invoice_date) {
-    return res.status(400).json({ error: "Invoice date is required" });
+    return res.status(422).json({ error: "Invoice date is required" });
   }
   if (!subtotal || isNaN(subtotal)) {
-    return res.status(400).json({ error: "Valid subtotal is required" });
+    return res.status(422).json({ error: "Valid subtotal is required" });
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "At least one valid item is required" });
+    return res.status(422).json({ error: "At least one valid item is required" });
   }
   if (!status || !['opened', 'proforma'].includes(status)) {
-    return res.status(400).json({ error: "Invalid invoice status" });
+    return res.status(422).json({ error: "Invalid invoice status" });
   }
 
   console.log('Validated required fields successfully');
@@ -61,25 +61,25 @@ const createInvoice = asyncHandler(async (req, res) => {
   // Validate items
   for (const item of items) {
     if (!item.product_id || item.product_id === 0) {
-      return res.status(400).json({ error: "Each item must have a valid product ID" });
+      return res.status(422).json({ error: "Each item must have a valid product ID" });
     }
     if (!item.description) {
-      return res.status(400).json({ error: "Each item must have a description" });
+      return res.status(422).json({ error: "Each item must have a description" });
     }
     if (!item.quantity || item.quantity <= 0) {
-      return res.status(400).json({ error: "Each item must have a valid quantity" });
+      return res.status(422).json({ error: "Each item must have a valid quantity" });
     }
     if (!item.unit_price || item.unit_price < 0) {
-      return res.status(400).json({ error: "Each item must have a valid unit price" });
+      return res.status(422).json({ error: "Each item must have a valid unit price" });
     }
     if (item.tax_rate < 0) {
-      return res.status(400).json({ error: "Tax rate cannot be negative" });
+      return res.status(422).json({ error: "Tax rate cannot be negative" });
     }
     if (item.tax_amount < 0) {
-      return res.status(400).json({ error: "Tax amount cannot be negative" });
+      return res.status(422).json({ error: "Tax amount cannot be negative" });
     }
     if (item.total_price < 0) {
-      return res.status(400).json({ error: "Total price cannot be negative" });
+      return res.status(422).json({ error: "Total price cannot be negative" });
     }
   }
 
@@ -176,11 +176,56 @@ const createInvoice = asyncHandler(async (req, res) => {
         item.tax_amount,
         item.total_price
       ];
+
+      if (status !== 'proforma') {
+        const [productRows] = await connection.query(
+          `SELECT quantity_on_hand FROM products WHERE id = ? AND company_id = ?`,
+          [item.product_id, company_id]
+        );
+
+        console.log(`Fetched product data for product_id ${item.product_id}:`, productRows);
+
+        if (productRows.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: `${item.product_name} not found.` });
+        }
+
+        console.log(`Available quantity for product_id ${item.product_id}:`, productRows[0].quantity_on_hand);
+
+        const availableQuantity = Number(productRows[0].quantity_on_hand);
+        if (availableQuantity < Number(item.quantity)) {
+          console.error(`Insufficient quantity for product_id ${item.product_id}: Available ${availableQuantity}, Requested ${item.quantity}`);
+          await connection.rollback();
+          return res.status(404).json({ error: `Insufficient quantity for ${item.product_name}. Available: ${availableQuantity}, Requested: ${item.quantity}` });
+        }
+
+        console.log(`Sufficient quantity for product_id ${item.product_id}:`, availableQuantity);
+      }
+
       const [itemResult] = await connection.query(itemQuery, itemData);
+
       if (itemResult.affectedRows === 0) {
         await connection.rollback();
-        return res.status(400).json({ error: "Failed to create invoice items" });
+        return res.status(404).json({ error: "Failed to create invoice items" });
       }
+
+      console.log('Inserted invoice item:', itemData);
+
+      if (status !== 'proforma') {
+        const [updateResult] = await connection.query(
+          `UPDATE products SET quantity_on_hand = quantity_on_hand - ? WHERE id = ? AND company_id = ?`,
+          [item.quantity, item.product_id, company_id]
+        );
+
+        console.log(`Updated product ID ${item.product_id} quantity_on_hand by -${item.quantity}`);
+
+        if (updateResult.affectedRows === 0) {
+          await connection.rollback();
+          console.error(`Failed to update product ID ${item.product_id} quantity_on_hand`);
+          return res.status(404).json({ error: "Failed to update product quantity" });
+        }
+      }
+      
     }
 
     // Handle file attachment if provided
@@ -229,7 +274,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     await connection.rollback();
     console.error('Error creating invoice:', error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+      return res.status(404).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
     res.status(500).json({ error: error.sqlMessage || 'Internal server error' });
   } finally {
@@ -410,11 +455,15 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
+
+
+
+
     // Delete existing items
-    await connection.query(
-      `DELETE FROM invoice_items WHERE invoice_id = ?`,
-      [invoiceId]
-    );
+    // await connection.query(
+    //   `DELETE FROM invoice_items WHERE invoice_id = ?`,
+    //   [invoiceId]
+    // );
 
     // Insert updated invoice items
     const itemQuery = `INSERT INTO invoice_items
@@ -440,6 +489,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
         return res.status(400).json({ error: "Failed to create invoice items" });
       }
     }
+
+
 
     // Handle file attachment if provided
     if (req.file) {
@@ -966,12 +1017,12 @@ const recordPayment = asyncHandler(async (req, res) => {
 });
 
 const checkCustomerEligibility = asyncHandler(async (req, res) => {
-  const { customer_id, company_id, invoice_total } = req.body;
+  const { customer_id, company_id, invoice_total, operation_type} = req.body;
 
   console.log('Checking customer eligibility:', { customer_id, company_id });
 
-  if (!customer_id || !company_id || !invoice_total) {
-    return res.status(400).json({ error: "Customer ID, Company ID, and Invoice Total are required" });
+  if (!customer_id || !company_id || !invoice_total || !operation_type) {
+    return res.status(400).json({ error: "Customer ID, Company ID, Invoice Total, and Operation Type are required" });
   }
 
   const connection = await db.getConnection();
@@ -989,6 +1040,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     const creditLimit = Number(customerRows[0].credit_limit) || 0;
     const currentBalance = Number(customerRows[0].current_balance) || 0;
+      
 
     const [hasOverdue] = await connection.query(
       `SELECT * FROM invoices 
@@ -1003,7 +1055,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     let totalBalanceDue = currentBalance + invoice_total;
 
-    if (creditLimit <= totalBalanceDue) {
+    if (creditLimit < totalBalanceDue) {
       connection.release();
       return res.status(403).json({ eligible: false, reason: "Customer's credit limit exceeded" });
     }

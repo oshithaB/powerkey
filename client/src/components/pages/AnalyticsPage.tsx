@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, BarChart3, TrendingUp, Activity } from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2'; // Added Line import
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement, // Added LineElement
+  PointElement, // Added PointElement
   Title,
   Tooltip,
   Legend,
@@ -14,28 +16,33 @@ import axios from 'axios';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend); // Updated registration
 
 export default function AnalyticsPage() {
   const { selectedCompany } = useCompany();
   const [topProducts, setTopProducts] = useState<{ name: string; total_quantity: number; total_revenue: number }[]>([]);
   const [topSalespersons, setTopSalespersons] = useState<{ name: string; total_sales: number; total_invoices: number }[]>([]);
+  const [topCustomers, setTopCustomers] = useState<{ name: string; email: string; purchase_count: number; total_spent: number }[]>([]);
   const companyId = selectedCompany?.company_id;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch top 10 products
         const productsResponse = await axiosInstance.get(`api/top10Products/${selectedCompany?.company_id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
         setTopProducts(productsResponse.data.data);
 
-        // Fetch top 5 salespersons
         const salespersonsResponse = await axiosInstance.get(`api/top5Salespersons/${companyId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
         setTopSalespersons(salespersonsResponse.data.data);
+
+        const customersResponse = await axiosInstance.get(`api/customerPurchaseFrequency/${companyId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        setTopCustomers(customersResponse.data.data);
+        console.log(customersResponse.data.data);
       } catch (error) {
         console.error('Error fetching chart data:', error);
       }
@@ -46,10 +53,8 @@ export default function AnalyticsPage() {
     }
   }, [companyId]);
 
-  // Normalize revenue for better visualization (e.g., divide by 100 for scaling)
   const normalizeRevenue = (revenue: number) => revenue / 100;
 
-  // Data for Top 10 Products Bar Chart
   const topProductsData = {
     labels: topProducts.map((product) => product.name),
     datasets: [
@@ -72,7 +77,6 @@ export default function AnalyticsPage() {
     ],
   };
 
-  // Data for Top 5 Salespersons Bar Chart
   const topSalespersonsData = {
     labels: topSalespersons.map((salesperson) => salesperson.name),
     datasets: [
@@ -95,6 +99,30 @@ export default function AnalyticsPage() {
     ],
   };
 
+  const topCustomersData = {
+    labels: topCustomers.map((customer) => customer.name),
+    datasets: [
+      {
+        label: 'Purchase Count',
+        data: topCustomers.map((customer) => Number(customer.purchase_count)),
+        borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        fill: true,
+        tension: 0.4,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Total Spent (x100)',
+        data: topCustomers.map((customer) => normalizeRevenue(Number(customer.total_spent))),
+        borderColor: 'rgba(255, 206, 86, 1)',
+        backgroundColor: 'rgba(255, 206, 86, 0.2)',
+        fill: true,
+        tension: 0.4,
+        yAxisID: 'y1',
+      },
+    ],
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -107,7 +135,7 @@ export default function AnalyticsPage() {
           label: function (context: any) {
             const datasetLabel = context.dataset.label || '';
             const value = context.parsed.y;
-            if (datasetLabel.includes('Revenue')) {
+            if (datasetLabel.includes('Revenue') || datasetLabel.includes('Spent')) {
               return `${datasetLabel}: ${(value * 100).toFixed(2)}`;
             }
             return `${datasetLabel}: ${value}`;
@@ -122,7 +150,7 @@ export default function AnalyticsPage() {
         position: 'left' as const,
         title: {
           display: true,
-          text: 'Quantity / Invoices',
+          text: 'Quantity / Invoices / Purchases',
         },
         beginAtZero: true,
       },
@@ -132,11 +160,11 @@ export default function AnalyticsPage() {
         position: 'right' as const,
         title: {
           display: true,
-          text: 'Revenue (x100) / Sales',
+          text: 'Revenue (x100) / Sales / Total Spent (x100)',
         },
         beginAtZero: true,
         grid: {
-          drawOnChartArea: false, // Avoid overlapping grid lines
+          drawOnChartArea: false,
         },
       },
     },
@@ -148,7 +176,6 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
       </div>
 
-      {/* Analytics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card">
           <div className="card-content p-6">
@@ -207,7 +234,6 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="card-header">
@@ -231,12 +257,12 @@ export default function AnalyticsPage() {
 
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold">Top 10 Products</h2>
+            <h2 className="text-lg font-semibold">Top 5 Customers</h2>
           </div>
           <div className="card-content">
             <div className="h-64">
-              {topProducts.length > 0 ? (
-                <Bar data={topProductsData} options={chartOptions} />
+              {topCustomers.length > 0 ? (
+                <Line data={topCustomersData} options={chartOptions} />
               ) : (
                 <div className="h-64 flex items-center justify-center">
                   <div className="text-center">
@@ -250,32 +276,26 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Performance Metrics */}
       <div className="card">
         <div className="card-header">
-          <h2 className="text-lg font-semibold">Key Performance Indicators</h2>
+          <h2 className="text-lg font-semibold">Top 10 Products</h2>
         </div>
         <div className="card-content">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">0</h3>
-              <p className="text-sm text-gray-600">Average Order Value</p>
-            </div>
-
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">0%</h3>
-              <p className="text-sm text-gray-600">Customer Retention Rate</p>
-            </div>
-
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">0</h3>
-              <p className="text-sm text-gray-600">Inventory Turnover</p>
-            </div>
+          <div className="h-64">
+            {topProducts.length > 0 ? (
+              <Bar data={topProductsData} options={chartOptions} />
+            ) : (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <PieChart className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600">No data available</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Coming Soon */}
       <div className="card">
         <div className="card-content p-12 text-center">
           <Activity className="mx-auto h-12 w-12 text-gray-400 mb-4" />

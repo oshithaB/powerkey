@@ -81,7 +81,7 @@ async function getCustomerPurchaseFrequency(companyId) {
             WHERE c.company_id = ?
             GROUP BY c.id, c.name, c.email
             ORDER BY purchase_count DESC
-            LIMIT 10
+            LIMIT 5
         `, [companyId]);
         return rows;
     } catch (error) {

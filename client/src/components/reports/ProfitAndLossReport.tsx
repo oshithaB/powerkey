@@ -61,6 +61,9 @@ const ProfitAndLossReport: React.FC = () => {
   const [filter, setFilter] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const fetchProfitAndLossData = async (startDate?: string, endDate?: string) => {
     setLoading(true);
@@ -81,10 +84,14 @@ const ProfitAndLossReport: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
+      if (isCustomRange) {
+        return;
+      }
+      
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
-
+  
       if (filter === 'week') {
         startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
@@ -92,10 +99,10 @@ const ProfitAndLossReport: React.FC = () => {
       } else if (filter === 'year') {
         startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
-
+  
       fetchProfitAndLossData(startDate, endDate);
     }
-  }, [selectedCompany?.company_id, filter]);
+  }, [selectedCompany?.company_id, filter, isCustomRange]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(value);
@@ -204,38 +211,91 @@ const ProfitAndLossReport: React.FC = () => {
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h1 className="text-2xl font-bold mb-4">Profit and Loss Report</h1>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40"
-                >
-                  <option value="">Select Period</option>
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">Last Year</option>
-                </select>
-                <button
-                  onClick={handlePrint}
-                  className="text-gray-400 hover:text-gray-600"
-                  title="Print Report"
-                >
-                  <Printer className="h-6 w-6" />
-                </button>
-                <button
-                  onClick={() => navigate(-1)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
+                <div className="flex space-x-2 items-end">
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                    <select
+                      value={isCustomRange ? 'custom' : filter}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === 'custom') {
+                          setIsCustomRange(true);
+                          setFilter('');
+                        } else {
+                          setIsCustomRange(false);
+                          setFilter(value);
+                          setStartDate('');
+                          setEndDate('');
+                        }
+                      }}
+                      className="border rounded-md p-2 w-40"
+                    >
+                      <option value="">Select Period</option>
+                      <option value="week">Last Week</option>
+                      <option value="month">Last Month</option>
+                      <option value="year">Last Year</option>
+                      <option value="custom">Custom Range</option>
+                    </select>
+                  </div>
+                  
+                  {isCustomRange && (
+                    <>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="border rounded-md p-2"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-gray-600 mb-1">End Date</label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="border rounded-md p-2"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (startDate && endDate) {
+                            fetchProfitAndLossData(startDate, endDate);
+                          }
+                        }}
+                        disabled={!startDate || !endDate}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        Apply
+                      </button>
+                    </>
+                  )}
+                  
+                  <button
+                    onClick={handlePrint}
+                    className="text-gray-400 hover:text-gray-600"
+                    title="Print Report"
+                  >
+                    <Printer className="h-6 w-6" />
+                  </button>
+                  <button
+                    onClick={() => navigate(-1)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
             </div>
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</p>
                 <p className="text-sm">
-                  {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data?.period.end_date}
+                  {isCustomRange 
+                    ? `Period: ${startDate} to ${endDate}` 
+                    : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - ${data?.period.end_date}` : data?.period.end_date || '--'
+                  }
                 </p>
               </div>
 
@@ -413,8 +473,11 @@ const ProfitAndLossReport: React.FC = () => {
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
-                    <p className="text-sm text-gray-600">
-                      Period: {filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : 'January 1 -'} {data.period.end_date}
+                    <p className="text-sm">
+                      {isCustomRange 
+                        ? `Period: ${startDate} to ${endDate}`
+                        : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - ${data?.period.end_date}` : data?.period.end_date || '--'
+                      }
                     </p>
                   </div>
                   {selectedCompany?.company_logo && (

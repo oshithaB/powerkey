@@ -236,6 +236,125 @@ export default function ReportsPage() {
     }
   ];
 
+  const expenseAndSuppliers = [
+    {
+      name: "Cheque Detail",
+      description: "Details of all cheques issued",
+      path: "/reports/cheque-detail"
+    },
+    {
+      name: 'Purchases by Product/Service Summary',
+      description: 'Purchases summary by product/service',
+      path: '/reports/purchases-by-product-service'
+    },
+    {
+      name: 'Purchases by Class Detail',
+      description: 'Detailed purchases by class',
+      path: '/reports/purchases-by-class-detail'
+    },
+    {
+      name: 'Open Purchase Orders Detail',
+      description: 'Details of all open purchase orders',
+      path: '/reports/open-purchase-orders-detail'
+    },
+    {
+      name: 'Open Purchase Order List',
+      description: 'List of all open purchase orders',
+      path: '/reports/open-purchase-orders-list'
+    },
+    {
+      name: 'Purchase List',
+      description: 'List of all purchases made',
+      path: '/reports/purchase-list'
+    },
+    {
+      name: 'Transaction List by Supplier',
+      description: 'List of transactions by supplier',
+      path: '/reports/transaction-list-by-supplier'
+    },
+    {
+      name: 'Purchases by Supplier Summary',
+      description: 'Purchases summary by supplier',
+      path: '/reports/purchases-by-supplier'
+    },
+    {
+      name: 'Supplier Contact List',
+      description: 'List of supplier contacts details',
+      path: '/reports/supplier-contact-list'
+    },
+    {
+      name: 'Expense by Supplier Summary',
+      description: 'Expense summary by supplier',
+      path: '/reports/expense-by-supplier'
+    },
+    {
+      name: 'Supplier Phone List',
+      description: 'List of supplier phone numbers',
+      path: '/reports/supplier-phone-list'
+    }
+  ];
+
+  const salesTax = [
+    {
+      name: 'SSCL(100%) - Tax Detail Report',
+      description: 'Detailed report of SSCL tax collected',
+      path: '/reports/sscl-tax-detail'
+    },
+    {
+      name: 'VAT 18% - Tax Detail Report',
+      description: 'Detailed report of VAT 18% tax collected',
+      path: '/reports/vat-18-tax-detail'
+    },
+    {
+      name: 'SSCL (100%) - Tax Exception Report',
+      description: 'Exceptions in SSCL tax collection',
+      path: '/reports/sscl-tax-exception'
+    },
+    {
+      name: 'VAT 18% - Tax Exception Report',
+      description: 'Exceptions in VAT 18% tax collection',
+      path: '/reports/vat-18-tax-exception'
+    },
+    {
+      name: 'SSCL (100%) - Tax Summary Report',
+      description: 'Summary of SSCL tax collected',
+      path: '/reports/sscl-tax-summary'
+    },
+    {
+      name: 'VAT 18% - Tax Summary Report',
+      description: 'Summary of VAT 18% tax collected',
+      path: '/reports/vat-18-tax-summary'
+    },
+    {
+      name: 'Tax Liability Report',
+      description: 'Overview of tax liabilities',
+      path: '/reports/tax-liability'
+    },
+    {
+      name: 'Transaction Detail by Tax Code',
+      description: 'Detailed transactions categorized by tax code',
+      path: '/reports/transaction-detail-by-tax-code'
+    }
+  ];
+
+  const employees = [
+    {
+      name: 'Employee Contact List',
+      description: 'List of employee contacts details',
+      path: '/reports/employee-contact-list'
+    },
+    {
+      name: 'Recent/Edited Time Activities',
+      description: 'Recently added or edited time activities',
+      path: '/reports/recent-edited-time-activities'
+    },
+    {
+      name: 'Time Activities by Employee Detail',
+      description: 'Detailed time activities by employee',
+      path: '/reports/time-activities-by-employee-detail'
+    }
+  ];
+
   const toggleFavorite = (reportName) => {
     setFavoriteReports(prev => {
       if (prev.includes(reportName)) {
@@ -430,6 +549,108 @@ export default function ReportsPage() {
         <div className="card-content">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {whatYouOweReports.map(report => (
+              <button 
+                key={report.name}
+                className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                onClick={() => navigate(report.path)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-gray-900">{report.name}</h4>
+                  <Star 
+                    className={`h-5 w-5 cursor-pointer ${
+                      favoriteReports.includes(report.name) 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-400'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(report.name);
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600">{report.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Expense and Suppliers */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="text-lg font-semibold">Expense and Suppliers</h2>
+        </div>
+        <div className="card-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {expenseAndSuppliers.map(report => (
+              <button 
+                key={report.name}
+                className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                onClick={() => navigate(report.path)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-gray-900">{report.name}</h4>
+                  <Star 
+                    className={`h-5 w-5 cursor-pointer ${
+                      favoriteReports.includes(report.name) 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-400'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(report.name);
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600">{report.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Sales Tax */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="text-lg font-semibold">Sales Tax</h2>
+        </div>
+        <div className="card-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {salesTax.map(report => (
+              <button 
+                key={report.name}
+                className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                onClick={() => navigate(report.path)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-gray-900">{report.name}</h4>
+                  <Star 
+                    className={`h-5 w-5 cursor-pointer ${
+                      favoriteReports.includes(report.name) 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-400'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(report.name);
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600">{report.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Employees */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="text-lg font-semibold">Employees</h2>
+        </div>
+        <div className="card-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {employees.map(report => (
               <button 
                 key={report.name}
                 className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"

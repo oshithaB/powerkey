@@ -25,6 +25,9 @@ const CommissionReport: React.FC = () => {
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -50,24 +53,31 @@ const CommissionReport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id) {
-      const today = new Date();
-      let startDate: string | undefined;
-      let endDate: string = today.toISOString().split('T')[0];
-
-      if (filter === 'week') {
-        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
-      } else if (filter === 'month') {
-        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
-      } else if (filter === 'year') {
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+      if (selectedCompany?.company_id) {
+        if (isCustomRange) {
+          return;
+        }
+        
+        const today = new Date();
+        let startDate: string | undefined;
+        let endDate: string = today.toISOString().split('T')[0];
+    
+        if (filter === 'week') {
+          startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+        } else if (filter === 'month') {
+          startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
+        } else if (filter === 'year') {
+          startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        }
+    
+        setPeriodStart(startDate || '');
+        setPeriodEnd(endDate);
+        fetchCommissionData(startDate, endDate);
+      } else {
+        setError('Missing company or customer information');
+        setLoading(false);
       }
-
-      setPeriodStart(startDate || '');
-      setPeriodEnd(endDate);
-      fetchCommissionData(startDate, endDate);
-    }
-  }, [selectedCompany?.company_id, filter]);
+    }, [selectedCompany?.company_id, filter, isCustomRange]);
 
   const formatCurrency = (value: string) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
@@ -166,26 +176,80 @@ const CommissionReport: React.FC = () => {
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h1 className="text-2xl font-bold mb-4">Commission Report - All Employees</h1>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40"
-                >
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">Last Year</option>
-                </select>
+              <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                  <select
+                    value={isCustomRange ? 'custom' : filter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setIsCustomRange(true);
+                        setFilter('');
+                      } else {
+                        setIsCustomRange(false);
+                        setFilter(value);
+                        setStartDate('');
+                        setEndDate('');
+                      }
+                    }}
+                    className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Select Period</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                
+                {isCustomRange && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (startDate && endDate) {
+                          fetchCommissionData(startDate, endDate);
+                        }
+                      }}
+                      disabled={!startDate || !endDate}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+                
                 <button
                   onClick={handlePrint}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                   title="Print Report"
+                  disabled={loading || !data}
                 >
                   <Printer className="h-6 w-6" />
                 </button>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate('/dashboard/reports')}
                   className="text-gray-400 hover:text-gray-600"
+                  title="Close"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -195,10 +259,11 @@ const CommissionReport: React.FC = () => {
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm">Employee Commission Summary</p>
-                <p className="text-sm">
+                <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                 </p>
               </div>
 
@@ -271,7 +336,10 @@ const CommissionReport: React.FC = () => {
                       {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>
                     <p className="text-sm text-gray-600">
-                      Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
+                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                     </p>
                   </div>
 

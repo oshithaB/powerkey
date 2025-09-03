@@ -19,11 +19,11 @@ const getCommissionReport = async (req, res) => {
             FROM
                 employees e
             LEFT JOIN
-                products p ON e.id = p.added_employee_id
+                invoices i ON e.id = i.employee_id
             LEFT JOIN
-                invoice_items ii ON p.id = ii.product_id
+                invoice_items ii ON i.id = ii.invoice_id
             LEFT JOIN
-                invoices i ON ii.invoice_id = i.id
+                products p ON ii.product_id = p.id
             WHERE
                 e.is_active = TRUE
             GROUP BY
@@ -81,11 +81,11 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             FROM
                 employees e
             LEFT JOIN
-                products p ON e.id = p.added_employee_id
+                invoices i ON e.id = i.employee_id
             LEFT JOIN
-                invoice_items ii ON p.id = ii.product_id
+                invoice_items ii ON i.id = ii.invoice_id
             LEFT JOIN
-                invoices i ON ii.invoice_id = i.id
+                products p ON ii.product_id = p.id
             WHERE
                 e.is_active = TRUE AND e.id = ?
             GROUP BY
@@ -101,7 +101,7 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             paramsInvoices = [employeeId];
         }
 
-        // Query to fetch invoice details for the employee
+        // Query to fetch invoice details for the employee (as salesperson)
         const invoicesQuery = `
             SELECT
                 i.id AS invoice_id,
@@ -120,18 +120,18 @@ const getCommissionReportByEmployeeId = async (req, res) => {
                 (ii.quantity * p.commission) AS total_commission
             FROM
                 employees e
-            LEFT JOIN
-                products p ON e.id = p.added_employee_id
-            LEFT JOIN
-                invoice_items ii ON p.id = ii.product_id
-            LEFT JOIN
-                invoices i ON ii.invoice_id = i.id
+            INNER JOIN
+                invoices i ON e.id = i.employee_id
+            INNER JOIN
+                invoice_items ii ON i.id = ii.invoice_id
+            INNER JOIN
+                products p ON ii.product_id = p.id
             LEFT JOIN
                 customer c ON i.customer_id = c.id
             LEFT JOIN
                 company co ON i.company_id = co.company_id
             WHERE
-                e.is_active = TRUE AND e.id = ? AND i.id IS NOT NULL${whereDate}
+                e.is_active = TRUE AND e.id = ?${whereDate}
             ORDER BY
                 i.invoice_date DESC
         `;
@@ -159,7 +159,7 @@ const getCommissionReportByEmployeeId = async (req, res) => {
                 companyName: invoice.company_name,
                 invoiceNumber: invoice.invoice_number,
                 invoiceDate: invoice.invoice_date,
-                discountAmount: parseFloat(invoice.discount_amount).toFixed(2),
+                discountAmount: parseFloat(invoice.discount_amount || 0).toFixed(2),
                 totalAmount: parseFloat(invoice.total_amount).toFixed(2),
                 customerId: invoice.customer_id,
                 customerName: invoice.customer_name,

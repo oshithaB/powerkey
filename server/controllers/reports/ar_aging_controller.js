@@ -99,10 +99,10 @@ const getARAgingSummary = async (req, res) => {
 
 const getCustomerInvoices = async (req, res) => {
     try {
-        const { company_id } = req.params;
-        const { customer_id } = req.params;
+        const { company_id, customer_id } = req.params;
+        const { start_date, end_date } = req.query;
 
-        const query = `
+        let query = `
             SELECT 
                 i.id AS invoice_id,
                 i.invoice_number,
@@ -120,11 +120,23 @@ const getCustomerInvoices = async (req, res) => {
                 i.company_id = ?
                 AND i.customer_id = ?
                 AND i.balance_due > 0
-            ORDER BY 
-                i.due_date ASC
         `;
 
         const params = [company_id, customer_id];
+
+        // Add date filtering if start_date and end_date are provided
+        if (start_date && end_date) {
+            query += ` AND i.invoice_date >= ? AND i.invoice_date <= ?`;
+            params.push(start_date, end_date);
+        } else if (start_date) {
+            query += ` AND i.invoice_date >= ?`;
+            params.push(start_date);
+        } else if (end_date) {
+            query += ` AND i.invoice_date <= ?`;
+            params.push(end_date);
+        }
+
+        query += ` ORDER BY i.due_date ASC`;
 
         const [results] = await db.execute(query, params);
 
@@ -139,17 +151,13 @@ const getCustomerInvoices = async (req, res) => {
             status: row.status
         }));
 
-        if (invoices.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'No invoices found for the specified customer'
-            });
-        }
-
+        // Always return 200 status, even when no invoices are found
         res.status(200).json({
             success: true,
-            data: invoices,
-            message: 'Customer invoices retrieved successfully'
+            data: invoices, // This will be an empty array if no invoices found
+            message: invoices.length > 0 
+                ? 'Customer invoices retrieved successfully' 
+                : 'No invoices found for the specified customer in the given date range'
         });
     } catch (error) {
         console.error('Error fetching customer invoices:', error);

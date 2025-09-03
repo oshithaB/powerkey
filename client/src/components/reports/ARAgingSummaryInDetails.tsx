@@ -40,6 +40,9 @@ const ARAgingSummaryInDetails: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const { customerId, companyId } = useParams<{ customerId: string; companyId: string }>();
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -52,7 +55,7 @@ const ARAgingSummaryInDetails: React.FC = () => {
     setError(null);
     try {
       const response = await axiosInstance.get(`/api/ar-aging-summary-details/${customerId}/${selectedCompany?.company_id}`, {
-        params: { start_date: startDate, end_date: endDate, filter },
+        params: { start_date: startDate, end_date: endDate },
       });
       setData(response.data.data);
     } catch (err) {
@@ -65,18 +68,22 @@ const ARAgingSummaryInDetails: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id && customerId) {
+      if (isCustomRange) {
+        return;
+      }
+      
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
-
+  
       if (filter === 'week') {
         startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
         startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
-        startDate = new Date(2025, 0, 1).toISOString().split('T')[0];
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
-
+  
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
       fetchARAgingDetailsData(customerId, startDate, endDate);
@@ -84,7 +91,7 @@ const ARAgingSummaryInDetails: React.FC = () => {
       setError('Missing company or customer information');
       setLoading(false);
     }
-  }, [selectedCompany?.company_id, customerId, companyId, filter]);
+  }, [selectedCompany?.company_id, customerId, companyId, filter, isCustomRange]);
 
   const formatCurrency = (value: string) => {
     return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
@@ -268,17 +275,68 @@ const ARAgingSummaryInDetails: React.FC = () => {
                 </button>
                 <h1 className="text-2xl font-bold">A/R Aging Details Report</h1>
               </div>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                >
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">This Year</option>
-                </select>
+              <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                  <select
+                    value={isCustomRange ? 'custom' : filter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setIsCustomRange(true);
+                        setFilter('');
+                      } else {
+                        setIsCustomRange(false);
+                        setFilter(value);
+                        setStartDate('');
+                        setEndDate('');
+                      }
+                    }}
+                    className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Select Period</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                
+                {isCustomRange && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (startDate && endDate && customerId) {
+                          fetchARAgingDetailsData(customerId, startDate, endDate);
+                        }
+                      }}
+                      disabled={!startDate || !endDate}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+                
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
@@ -304,6 +362,7 @@ const ARAgingSummaryInDetails: React.FC = () => {
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                 </p>
               </div>
 
@@ -369,7 +428,10 @@ const ARAgingSummaryInDetails: React.FC = () => {
                     <h2 className="text-xl text-gray-600 mb-2">Accounts Receivable Aging Details</h2>
                     <h2 className="text-xl text-gray-600 mb-2">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</h2>
                     <p className="text-sm text-gray-600">
-                      Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
+                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                     </p>
                     <p className="text-sm text-gray-600 mt-2">Customer: {data?.due_today[0]?.customerName || data?.due_15_days[0]?.customerName || data?.due_30_days[0]?.customerName || data?.due_60_days[0]?.customerName || data?.over_60_days[0]?.customerName || 'Customer'}</p>
                   </div>

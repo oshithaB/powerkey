@@ -8,6 +8,11 @@ import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
 interface ProfitAndLossData {
+  period: {
+    start_date: string;
+    end_date: string;
+    generated_at: string;
+  };
   employee: {
     id: string;
     name: string;
@@ -52,12 +57,9 @@ const ProfitAndLossByClass: React.FC = () => {
   const [inventoryShrinkage, setInventoryShrinkage] = useState<number>(0);
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  };
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const fetchProfitAndLossData = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
@@ -93,27 +95,25 @@ const ProfitAndLossByClass: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
+      if (isCustomRange) {
+        return;
+      }
+      
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
-
+  
       if (filter === 'week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        startDate = weekAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        startDate = monthAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
         startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
-
-      setPeriodStart(startDate || '');
-      setPeriodEnd(endDate);
+  
       fetchProfitAndLossData(startDate, endDate);
     }
-  }, [selectedCompany?.company_id, filter]);
+  }, [selectedCompany?.company_id, filter, isCustomRange]);
 
   const formatCurrency = (value: number) => {
     // Handle null/undefined values
@@ -156,56 +156,104 @@ const ProfitAndLossByClass: React.FC = () => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!printRef.current) {
-      alert('Print content not available');
+    if (!data.length) {
+      alert('No data available to print');
       return;
     }
 
     try {
-      const pdf = new jsPDF('l', 'mm', 'a4'); // Changed to landscape for better table fit
+      const pdf = new jsPDF('l', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 10;
-      const maxContentHeight = pageHeight - 2 * margin;
+      const columnsPerPage = 5; // Account column + 4 employee columns + total column on last page
+      const totalPages = Math.ceil((data.length + 1) / columnsPerPage); // +1 for total column
 
-      const scale = 2; // Reduced scale for better performance
-      const canvas = await html2canvas(printRef.current, {
-        scale,
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        windowWidth: printRef.current.scrollWidth,
-        windowHeight: printRef.current.scrollHeight,
-      });
-      
-      const imgData = canvas.toDataURL('image/png', 0.95);
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pageWidth - 2 * margin;
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-      const totalPages = Math.ceil(imgHeight / maxContentHeight);
-
-      for (let i = 0; i < totalPages; i++) {
-        if (i > 0) {
+      // Generate each page
+      for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+        if (pageIndex > 0) {
           pdf.addPage();
         }
+
+        const startEmployeeIndex = pageIndex * (columnsPerPage - 1);
+        const endEmployeeIndex = Math.min(startEmployeeIndex + (columnsPerPage - 1), data.length);
+        const pageEmployees = data.slice(startEmployeeIndex, endEmployeeIndex);
+        const showTotalColumn = pageIndex === totalPages - 1;
+
+        // Create a temporary div for this page
+        const tempDiv = document.createElement('div');
+        tempDiv.style.width = '1200px';
+        tempDiv.style.backgroundColor = '#ffffff';
+        tempDiv.style.padding = '20px';
         
-        const srcY = i * maxContentHeight * (canvas.height / imgHeight);
-        const pageContentHeight = Math.min(canvas.height - srcY, maxContentHeight * (canvas.height / imgHeight));
-        
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = pageContentHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        if (tempCtx && pageContentHeight > 0) {
-          tempCtx.imageSmoothingEnabled = true;
-          tempCtx.imageSmoothingQuality = 'high';
-          tempCtx.drawImage(canvas, 0, srcY, canvas.width, pageContentHeight, 0, 0, canvas.width, pageContentHeight);
-          const pageImgData = tempCanvas.toDataURL('image/png', 0.95);
-          pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight - (i * maxContentHeight), maxContentHeight));
-        }
+        // Generate HTML content for this page with company logo
+        tempDiv.innerHTML = `
+          <div style="margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+              <div>
+                <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Profit and Loss by Class</h1>
+                <h2 style="font-size: 18px; color: #666; margin-bottom: 8px;">Profit and Loss Summary</h2>
+                <h2 style="font-size: 18px; color: #666; margin-bottom: 8px;">${selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</h2>
+                <p style="font-size: 12px; color: #666;">
+                  ${isCustomRange 
+                    ? `Period: ${startDate} to ${endDate}` 
+                    : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
+                  }
+                </p>
+              </div>
+              ${selectedCompany?.company_logo ? `
+                <img src="http://localhost:3000${selectedCompany.company_logo}" alt="${selectedCompany.name} Logo" 
+                     style="height: 100px; width: auto; max-width: 500px; object-fit: contain;" />
+              ` : ''}
+            </div>
+            <p style="font-size: 10px; color: #666; margin-top: 10px;">Page ${pageIndex + 1} of ${totalPages}</p>
+          </div>
+          
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: left; border: 1px solid #ccc; width: 200px;">Account</th>
+                ${pageEmployees.map(employee => 
+                  `<th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: right; border: 1px solid #ccc; min-width: 120px;">${employee.employee.name}</th>`
+                ).join('')}
+                ${showTotalColumn ? 
+                  `<th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: right; border: 1px solid #ccc; min-width: 120px;">Total</th>` 
+                  : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${generateTableRowsHTML(pageEmployees, showTotalColumn)}
+            </tbody>
+          </table>
+          
+          <div style="border-top: 1px solid #ccc; padding-top: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <p style="font-size: 12px; color: #666;">Report generated at: ${new Date().toLocaleString()}</p>
+              <p style="font-size: 12px; color: #666;">Profit and Loss by Class</p>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(tempDiv);
+
+        // Convert to canvas
+        const canvas = await html2canvas(tempDiv, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+        });
+
+        document.body.removeChild(tempDiv);
+
+        // Add to PDF
+        const imgData = canvas.toDataURL('image/png', 0.95);
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = pageWidth - 2 * margin;
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight, pageHeight - 2 * margin));
       }
 
       const filename = `profit-and-loss-by-class-${new Date().toISOString().split('T')[0]}.pdf`;
@@ -215,6 +263,55 @@ const ProfitAndLossByClass: React.FC = () => {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     }
+  };
+
+  const generateTableRowsHTML = (pageEmployees: ProfitAndLossData[], showTotalColumn: boolean) => {
+    const rows = [
+      { label: 'Discounts given', getValue: (emp: ProfitAndLossData) => -safeGetValue(emp, 'income.discounts_given') },
+      { label: 'Sales of Product Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.sales_of_product_income') },
+      { label: 'Shipping Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.shipping_income') },
+      { label: 'Tax Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.tax_income') },
+      { label: 'Total for Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.total_income'), isTotal: true },
+      { label: 'Cost of Sales', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), isCostSection: true },
+      { label: 'Inventory Shrinkage', getValue: () => 0, isInventory: true, isCostSection: true },
+      { label: 'Total for Cost of Sales', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), isTotal: true, isCostSection: true },
+      { label: 'Gross Profit', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'profitability.gross_profit'), isTotal: true },
+      { label: 'Other Income', getValue: () => 0 },
+      { label: 'Expenses', getValue: () => 0 },
+      { label: 'Other Expenses', getValue: () => 0 },
+      { label: 'Net Earnings', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'profitability.net_earnings'), isFinal: true }
+    ];
+
+    return rows.map(row => {
+      const cellStyle = `padding: 6px; border: 1px solid #ccc; text-align: ${row.label === 'Account' ? 'left' : 'right'}; ${
+        row.isTotal || row.isFinal ? 'font-weight: bold;' : ''
+      } ${row.isCostSection ? 'background-color: #f7fafc;' : ''} ${
+        row.isFinal ? 'border-top: 2px solid #333;' : ''
+      }`;
+
+      let totalValue = 0;
+      if (row.isInventory) {
+        totalValue = inventoryShrinkage;
+      } else if (row.label === 'Total for Cost of Sales') {
+        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0) + inventoryShrinkage;
+      } else if (row.label === 'Net Earnings') {
+        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0) - inventoryShrinkage;
+      } else {
+        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0);
+      }
+
+      return `
+        <tr>
+          <td style="${cellStyle}">${row.label}</td>
+          ${pageEmployees.map(employee => 
+            `<td style="${cellStyle}">${formatCurrency(row.isInventory ? 0 : row.getValue(employee))}</td>`
+          ).join('')}
+          ${showTotalColumn ? 
+            `<td style="${cellStyle}">${formatCurrency(totalValue)}</td>` 
+            : ''}
+        </tr>
+      `;
+    }).join('');
   };
 
   const printStyles = `
@@ -240,6 +337,63 @@ const ProfitAndLossByClass: React.FC = () => {
     }
     .cost-section {
       background-color: #f7fafc;
+    }
+    
+    /* Fixed column styles */
+    .table-container {
+      position: relative;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    
+    .fixed-table {
+      display: flex;
+    }
+    
+    .fixed-column {
+      position: sticky;
+      left: 0;
+      z-index: 10;
+      background: white;
+      border-right: 2px solid #e2e8f0;
+    }
+    
+    .scrollable-columns {
+      overflow-x: auto;
+      flex: 1;
+      scrollbar-width: auto;
+      scrollbar-color: #d1d5db #f3f4f6;
+    }
+    
+    .scrollable-columns::-webkit-scrollbar {
+      height: 8px;
+    }
+    
+    .scrollable-columns::-webkit-scrollbar-track {
+      background: #f3f4f6;
+    }
+    
+    .scrollable-columns::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+    
+    .scrollable-columns::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+    .scrollable-columns table {
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: ${(data.length + 1) + 200}px; /* Ensure table width exceeds viewport for scrolling */
+    }
+    
+    .scrollable-column th {
+      border-right: none;
+      width: 100%
+    }
+
+    .scrollable-columns th, td {
+      white-space: nowrap; /* Prevent employee names from wrapping */
     }
   `;
 
@@ -288,29 +442,77 @@ const ProfitAndLossByClass: React.FC = () => {
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h1 className="text-2xl font-bold mb-4">Profit and Loss by Class</h1>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                >
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">This Year</option>
-                </select>
+              <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                  <select
+                    value={isCustomRange ? 'custom' : filter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setIsCustomRange(true);
+                        setFilter('');
+                      } else {
+                        setIsCustomRange(false);
+                        setFilter(value);
+                        setStartDate('');
+                        setEndDate('');
+                      }
+                    }}
+                    className="border rounded-md p-2 w-40"
+                  >
+                    <option value="">Select Period</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">Last Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                
+                {isCustomRange && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (startDate && endDate) {
+                          fetchProfitAndLossData(startDate, endDate);
+                        }
+                      }}
+                      disabled={!startDate || !endDate}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+                
                 <button
                   onClick={handlePrint}
-                  className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  className="text-gray-400 hover:text-gray-600"
                   title="Print Report"
-                  disabled={loading || data.length === 0}
                 >
                   <Printer className="h-6 w-6" />
                 </button>
                 <button
                   onClick={() => navigate(-1)}
                   className="text-gray-400 hover:text-gray-600"
-                  title="Close"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -321,9 +523,10 @@ const ProfitAndLossByClass: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm font-medium">Profit and Loss Summary</p>
                 <p className="text-sm text-gray-600">
-                  {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {isCustomRange 
+                    ? `Period: ${startDate} to ${endDate}` 
+                    : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
+                  }
                 </p>
               </div>
 
@@ -347,81 +550,203 @@ const ProfitAndLossByClass: React.FC = () => {
               )}
               
               {!loading && !error && data.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-full">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Account
-                        </th>
-                        {data.map((employee) => (
-                          <th key={employee.employee.id} 
-                              onClick={() => handleEmployeeClick(employee.employee.id)}
-                              className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px] cursor-pointer hover:underline"
-                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            {employee.employee.name}
-                          </th>
-                        ))}
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Income Section */}
-                      {renderTableRow('Discounts given', (emp) => -safeGetValue(emp, 'income.discounts_given'))}
-                      {renderTableRow('Sales of Product Income', (emp) => safeGetValue(emp, 'income.sales_of_product_income'))}
-                      {renderTableRow('Shipping Income', (emp) => safeGetValue(emp, 'income.shipping_income'))}
-                      {renderTableRow('Tax Income', (emp) => safeGetValue(emp, 'income.tax_income'))}
-                      {renderTableRow('Total for Income', (emp) => safeGetValue(emp, 'income.total_income'), true)}
-                      
-                      {/* Cost of Sales Section */}
-                      {renderTableRow('Cost of Sales', (emp) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), false, true, 'cost-section')}
-                      <tr>
-                        <td className="p-2 border-b font-medium cost-section">Inventory Shrinkage</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
-                            {formatCurrency(0)}
-                          </td>
-                        ))}
-                        <td className="p-2 border-b text-right cost-section">
-                          {formatCurrency(inventoryShrinkage)}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 border-b font-bold cost-section">Total for Cost of Sales</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
-                            {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
-                          </td>
-                        ))}
-                        <td className="p-2 border-b text-right font-bold cost-section">
-                          {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
-                        </td>
-                      </tr>
-                      
-                      {/* Profit Section */}
-                      {renderTableRow('Gross Profit', (emp) => safeGetValue(emp, 'profitability.gross_profit'), true)}
-                      {renderTableRow('Other Income', () => 0)}
-                      {renderTableRow('Expenses', () => 0)}
-                      {renderTableRow('Other Expenses', () => 0)}
-                      
-                      {/* Final Net Earnings */}
-                      <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold">Net Earnings</td>
-                        {data.map((employee) => (
-                          <td key={employee.employee.id} className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                            {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
-                          </td>
-                        ))}
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="table-container">
+                  <div className="fixed-table">
+                    {/* Fixed Account Column */}
+                    <div className="fixed-column">
+                      <table className="border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left w-48"
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                              Account
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr><td className="p-2 border-b font-medium w-48">Discounts given</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Sales of Product Income</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Shipping Income</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Tax Income</td></tr>
+                          <tr><td className="p-2 border-b font-bold w-48">Total for Income</td></tr>
+                          <tr><td className="p-2 border-b font-medium cost-section w-48">Cost of Sales</td></tr>
+                          <tr><td className="p-2 border-b font-medium cost-section w-48">Inventory Shrinkage</td></tr>
+                          <tr><td className="p-2 border-b font-bold cost-section w-48">Total for Cost of Sales</td></tr>
+                          <tr><td className="p-2 border-b font-bold w-48">Gross Profit</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Other Income</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Expenses</td></tr>
+                          <tr><td className="p-2 border-b font-medium w-48">Other Expenses</td></tr>
+                          <tr><td className="p-3 border-t-2 border-gray-800 font-bold w-48">Net Earnings</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Scrollable Columns */}
+                    <div className="scrollable-columns">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr>
+                            {data.map((employee) => (
+                              <th key={employee.employee.id} 
+                                  onClick={() => handleEmployeeClick(employee.employee.id)}
+                                  className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px] cursor-pointer hover:underline"
+                                  style={{ 
+                                    backgroundColor: '#e2e8f0', 
+                                    WebkitPrintColorAdjust: 'exact', 
+                                    colorAdjust: 'exact', 
+                                    printColorAdjust: 'exact'
+                                  }}>
+                                {employee.employee.name}
+                              </th>
+                            ))}
+                            <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                                style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                              Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Income Section */}
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(-safeGetValue(employee, 'income.discounts_given'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(data.reduce((total, emp) => total + (-safeGetValue(emp, 'income.discounts_given')), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(employee, 'income.sales_of_product_income'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.sales_of_product_income'), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(employee, 'income.shipping_income'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.shipping_income'), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(employee, 'income.tax_income'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.tax_income'), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold">
+                                {formatCurrency(safeGetValue(employee, 'income.total_income'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right font-bold">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.total_income'), 0))}
+                            </td>
+                          </tr>
+                          
+                          {/* Cost of Sales Section */}
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
+                                {formatCurrency(safeGetValue(employee, 'cost_of_sales.cost_of_sales'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right cost-section">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'cost_of_sales.cost_of_sales'), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
+                                {formatCurrency(0)}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right cost-section">
+                              {formatCurrency(inventoryShrinkage)}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
+                                {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right font-bold cost-section">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), 0) + inventoryShrinkage)}
+                            </td>
+                          </tr>
+                          
+                          {/* Profit Section */}
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold">
+                                {formatCurrency(safeGetValue(employee, 'profitability.gross_profit'))}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right font-bold">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'profitability.gross_profit'), 0))}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(0)}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(0)}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(0)}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(0)}
+                            </td>
+                          </tr>
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                                {formatCurrency(0)}
+                              </td>
+                            ))}
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(0)}
+                            </td>
+                          </tr>
+                          
+                          {/* Final Net Earnings */}
+                          <tr>
+                            {data.map((employee) => (
+                              <td key={employee.employee.id} className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                                {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
+                              </td>
+                            ))}
+                            <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'profitability.net_earnings'), 0) - inventoryShrinkage)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
               
@@ -461,7 +786,10 @@ const ProfitAndLossByClass: React.FC = () => {
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
+                      {isCustomRange 
+                        ? `Period: ${startDate} to ${endDate}` 
+                        : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
+                      }
                     </p>
                   </div>
 
@@ -474,10 +802,10 @@ const ProfitAndLossByClass: React.FC = () => {
                   )}
                 </div>
 
-                {/* Report Content */}
+                
                 <table className="w-full border-collapse mb-6">
                   <thead>
-                    <tr>
+                    <tr className='scrollable-columns'>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Account
@@ -524,7 +852,7 @@ const ProfitAndLossByClass: React.FC = () => {
                         </td>
                       ))}
                       <td className="p-2 border-b text-right font-bold cost-section">
-                        {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
+                        {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), 0) + inventoryShrinkage)}
                       </td>
                     </tr>
                     
@@ -543,7 +871,7 @@ const ProfitAndLossByClass: React.FC = () => {
                         </td>
                       ))}
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
+                        {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'profitability.net_earnings'), 0) - inventoryShrinkage)}
                       </td>
                     </tr>
                   </tbody>

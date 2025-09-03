@@ -35,6 +35,7 @@ interface ProfitAndLossData {
     name: string;
     email: string | null;
     phone: string | null;
+    invoices: Invoice[];
   };
   period: {
     start_date: string;
@@ -92,6 +93,9 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const { customerId } = useParams<{ customerId: string }>();
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -129,28 +133,32 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id && customerId) {
-      const today = new Date();
-      let startDate: string | undefined;
-      let endDate: string = today.toISOString().split('T')[0];
-
-      if (filter === 'week') {
-        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
-      } else if (filter === 'month') {
-        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
-      } else if (filter === 'year') {
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+      if (selectedCompany?.company_id && customerId) {
+        if (isCustomRange) {
+          return;
+        }
+        
+        const today = new Date();
+        let startDate: string | undefined;
+        let endDate: string = today.toISOString().split('T')[0];
+    
+        if (filter === 'week') {
+          startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+        } else if (filter === 'month') {
+          startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
+        } else if (filter === 'year') {
+          startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        }
+    
+        setPeriodStart(startDate || '');
+        setPeriodEnd(endDate);
+        fetchProfitAndLossData(customerId, startDate, endDate);
+        fetchInvoicesByCustomer(customerId, startDate, endDate);
+      } else {
+        setError('Missing company or employee information');
+        setLoading(false);
       }
-
-      setPeriodStart(startDate || '');
-      setPeriodEnd(endDate);
-      fetchProfitAndLossData(customerId, startDate, endDate);
-      fetchInvoicesByCustomer(customerId, startDate, endDate);
-    } else {
-      setError('Missing company or customer information');
-      setLoading(false);
-    }
-  }, [selectedCompany?.company_id, customerId, filter]);
+    }, [selectedCompany?.company_id, customerId, filter, isCustomRange]);
 
   const formatCurrency = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -302,17 +310,71 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                 </button>
                 <h1 className="text-2xl font-bold">Customer Profit and Loss Report</h1>
               </div>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                >
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">This Year</option>
-                </select>
+              <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                  <select
+                    value={isCustomRange ? 'custom' : filter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setIsCustomRange(true);
+                        setFilter('');
+                      } else {
+                        setIsCustomRange(false);
+                        setFilter(value);
+                        setStartDate('');
+                        setEndDate('');
+                      }
+                    }}
+                    className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Select Period</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                
+                {isCustomRange && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (startDate && endDate && customerId) {
+                          setPeriodStart(startDate);
+                          setPeriodEnd(endDate);
+                          fetchProfitAndLossData(customerId, startDate, endDate);
+                          fetchInvoicesByCustomer(customerId, startDate, endDate);
+                        }
+                      }}
+                      disabled={!startDate || !endDate}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+                
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
@@ -581,7 +643,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {salesData.map((invoice: any) => (
+                            {salesData.invoices.map((invoice) => (
                             <tr key={invoice.invoiceId}>
                                 <td className="p-2 border-b">{invoice.invoiceNumber}</td>
                                 <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>

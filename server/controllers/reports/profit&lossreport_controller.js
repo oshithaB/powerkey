@@ -625,7 +625,7 @@ class ReportController {
                     company co ON i.company_id = co.company_id
                 WHERE
                     e.is_active = TRUE AND e.id = ? AND i.company_id = ? AND i.id IS NOT NULL 
-                    AND i.status IN ('paid', 'partially_paid', 'opened')${whereDate}
+                    AND i.status IN ('paid', 'partially_paid', 'opened', 'overdue')${whereDate}
                 ORDER BY
                     i.invoice_date DESC
             `;

@@ -98,6 +98,9 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const { employeeId } = useParams<{ employeeId: string }>();
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -135,10 +138,14 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id && employeeId) {
+      if (isCustomRange) {
+        return;
+      }
+      
       const today = new Date();
       let startDate: string | undefined;
       let endDate: string = today.toISOString().split('T')[0];
-
+  
       if (filter === 'week') {
         startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
@@ -146,7 +153,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
       } else if (filter === 'year') {
         startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
-
+  
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
       fetchProfitAndLossData(employeeId, startDate, endDate);
@@ -155,7 +162,7 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
       setError('Missing company or employee information');
       setLoading(false);
     }
-  }, [selectedCompany?.company_id, employeeId, filter]);
+  }, [selectedCompany?.company_id, employeeId, filter, isCustomRange]);
 
   const formatCurrency = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -307,17 +314,71 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                 </button>
                 <h1 className="text-2xl font-bold">Employee Profit and Loss Report</h1>
               </div>
-              <div className="flex space-x-2">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                >
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">This Year</option>
-                </select>
+              <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                  <select
+                    value={isCustomRange ? 'custom' : filter}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setIsCustomRange(true);
+                        setFilter('');
+                      } else {
+                        setIsCustomRange(false);
+                        setFilter(value);
+                        setStartDate('');
+                        setEndDate('');
+                      }
+                    }}
+                    className="border rounded-md p-2 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Select Period</option>
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                
+                {isCustomRange && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border rounded-md p-2"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (startDate && endDate && employeeId) {
+                          setPeriodStart(startDate);
+                          setPeriodEnd(endDate);
+                          fetchProfitAndLossData(employeeId, startDate, endDate);
+                          fetchInvoicesByEmployee(employeeId, startDate, endDate);
+                        }
+                      }}
+                      disabled={!startDate || !endDate}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+                
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
@@ -340,9 +401,13 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm font-medium">Employee Profit and Loss Details</p>
                 <p className="text-sm text-gray-600">
-                  {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                  {isCustomRange 
+                    ? `Period: ${startDate} to ${endDate}` 
+                    : filter === 'week' ? 'Last 7 Days' 
+                    : filter === 'month' ? 'Last 30 Days' 
+                    : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` 
+                    : ''
+                  }
                 </p>
               </div>
 

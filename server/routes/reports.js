@@ -4,6 +4,7 @@ const reportController = require('../controllers/reports/profit&lossreport_contr
 const commissionReportController = require('../controllers/reports/commissionreport_controller');
 const salesReportController = require('../controllers/reports/salesreport_controller');
 const aragingReportController = require('../controllers/reports/ar_aging_controller');
+const salesAndCustomerController = require('../controllers/reports/Sales&Customers/sales$customers_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -37,6 +38,28 @@ const {
     getCustomerInvoices,
     getARAgingSummaryInDetails,
 } = aragingReportController;
+
+// Importing customer contact controller functions
+const {
+    getCustomerContacts,
+    getSalesByEmployeeSummary,
+    getSalesByCustomerSummary,
+    getSalesByCustomerDetail,
+    getSalesByEmployeeDetail,
+    getDepositDetail,
+    getEstimatesByCustomer,
+    getInventoryValuationSummary,
+    getInventoryValuationDetail,
+    getPaymentMethodList,
+    getStockTakeWorksheet,
+    getTimeActivitiesByCustomerDetail,
+    getTransactionListByCustomer,
+    getProductServiceList,
+    getSalesByProductServiceSummary,
+    getSalesByProductServiceDetail,
+    getIncomeByCustomerSummary,
+    getCustomerPhoneList
+} = salesAndCustomerController;
 
 //====================================================================================================================
 
@@ -149,5 +172,132 @@ router.get(
     getARAgingSummaryInDetails
 );
 
+
+// Sales and Customer routes
+router.get(
+    '/customer-contacts/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerContacts
+);
+
+router.get(
+    '/sales-by-employee-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByEmployeeSummary
+);
+
+router.get(
+    '/sales-by-customer-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByCustomerSummary
+);
+
+router.get(
+    '/sales-by-customer-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByCustomerDetail
+);
+
+router.get(
+    '/sales-by-employee-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByEmployeeDetail
+);
+
+router.get(
+    '/deposit-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getDepositDetail
+);
+
+router.get(
+    '/estimates-by-customer/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getEstimatesByCustomer
+);
+
+router.get(
+    '/inventory-valuation-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getInventoryValuationSummary
+);
+
+router.get(
+    '/inventory-valuation-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getInventoryValuationDetail
+);
+
+router.get(
+    '/payment-methods/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getPaymentMethodList
+);
+
+router.get(
+    '/stock-take-worksheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getStockTakeWorksheet
+);
+
+router.get(
+    '/time-activities-by-customer-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getTimeActivitiesByCustomerDetail
+);
+
+router.get(
+    '/transaction-list-by-customer/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getTransactionListByCustomer
+);
+
+router.get(
+    '/product-service-list/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getProductServiceList
+);
+
+router.get(
+    '/sales-by-product-service-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByProductServiceSummary
+);
+
+router.get(
+    '/sales-by-product-service-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByProductServiceDetail
+);
+
+router.get(
+    '/income-by-customer-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getIncomeByCustomerSummary
+);
+
+router.get(
+    '/customer-phone-list/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerPhoneList
+);
 
 module.exports = router;

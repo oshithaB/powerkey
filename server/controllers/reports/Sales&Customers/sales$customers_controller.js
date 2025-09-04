@@ -399,6 +399,8 @@ const getSalesByProductServiceDetail = async (req, res) => {
           p.id AS product_id,
           p.name AS product_name,
           p.sku,
+          p.cost_price,
+          p.cost_price * ii.quantity AS total_cost,
           ii.description,
           ii.quantity,
           ii.unit_price,
@@ -406,6 +408,7 @@ const getSalesByProductServiceDetail = async (req, res) => {
           i.invoice_number,
           i.invoice_date,
           c.name AS customer_name
+          
        FROM products p
        JOIN invoice_items ii ON p.id = ii.product_id
        JOIN invoices i ON ii.invoice_id = i.id

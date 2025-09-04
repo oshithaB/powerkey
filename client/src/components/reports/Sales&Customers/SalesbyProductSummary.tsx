@@ -12,6 +12,7 @@ interface SalesByProductSummaryData {
   product_name: string;
   sku: string;
   unit_price: number;
+  cost_price: number;
   total_quantity_sold: number;
   total_cost: number;
   total_sales: number;
@@ -399,6 +400,10 @@ const SalesbyProductSummary: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Unit Price
                         </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Cost Price
+                        </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Total Quantity Sold
@@ -426,9 +431,12 @@ const SalesbyProductSummary: React.FC = () => {
                           <td className="p-2 border-b">
                             {product.sku}
                           </td>
-                            <td className="p-2 border-b">
-                                {formatCurrency(product.unit_price)}
-                            </td>
+                          <td className="p-2 border-b">
+                              {formatCurrency(product.unit_price)}
+                          </td>
+                          <td className='p-2 border-b'>
+                            {formatCurrency(product.cost_price)}
+                          </td>
                           <td className="p-2 border-b text-right">
                             {product.total_quantity_sold}
                           </td>
@@ -441,7 +449,7 @@ const SalesbyProductSummary: React.FC = () => {
                         </tr>
                       ))}
                       <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={3}>Total</td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {getTotal('total_quantity_sold')}
                         </td>

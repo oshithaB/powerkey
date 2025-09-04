@@ -13,6 +13,8 @@ interface SalesByProductDetailData {
   sku: string;
   description: string;
   quantity: number;
+  cost_price: number;
+  total_cost: number;
   unit_price: number;
   total_price: number;
   invoice_number: string;
@@ -387,21 +389,21 @@ const SalesbyProductDetail: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Customer
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          SKU
+                          Unit
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Description
+                          Cost
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Quantity
+                          QTY
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Unit Price
+                          Total Cost
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -421,17 +423,17 @@ const SalesbyProductDetail: React.FC = () => {
                           <td className="p-2 border-b">
                             {item.customer_name}
                           </td>
-                          <td className="p-2 border-b">
-                            {item.sku}
+                          <td className="p-2 border-b text-right">
+                            {formatCurrency(item.unit_price)}
                           </td>
                           <td className="p-2 border-b">
-                            {item.description}
+                            {formatCurrency(item.cost_price)}
                           </td>
                           <td className="p-2 border-b text-right">
                             {item.quantity}
                           </td>
-                          <td className="p-2 border-b text-right">
-                            {formatCurrency(item.unit_price)}
+                          <td className="p-2 border-b">
+                            {formatCurrency(item.total_cost)}
                           </td>
                           <td className="p-2 border-b text-right font-bold">
                             {formatCurrency(item.total_price)}
@@ -439,16 +441,19 @@ const SalesbyProductDetail: React.FC = () => {
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={5} className="p-3 border-t-2 border-gray-800 font-bold">
+                        <td colSpan={4} className="p-3 border-t-2 border-gray-800 font-bold">
                           Total
                         </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('quantity')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800"></td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_price'))}
-                        </td>
+                      <td className="p-2 border-t-2 border-gray-800"></td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {getTotal('quantity')}
+                      </td>
+                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
+                        {formatCurrency(getTotal('total_cost'))}
+                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                        {formatCurrency(getTotal('total_price'))}
+                      </td>
                       </tr>
                     </tbody>
                   </table>
@@ -508,35 +513,35 @@ const SalesbyProductDetail: React.FC = () => {
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Invoice Number
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Invoice Date
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Customer
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        SKU
+                        Unit
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Description
+                        Cost
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Quantity
+                        QTY
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Unit Price
+                        Total Cost
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Total Price
                       </th>
@@ -554,17 +559,17 @@ const SalesbyProductDetail: React.FC = () => {
                         <td className="p-2 border-b">
                           {item.customer_name}
                         </td>
-                        <td className="p-2 border-b">
-                          {item.sku}
+                        <td className="p-2 border-b text-right">
+                          {formatCurrency(item.unit_price)}
                         </td>
                         <td className="p-2 border-b">
-                          {item.description}
+                          {formatCurrency(item.cost_price)}
                         </td>
                         <td className="p-2 border-b text-right">
                           {item.quantity}
                         </td>
-                        <td className="p-2 border-b text-right">
-                          {formatCurrency(item.unit_price)}
+                        <td className="p-2 border-b">
+                          {formatCurrency(item.total_cost)}
                         </td>
                         <td className="p-2 border-b text-right font-bold">
                           {formatCurrency(item.total_price)}
@@ -572,13 +577,16 @@ const SalesbyProductDetail: React.FC = () => {
                       </tr>
                     ))}
                     <tr>
-                      <td colSpan={5} className="p-2 border-t-2 border-gray-800 font-bold">
+                      <td colSpan={4} className="p-2 border-t-2 border-gray-800 font-bold">
                         Total
                       </td>
+                      <td className="p-2 border-t-2 border-gray-800"></td>
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
                         {getTotal('quantity')}
                       </td>
-                      <td className="p-2 border-t-2 border-gray-800"></td>
+                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
+                        {formatCurrency(getTotal('total_cost'))}
+                      </td>
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
                         {formatCurrency(getTotal('total_price'))}
                       </td>

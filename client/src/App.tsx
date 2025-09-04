@@ -40,6 +40,7 @@ import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
 import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
 
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
+import ProductAndServiceList from './components/reports/Sales&Customers/ProductAndServiceList';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -332,6 +333,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CustomerContactDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/product-service-list"
+          element={
+            <ProtectedRoute>
+              <ProductAndServiceList />
             </ProtectedRoute>
           }
         />

@@ -7,27 +7,40 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface CustomerContactData {
-  id: string;
+interface ProductData {
+  id: number;
+  sku: string;
   name: string;
-  email: string;
-  phone: string;
-  billing_address: string;
-  shipping_address: string;
+  image?: string;
+  description: string;
+  category_id?: number;
+  category_name?: string;
+  preferred_vendor_id?: number;
+  vendor_name?: string;
+  added_employee_id?: number;
+  employee_name?: string;
+  unit_price: number;
+  cost_price: number;
+  quantity_on_hand: number;
+  manual_count: number;
+  reorder_level: number;
+  commission: number;
+  is_active: boolean;
+  created_at: string;
 }
 
-const CustomerContactDetails: React.FC = () => {
+const ProductList: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<CustomerContactData[]>([]);
+  const [data, setData] = useState<ProductData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [customerFilter, setCustomerFilter] = useState<string>('');
-  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerContactData[]>([]);
+  const [productFilter, setProductFilter] = useState<string>('');
+  const [productSuggestions, setProductSuggestions] = useState<ProductData[]>([]);
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchCustomerContacts = async () => {
+  const fetchProducts = async () => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -36,18 +49,18 @@ const CustomerContactDetails: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/customer-contacts/${selectedCompany.company_id}`);
+      const response = await axiosInstance.get(`/api/getProducts/${selectedCompany.company_id}`);
       
-      if (response.data?.data && Array.isArray(response.data.data)) {
-        setData(response.data.data);
-        setCustomerSuggestions(response.data.data);
+      if (Array.isArray(response.data)) {
+        setData(response.data);
+        setProductSuggestions(response.data);
       } else {
         setData([]);
-        setCustomerSuggestions([]);
+        setProductSuggestions([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch customer contact data. Please try again.');
+      setError('Failed to fetch product data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -56,20 +69,20 @@ const CustomerContactDetails: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
-      fetchCustomerContacts();
+      fetchProducts();
     }
   }, [selectedCompany?.company_id]);
 
-  const handleCustomerSearch = (value: string) => {
-    setCustomerFilter(value);
-    const filtered = data.filter(customer =>
-      customer.name.toLowerCase().includes(value.toLowerCase())
+  const handleProductSearch = (value: string) => {
+    setProductFilter(value);
+    const filtered = data.filter(product =>
+      product.name.toLowerCase().includes(value.toLowerCase())
     );
-    setCustomerSuggestions(filtered.length > 0 ? filtered : data);
+    setProductSuggestions(filtered.length > 0 ? filtered : data);
   };
 
   const handlePrint = () => {
-    if (customerSuggestions.length === 0) {
+    if (productSuggestions.length === 0) {
       alert('No data available to print');
       return;
     }
@@ -129,7 +142,7 @@ const CustomerContactDetails: React.FC = () => {
         }
       }
 
-      const filename = `customer-contact-details-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `product-list-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -159,7 +172,7 @@ const CustomerContactDetails: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view Customer Contact Details.</p>
+          <p className="text-gray-600">Please select a company to view Product List.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -191,31 +204,31 @@ const CustomerContactDetails: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">Customer Contact Details</h1>
+                <h1 className="text-2xl font-bold mb-4">Product List</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
-                  <label className="text-xs text-gray-600 mb-1">Search Customer</label>
+                  <label className="text-xs text-gray-600 mb-1">Search Product</label>
                   <div className="relative">
                     <input
                       type="text"
                       className="border rounded-md p-2 w-40"
-                      value={customerFilter}
-                      onChange={(e) => handleCustomerSearch(e.target.value)}
-                      placeholder="Search customers..."
+                      value={productFilter}
+                      onChange={(e) => handleProductSearch(e.target.value)}
+                      placeholder="Search products..."
                     />
-                    {customerFilter && customerSuggestions.length > 0 && (
+                    {productFilter && productSuggestions.length > 0 && (
                       <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-40 mt-1">
-                        {customerSuggestions.map((customer) => (
+                        {productSuggestions.map((product) => (
                           <li
-                            key={customer.id}
+                            key={product.id}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
-                              setCustomerFilter(customer.name);
-                              setCustomerSuggestions([customer]);
+                              setProductFilter(product.name);
+                              setProductSuggestions([product]);
                             }}
                           >
-                            {customer.name}
+                            {product.name}
                           </li>
                         ))}
                       </ul>
@@ -240,7 +253,7 @@ const CustomerContactDetails: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Customer Contact Details</p>
+                <p className="text-sm font-medium">Product List</p>
               </div>
 
               {error && (
@@ -256,56 +269,84 @@ const CustomerContactDetails: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && customerSuggestions.length === 0 && (
+              {!loading && !error && productSuggestions.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No customer contact data available.
+                  No product data available.
                 </div>
               )}
               
-              {!loading && !error && customerSuggestions.length > 0 && (
+              {!loading && !error && productSuggestions.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
                       <tr>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          SKU
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Name
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Email
+                          Category
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Phone
+                          Vendor
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Billing Address
+                          Unit Price
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Shipping Address
+                          Cost Price
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Quantity on Hand
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Reorder Level
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Commission
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {customerSuggestions.map((customer, index) => (
+                      {productSuggestions.map((product, index) => (
                         <tr key={index} className="hover:bg-gray-50">
+                          <td className="p-2 border-b">
+                            {product.sku || 'N/A'}
+                          </td>
                           <td className="p-2 border-b font-medium">
-                            {customer.name}
+                            {product.name}
                           </td>
                           <td className="p-2 border-b">
-                            {customer.email}
+                            {product.category_name || 'N/A'}
                           </td>
                           <td className="p-2 border-b">
-                            {customer.phone}
+                            {product.vendor_name || 'N/A'}
                           </td>
-                          <td className="p-2 border-b">
-                            {customer.billing_address}
+                          <td className="p-2 border-b text-right">
+                            Rs. {Number(product.unit_price).toFixed(2)}
                           </td>
-                          <td className="p-2 border-b">
-                            {customer.shipping_address}
+                          <td className="p-2 border-b text-right">
+                            Rs. {Number(product.cost_price).toFixed(2)}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            {product.quantity_on_hand}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            {product.reorder_level}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            Rs. {Number(product.commission).toFixed(2)}
                           </td>
                         </tr>
                       ))}
@@ -322,12 +363,12 @@ const CustomerContactDetails: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && customerSuggestions.length > 0 && (
+      {showPrintPreview && productSuggestions.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Customer Contact Details
+                Print Preview - Product List
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -342,8 +383,8 @@ const CustomerContactDetails: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Customer Contact Details</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Customer Contact Information</h2>
+                    <h1 className="text-3xl font-bold mb-2">Product List</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Product Information</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
@@ -363,43 +404,71 @@ const CustomerContactDetails: React.FC = () => {
                     <tr>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        SKU
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Name
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Email
+                        Category
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Phone
+                        Vendor
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Billing Address
+                        Unit Price
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Shipping Address
+                        Cost Price
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Quantity on Hand
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Reorder Level
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Commission
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {customerSuggestions.map((customer, index) => (
+                    {productSuggestions.map((product, index) => (
                       <tr key={index}>
+                        <td className="p-2 border-b">
+                          {product.sku || 'N/A'}
+                        </td>
                         <td className="p-2 border-b font-medium">
-                          {customer.name}
+                          {product.name}
                         </td>
                         <td className="p-2 border-b">
-                          {customer.email}
+                          {product.category_name || 'N/A'}
                         </td>
                         <td className="p-2 border-b">
-                          {customer.phone}
+                          {product.vendor_name || 'N/A'}
                         </td>
-                        <td className="p-2 border-b">
-                          {customer.billing_address}
+                        <td className="p-2 border-b text-right">
+                          Rs. {Number(product.unit_price).toFixed(2)}
                         </td>
-                        <td className="p-2 border-b">
-                          {customer.shipping_address}
+                        <td className="p-2 border-b text-right">
+                          Rs. {Number(product.cost_price).toFixed(2)}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          {product.quantity_on_hand}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          {product.reorder_level}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          Rs. {Number(product.commission).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -415,7 +484,7 @@ const CustomerContactDetails: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Customer Contact Details
+                        Product List
                       </p>
                     </div>
                   </div>
@@ -444,4 +513,4 @@ const CustomerContactDetails: React.FC = () => {
   );
 };
 
-export default CustomerContactDetails;
+export default ProductList;

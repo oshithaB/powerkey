@@ -138,7 +138,7 @@ export default function ReportsPage() {
     {
       name: 'Sales by Product/Service Summary',
       description: 'Sales performance by product/service',
-      path: '/reports/sales-by-product-service'
+      path: '/reports/sales-by-product'
     },
     {
       name: 'Income by Customer Summary',

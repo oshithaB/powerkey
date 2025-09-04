@@ -41,6 +41,10 @@ import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetail
 
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
 import ProductAndServiceList from './components/reports/Sales&Customers/ProductAndServiceList';
+import SalesbyCustomerSummary from './components/reports/Sales&Customers/SalesbyCustomerSummary';
+import SalesbyCustomerDetail from './components/reports/Sales&Customers/SalesbyCustomerDetail';
+import SalesbyProductSummary from './components/reports/Sales&Customers/SalesbyProductSummary';
+import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyProductDetail';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -342,6 +346,42 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ProductAndServiceList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-customer"
+          element={
+            <ProtectedRoute>
+              <SalesbyCustomerSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-customer-detail/:customerId"
+          element={
+            <ProtectedRoute>
+              <SalesbyCustomerDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-product"
+          element={
+            <ProtectedRoute>
+              <SalesbyProductSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-product-detail/:productId"
+          element={
+            <ProtectedRoute>
+              <SalesbyProductDetail />
             </ProtectedRoute>
           }
         />

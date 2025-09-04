@@ -58,7 +58,8 @@ const {
     getSalesByProductServiceSummary,
     getSalesByProductServiceDetail,
     getIncomeByCustomerSummary,
-    getCustomerPhoneList
+    getCustomerPhoneList,
+    getSalesByCustomerIDDetail,
 } = salesAndCustomerController;
 
 //====================================================================================================================
@@ -280,7 +281,7 @@ router.get(
 );
 
 router.get(
-    '/sales-by-product-service-detail/:company_id',
+    '/sales-by-product-service-detail/:company_id/:product_id',
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getSalesByProductServiceDetail
@@ -298,6 +299,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getCustomerPhoneList
+);
+
+router.get(
+    '/sales-by-customerid-detail/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSalesByCustomerIDDetail
 );
 
 module.exports = router;

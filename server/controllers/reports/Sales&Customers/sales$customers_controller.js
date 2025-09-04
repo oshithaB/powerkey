@@ -41,9 +41,11 @@ const getCustomerContacts = async (req, res) => {
 // Get sales by employee summary
 const getSalesByEmployeeSummary = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           e.name AS employee_name,
           COUNT(i.id) AS total_invoices,
           SUM(i.total_amount) AS total_sales,
@@ -55,9 +57,18 @@ const getSalesByEmployeeSummary = async (req, res) => {
          AND i.company_id = ?
          AND i.total_amount IS NOT NULL
          AND i.status IN ('opened', 'partially_paid', 'overdue')
-       GROUP BY e.id, e.name`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` GROUP BY e.id, e.name`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -75,9 +86,12 @@ const getSalesByEmployeeSummary = async (req, res) => {
 // Get sales by customer summary
 const getSalesByCustomerSummary = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
+          c.id AS customer_id,
           c.name AS customer_name,
           COUNT(i.id) AS total_invoices,
           SUM(i.total_amount) AS total_sales,
@@ -88,10 +102,19 @@ const getSalesByCustomerSummary = async (req, res) => {
        WHERE c.is_active = TRUE
          AND c.company_id = ?
          AND i.total_amount IS NOT NULL
-         AND i.status IN ('opened', 'partially_paid', 'overdue')
-       GROUP BY c.id, c.name`,
-      [company_id]
-    );
+         AND i.status IN ('opened', 'partially_paid')
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` GROUP BY c.id, c.name`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -109,9 +132,11 @@ const getSalesByCustomerSummary = async (req, res) => {
 // Get sales by customer detail
 const getSalesByCustomerDetail = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           c.name AS customer_name,
           i.invoice_number,
           i.invoice_date,
@@ -124,9 +149,18 @@ const getSalesByCustomerDetail = async (req, res) => {
        JOIN invoices i ON c.id = i.customer_id
        WHERE c.is_active = TRUE
          AND c.company_id = ?
-       ORDER BY c.name, i.invoice_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY c.name, i.invoice_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -141,12 +175,62 @@ const getSalesByCustomerDetail = async (req, res) => {
   }
 };
 
+// Get Sales by CustomerID Detail
+const getSalesByCustomerIDDetail = async (req, res) => {
+  const { company_id, customer_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
+  try {
+    let query = `
+      SELECT
+          c.name AS customer_name,
+          i.invoice_number,
+          i.invoice_date,
+          i.due_date,
+          i.total_amount,
+          i.paid_amount,
+          i.balance_due,
+          i.status
+        FROM customer c
+        JOIN invoices i ON c.id = i.customer_id
+        WHERE c.is_active = TRUE
+          AND c.company_id = ?
+          AND c.id = ?
+          AND i.status IN ('opened', 'partially_paid')
+    `;
+    
+    const queryParams = [company_id, customer_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY i.invoice_date DESC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    res.status(200).json({
+      status: 'success',
+      data: rows
+    });
+  } catch (error) {
+    console.error('Error fetching sales by customer ID detail:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error'
+    });
+  }
+};
+
 // Get Sales by Employee Detail
 const getSalesByEmployeeDetail = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT
+    let query = `
+      SELECT
           e.name AS employee_name,
           i.invoice_number,
           i.invoice_date,
@@ -159,9 +243,19 @@ const getSalesByEmployeeDetail = async (req, res) => {
         JOIN invoices i ON e.id = i.employee_id
         WHERE e.is_active = TRUE
           AND i.company_id = ?
-        ORDER BY e.name, i.invoice_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY e.name, i.invoice_date`;
+
+    const [rows] = await db.query(query, queryParams);
+
     res.status(200).json({
       status: 'success',
       data: rows
@@ -211,20 +305,35 @@ const getProductServiceList = async (req, res) => {
 // Get sales by product/service summary
 const getSalesByProductServiceSummary = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT
+          p.id AS product_id,
           p.name AS product_name,
           p.sku,
+          p.unit_price,
+          p.cost_price,
+          SUM(p.cost_price * ii.quantity) AS total_cost,
           SUM(ii.quantity) AS total_quantity_sold,
           SUM(ii.total_price) AS total_sales
        FROM products p
        JOIN invoice_items ii ON p.id = ii.product_id
        JOIN invoices i ON ii.invoice_id = i.id
        WHERE p.company_id = ?
-       GROUP BY p.id, p.name, p.sku`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` GROUP BY p.id, p.name, p.sku`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -242,18 +351,29 @@ const getSalesByProductServiceSummary = async (req, res) => {
 // Get income by customer summary
 const getIncomeByCustomerSummary = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           c.name AS customer_name,
           SUM(p.payment_amount) AS total_income,
           COUNT(p.id) AS total_payments
        FROM customer c
        LEFT JOIN payments p ON c.id = p.customer_id
        WHERE c.company_id = ?
-       GROUP BY c.id, c.name`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND p.payment_date BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` GROUP BY c.id, c.name`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -270,10 +390,13 @@ const getIncomeByCustomerSummary = async (req, res) => {
 
 // Get sales by product/service detail
 const getSalesByProductServiceDetail = async (req, res) => {
-  const { company_id } = req.params;
+  const { company_id, product_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT
+          p.id AS product_id,
           p.name AS product_name,
           p.sku,
           ii.description,
@@ -287,10 +410,19 @@ const getSalesByProductServiceDetail = async (req, res) => {
        JOIN invoice_items ii ON p.id = ii.product_id
        JOIN invoices i ON ii.invoice_id = i.id
        JOIN customer c ON i.customer_id = c.id
-       WHERE p.company_id = ?
-       ORDER BY p.name, i.invoice_date`,
-      [company_id]
-    );
+       WHERE p.company_id = ? AND p.id = ?
+    `;
+    
+    const queryParams = [company_id, product_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY p.name, i.invoice_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -335,9 +467,11 @@ const getCustomerPhoneList = async (req, res) => {
 // Get deposit detail
 const getDepositDetail = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           p.id,
           p.payment_date,
           p.payment_amount,
@@ -349,9 +483,18 @@ const getDepositDetail = async (req, res) => {
        JOIN customer c ON p.customer_id = c.id
        JOIN invoices i ON p.invoice_id = i.id
        WHERE p.company_id = ?
-       ORDER BY p.payment_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND p.payment_date BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY p.payment_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -369,9 +512,11 @@ const getDepositDetail = async (req, res) => {
 // Get estimates by customer
 const getEstimatesByCustomer = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           c.name AS customer_name,
           e.estimate_number,
           e.estimate_date,
@@ -381,9 +526,18 @@ const getEstimatesByCustomer = async (req, res) => {
        FROM customer c
        JOIN estimates e ON c.id = e.customer_id
        WHERE c.company_id = ?
-       ORDER BY c.name, e.estimate_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND e.estimate_date BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY c.name, e.estimate_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -466,16 +620,26 @@ const getInventoryValuationDetail = async (req, res) => {
 // Get payment method list
 const getPaymentMethodList = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT DISTINCT
+    let query = `
+      SELECT DISTINCT
           pm.id,
           pm.name
        FROM payment_methods pm
        JOIN payments p ON pm.name = p.payment_method
-       WHERE p.company_id = ?`,
-      [company_id]
-    );
+       WHERE p.company_id = ?
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND p.payment_date BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -525,9 +689,11 @@ const getStockTakeWorksheet = async (req, res) => {
 // Get time activities by customer detail
 const getTimeActivitiesByCustomerDetail = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           c.name AS customer_name,
           i.invoice_number,
           i.invoice_date,
@@ -540,9 +706,18 @@ const getTimeActivitiesByCustomerDetail = async (req, res) => {
        JOIN invoice_items ii ON i.id = ii.invoice_id
        WHERE ii.description LIKE '%time activity%'
          AND c.company_id = ?
-       ORDER BY c.name, i.invoice_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY c.name, i.invoice_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -560,9 +735,11 @@ const getTimeActivitiesByCustomerDetail = async (req, res) => {
 // Get transaction list by customer
 const getTransactionListByCustomer = async (req, res) => {
   const { company_id } = req.params;
+  const { start_date, end_date } = req.query;
+  
   try {
-    const [rows] = await db.query(
-      `SELECT 
+    let query = `
+      SELECT 
           c.name AS customer_name,
           i.invoice_number,
           i.invoice_date,
@@ -577,9 +754,18 @@ const getTransactionListByCustomer = async (req, res) => {
        LEFT JOIN invoices i ON c.id = i.customer_id
        LEFT JOIN payments p ON i.id = p.invoice_id
        WHERE c.company_id = ? AND c.is_active = TRUE
-       ORDER BY c.name, i.invoice_date, p.payment_date`,
-      [company_id]
-    );
+    `;
+    
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+      queryParams.push(start_date, end_date);
+    }
+
+    query += ` ORDER BY c.name, i.invoice_date, p.payment_date`;
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
@@ -612,5 +798,6 @@ module.exports = {
   getPaymentMethodList,
   getStockTakeWorksheet,
   getTimeActivitiesByCustomerDetail,
-  getTransactionListByCustomer
+  getTransactionListByCustomer,
+  getSalesByCustomerIDDetail
 };

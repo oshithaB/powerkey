@@ -39,6 +39,8 @@ import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossB
 import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
 import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
 
+import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
+
 import NotFound from './components/NotFound/NotFound';
 
 interface Cheque {
@@ -320,6 +322,16 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ARAgingSummaryInDetails />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/reports/customer-contact-list"
+          element={
+            <ProtectedRoute>
+              <CustomerContactDetails />
             </ProtectedRoute>
           }
         />

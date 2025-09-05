@@ -8,12 +8,7 @@ import html2canvas from 'html2canvas';
 import { useCompany } from '../../contexts/CompanyContext';
 
 interface ProfitAndLossData {
-  period: {
-    start_date: string;
-    end_date: string;
-    generated_at: string;
-  };
-  employee: {
+  customer: {
     id: string;
     name: string;
     email: string;
@@ -45,7 +40,7 @@ interface ProfitAndLossData {
   };
 }
 
-const ProfitAndLossByClass: React.FC = () => {
+const ProfitAndLossByCustomer: React.FC = () => {
   const { selectedCompany } = useCompany();
   const [data, setData] = useState<ProfitAndLossData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,6 +56,12 @@ const ProfitAndLossByClass: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomRange, setIsCustomRange] = useState(false);
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  };
+
   const fetchProfitAndLossData = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
@@ -71,15 +72,15 @@ const ProfitAndLossByClass: React.FC = () => {
     setError(null);
     try {
       const [profitResponse, shrinkageResponse] = await Promise.all([
-        axiosInstance.get(`/api/profit-and-loss-all-employees/${selectedCompany.company_id}`, {
+        axiosInstance.get(`/api/profit-and-loss-all-customers/${selectedCompany.company_id}`, {
           params: { start_date: startDate, end_date: endDate }
         }),
         axiosInstance.get(`/api/inventory-shrinkage/${selectedCompany.company_id}`)
       ]);
       
       // Validate response structure
-      if (profitResponse.data?.data?.employees && Array.isArray(profitResponse.data.data.employees)) {
-        setData(profitResponse.data.data.employees);
+      if (profitResponse.data?.data?.customers && Array.isArray(profitResponse.data.data.customers)) {
+        setData(profitResponse.data.data.customers);
         setInventoryShrinkage(shrinkageResponse.data?.data?.inventory_shrinkage || 0);
       } else {
         setData([]);
@@ -126,10 +127,10 @@ const ProfitAndLossByClass: React.FC = () => {
     }).format(numValue);
   };
 
-  const safeGetValue = (employee: ProfitAndLossData, path: string): number => {
+  const safeGetValue = (customer: ProfitAndLossData, path: string): number => {
     try {
       const keys = path.split('.');
-      let value: any = employee;
+      let value: any = customer;
       for (const key of keys) {
         value = value?.[key];
       }
@@ -140,11 +141,11 @@ const ProfitAndLossByClass: React.FC = () => {
   };
 
   const getTotal = (path: string) => {
-    return data.reduce((total, employee) => total + safeGetValue(employee, path), 0);
+    return data.reduce((total, customer) => total + safeGetValue(customer, path), 0);
   };
 
-  const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/reports/profit-and-loss-by-employee/${employeeId}`);
+  const handleCustomerClick = (customerId: string) => {
+    navigate(`/reports/profit-and-loss-by-customer/${customerId}`);
   };
 
   const handlePrint = () => {
@@ -160,26 +161,26 @@ const ProfitAndLossByClass: React.FC = () => {
       alert('No data available to print');
       return;
     }
-
+  
     try {
       const pdf = new jsPDF('l', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 10;
-      const columnsPerPage = 5; // Account column + 4 employee columns + total column on last page
+      const columnsPerPage = 5; // Account column + 4 customer columns + total column on last page
       const totalPages = Math.ceil((data.length + 1) / columnsPerPage); // +1 for total column
-
+  
       // Generate each page
       for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
         if (pageIndex > 0) {
           pdf.addPage();
         }
-
-        const startEmployeeIndex = pageIndex * (columnsPerPage - 1);
-        const endEmployeeIndex = Math.min(startEmployeeIndex + (columnsPerPage - 1), data.length);
-        const pageEmployees = data.slice(startEmployeeIndex, endEmployeeIndex);
+  
+        const startCustomerIndex = pageIndex * (columnsPerPage - 1);
+        const endCustomerIndex = Math.min(startCustomerIndex + (columnsPerPage - 1), data.length);
+        const pageCustomers = data.slice(startCustomerIndex, endCustomerIndex);
         const showTotalColumn = pageIndex === totalPages - 1;
-
+  
         // Create a temporary div for this page
         const tempDiv = document.createElement('div');
         tempDiv.style.width = '1200px';
@@ -191,7 +192,7 @@ const ProfitAndLossByClass: React.FC = () => {
           <div style="margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
               <div>
-                <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Profit and Loss by Class</h1>
+                <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Profit and Loss by Customer</h1>
                 <h2 style="font-size: 18px; color: #666; margin-bottom: 8px;">Profit and Loss Summary</h2>
                 <h2 style="font-size: 18px; color: #666; margin-bottom: 8px;">${selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</h2>
                 <p style="font-size: 12px; color: #666;">
@@ -213,8 +214,8 @@ const ProfitAndLossByClass: React.FC = () => {
             <thead>
               <tr>
                 <th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: left; border: 1px solid #ccc; width: 200px;">Account</th>
-                ${pageEmployees.map(employee => 
-                  `<th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: right; border: 1px solid #ccc; min-width: 120px;">${employee.employee.name}</th>`
+                ${pageCustomers.map(customer => 
+                  `<th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: right; border: 1px solid #ccc; min-width: 120px;">${customer.customer.name}</th>`
                 ).join('')}
                 ${showTotalColumn ? 
                   `<th style="background-color: #e2e8f0; padding: 8px; font-weight: bold; text-align: right; border: 1px solid #ccc; min-width: 120px;">Total</th>` 
@@ -222,20 +223,20 @@ const ProfitAndLossByClass: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              ${generateTableRowsHTML(pageEmployees, showTotalColumn)}
+              ${generateTableRowsHTML(pageCustomers, showTotalColumn)}
             </tbody>
           </table>
           
           <div style="border-top: 1px solid #ccc; padding-top: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <p style="font-size: 12px; color: #666;">Report generated at: ${new Date().toLocaleString()}</p>
-              <p style="font-size: 12px; color: #666;">Profit and Loss by Class</p>
+              <p style="font-size: 12px; color: #666;">Profit and Loss by Customer</p>
             </div>
           </div>
         `;
-
+  
         document.body.appendChild(tempDiv);
-
+  
         // Convert to canvas
         const canvas = await html2canvas(tempDiv, {
           scale: 2,
@@ -244,19 +245,19 @@ const ProfitAndLossByClass: React.FC = () => {
           allowTaint: true,
           backgroundColor: '#ffffff',
         });
-
+  
         document.body.removeChild(tempDiv);
-
+  
         // Add to PDF
         const imgData = canvas.toDataURL('image/png', 0.95);
         const imgProps = pdf.getImageProperties(imgData);
         const imgWidth = pageWidth - 2 * margin;
         const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
+  
         pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight, pageHeight - 2 * margin));
       }
-
-      const filename = `profit-and-loss-by-class-${new Date().toISOString().split('T')[0]}.pdf`;
+  
+      const filename = `profit-and-loss-by-customer-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -264,47 +265,47 @@ const ProfitAndLossByClass: React.FC = () => {
       alert('Failed to generate PDF. Please try again.');
     }
   };
-
-  const generateTableRowsHTML = (pageEmployees: ProfitAndLossData[], showTotalColumn: boolean) => {
+  
+  const generateTableRowsHTML = (pageCustomers: any[], showTotalColumn: boolean) => {
     const rows = [
-      { label: 'Discounts given', getValue: (emp: ProfitAndLossData) => -safeGetValue(emp, 'income.discounts_given') },
-      { label: 'Sales of Product Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.sales_of_product_income') },
-      { label: 'Shipping Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.shipping_income') },
-      { label: 'Tax Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.tax_income') },
-      { label: 'Total for Income', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'income.total_income'), isTotal: true },
-      { label: 'Cost of Sales', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), isCostSection: true },
+      { label: 'Discounts given', getValue: (customer: any) => -safeGetValue(customer, 'income.discounts_given') },
+      { label: 'Sales of Product Income', getValue: (customer: any) => safeGetValue(customer, 'income.sales_of_product_income') },
+      { label: 'Shipping Income', getValue: (customer: any) => safeGetValue(customer, 'income.shipping_income') },
+      { label: 'Tax Income', getValue: (customer: any) => safeGetValue(customer, 'income.tax_income') },
+      { label: 'Total for Income', getValue: (customer: any) => safeGetValue(customer, 'income.total_income'), isTotal: true },
+      { label: 'Cost of Sales', getValue: (customer: any) => safeGetValue(customer, 'cost_of_sales.cost_of_sales'), isCostSection: true },
       { label: 'Inventory Shrinkage', getValue: () => 0, isInventory: true, isCostSection: true },
-      { label: 'Total for Cost of Sales', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), isTotal: true, isCostSection: true },
-      { label: 'Gross Profit', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'profitability.gross_profit'), isTotal: true },
+      { label: 'Total for Cost of Sales', getValue: (customer: any) => safeGetValue(customer, 'cost_of_sales.total_cost_of_sales'), isTotal: true, isCostSection: true },
+      { label: 'Gross Profit', getValue: (customer: any) => safeGetValue(customer, 'profitability.gross_profit'), isTotal: true },
       { label: 'Other Income', getValue: () => 0 },
       { label: 'Expenses', getValue: () => 0 },
       { label: 'Other Expenses', getValue: () => 0 },
-      { label: 'Net Earnings', getValue: (emp: ProfitAndLossData) => safeGetValue(emp, 'profitability.net_earnings'), isFinal: true }
+      { label: 'Net Earnings', getValue: (customer: any) => safeGetValue(customer, 'profitability.net_earnings'), isFinal: true }
     ];
-
+  
     return rows.map(row => {
       const cellStyle = `padding: 6px; border: 1px solid #ccc; text-align: ${row.label === 'Account' ? 'left' : 'right'}; ${
         row.isTotal || row.isFinal ? 'font-weight: bold;' : ''
       } ${row.isCostSection ? 'background-color: #f7fafc;' : ''} ${
         row.isFinal ? 'border-top: 2px solid #333;' : ''
       }`;
-
+  
       let totalValue = 0;
       if (row.isInventory) {
         totalValue = inventoryShrinkage;
       } else if (row.label === 'Total for Cost of Sales') {
-        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0) + inventoryShrinkage;
+        totalValue = data.reduce((sum, customer) => sum + row.getValue(customer), 0) + inventoryShrinkage;
       } else if (row.label === 'Net Earnings') {
-        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0) - inventoryShrinkage;
+        totalValue = data.reduce((sum, customer) => sum + row.getValue(customer), 0) - inventoryShrinkage;
       } else {
-        totalValue = data.reduce((sum, emp) => sum + row.getValue(emp), 0);
+        totalValue = data.reduce((sum, customer) => sum + row.getValue(customer), 0);
       }
-
+  
       return `
         <tr>
           <td style="${cellStyle}">${row.label}</td>
-          ${pageEmployees.map(employee => 
-            `<td style="${cellStyle}">${formatCurrency(row.isInventory ? 0 : row.getValue(employee))}</td>`
+          ${pageCustomers.map(customer => 
+            `<td style="${cellStyle}">${formatCurrency(row.isInventory ? 0 : row.getValue(customer))}</td>`
           ).join('')}
           ${showTotalColumn ? 
             `<td style="${cellStyle}">${formatCurrency(totalValue)}</td>` 
@@ -402,9 +403,9 @@ const ProfitAndLossByClass: React.FC = () => {
       <td className={`p-2 border-b ${isTotal ? 'font-bold' : 'font-medium'} ${sectionClass}`}>
         {label}
       </td>
-      {data.map((employee) => (
-        <td key={employee.employee.id} className={`p-2 border-b text-right ${isTotal ? 'font-bold' : ''} ${sectionClass}`}>
-          {formatCurrency(getValue(employee))}
+      {data.map((customer) => (
+        <td key={customer.customer.id} className={`p-2 border-b text-right ${isTotal ? 'font-bold' : ''} ${sectionClass}`}>
+          {formatCurrency(getValue(customer))}
         </td>
       ))}
       <td className={`p-2 border-b text-right ${isTotal ? 'font-bold' : ''} ${sectionClass}`}>
@@ -441,7 +442,7 @@ const ProfitAndLossByClass: React.FC = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-2xl font-bold mb-4">Profit and Loss by Class</h1>
+              <h1 className="text-2xl font-bold mb-4">Profit and Loss by Customer</h1>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-600 mb-1">Filter Period</label>
@@ -522,12 +523,10 @@ const ProfitAndLossByClass: React.FC = () => {
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm font-medium">Profit and Loss Summary</p>
-                <p className="text-sm text-gray-600">
-                  {isCustomRange 
-                    ? `Period: ${startDate} to ${endDate}` 
-                    : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
-                  }
-                </p>
+                {isCustomRange 
+                  ? `Period: ${startDate} to ${endDate}` 
+                  : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
+                }
               </div>
 
               {error && (
@@ -586,9 +585,9 @@ const ProfitAndLossByClass: React.FC = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr>
-                            {data.map((employee) => (
-                              <th key={employee.employee.id} 
-                                  onClick={() => handleEmployeeClick(employee.employee.id)}
+                            {data.map((customer) => (
+                              <th key={customer.customer.id} 
+                                  onClick={() => handleCustomerClick(customer.customer.id)}
                                   className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px] cursor-pointer hover:underline"
                                   style={{ 
                                     backgroundColor: '#e2e8f0', 
@@ -596,7 +595,7 @@ const ProfitAndLossByClass: React.FC = () => {
                                     colorAdjust: 'exact', 
                                     printColorAdjust: 'exact'
                                   }}>
-                                {employee.employee.name}
+                                {customer.customer.name}
                               </th>
                             ))}
                             <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
@@ -608,9 +607,9 @@ const ProfitAndLossByClass: React.FC = () => {
                         <tbody>
                           {/* Income Section */}
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
-                                {formatCurrency(-safeGetValue(employee, 'income.discounts_given'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
+                                {formatCurrency(-safeGetValue(customer, 'income.discounts_given'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right">
@@ -618,9 +617,9 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
-                                {formatCurrency(safeGetValue(employee, 'income.sales_of_product_income'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(customer, 'income.sales_of_product_income'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right">
@@ -628,9 +627,9 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
-                                {formatCurrency(safeGetValue(employee, 'income.shipping_income'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(customer, 'income.shipping_income'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right">
@@ -638,9 +637,9 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
-                                {formatCurrency(safeGetValue(employee, 'income.tax_income'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
+                                {formatCurrency(safeGetValue(customer, 'income.tax_income'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right">
@@ -648,9 +647,9 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold">
-                                {formatCurrency(safeGetValue(employee, 'income.total_income'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right font-bold">
+                                {formatCurrency(safeGetValue(customer, 'income.total_income'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right font-bold">
@@ -660,9 +659,9 @@ const ProfitAndLossByClass: React.FC = () => {
                           
                           {/* Cost of Sales Section */}
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
-                                {formatCurrency(safeGetValue(employee, 'cost_of_sales.cost_of_sales'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right cost-section">
+                                {formatCurrency(safeGetValue(customer, 'cost_of_sales.cost_of_sales'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right cost-section">
@@ -670,8 +669,8 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right cost-section">
                                 {formatCurrency(0)}
                               </td>
                             ))}
@@ -680,21 +679,21 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
-                                {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right font-bold cost-section">
+                                {formatCurrency(safeGetValue(customer, 'cost_of_sales.total_cost_of_sales'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right font-bold cost-section">
-                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), 0) + inventoryShrinkage)}
+                              {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
                             </td>
                           </tr>
                           
                           {/* Profit Section */}
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right font-bold">
-                                {formatCurrency(safeGetValue(employee, 'profitability.gross_profit'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right font-bold">
+                                {formatCurrency(safeGetValue(customer, 'profitability.gross_profit'))}
                               </td>
                             ))}
                             <td className="p-2 border-b text-right font-bold">
@@ -702,8 +701,8 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
                                 {formatCurrency(0)}
                               </td>
                             ))}
@@ -712,8 +711,8 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
                                 {formatCurrency(0)}
                               </td>
                             ))}
@@ -722,8 +721,8 @@ const ProfitAndLossByClass: React.FC = () => {
                             </td>
                           </tr>
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-2 border-b text-right">
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-2 border-b text-right">
                                 {formatCurrency(0)}
                               </td>
                             ))}
@@ -734,13 +733,13 @@ const ProfitAndLossByClass: React.FC = () => {
                           
                           {/* Final Net Earnings */}
                           <tr>
-                            {data.map((employee) => (
-                              <td key={employee.employee.id} className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                                {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
+                            {data.map((customer) => (
+                              <td key={customer.customer.id} className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                                {formatCurrency(safeGetValue(customer, 'profitability.net_earnings'))}
                               </td>
                             ))}
                             <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'profitability.net_earnings'), 0) - inventoryShrinkage)}
+                              {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
                             </td>
                           </tr>
                         </tbody>
@@ -764,7 +763,7 @@ const ProfitAndLossByClass: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Profit and Loss by Class
+                Print Preview - Profit and Loss by Customer
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -780,16 +779,13 @@ const ProfitAndLossByClass: React.FC = () => {
                 {/* Header */}
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Profit and Loss by Class</h1>
+                    <h1 className="text-3xl font-bold mb-2">Profit and Loss by Customer</h1>
                     <h2 className="text-xl text-gray-600 mb-2">Profit and Loss Summary</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      {isCustomRange 
-                        ? `Period: ${startDate} to ${endDate}` 
-                        : filter === 'week' ? 'Last 7 Days' : filter === 'month' ? 'Last 30 Days' : filter === 'year' ? `January 1 - December 31, ${new Date().getFullYear()}` : ''
-                      }
+                      Period: {formatDate(periodStart)} - {formatDate(periodEnd)}, {new Date(periodEnd).getFullYear()}
                     </p>
                   </div>
 
@@ -802,7 +798,7 @@ const ProfitAndLossByClass: React.FC = () => {
                   )}
                 </div>
 
-                
+                {/* Report Content */}
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr className='scrollable-columns'>
@@ -810,11 +806,11 @@ const ProfitAndLossByClass: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Account
                       </th>
-                      {data.map((employee) => (
-                        <th key={employee.employee.id} 
+                      {data.map((customer) => (
+                        <th key={customer.customer.id} 
                             className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          {employee.employee.name}
+                          {customer.customer.name}
                         </th>
                       ))}
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
@@ -835,8 +831,8 @@ const ProfitAndLossByClass: React.FC = () => {
                     {renderTableRow('Cost of Sales', (emp) => safeGetValue(emp, 'cost_of_sales.cost_of_sales'), false, true, 'cost-section')}
                     <tr>
                       <td className="p-2 border-b font-medium cost-section">Inventory Shrinkage</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-b text-right cost-section">
+                      {data.map((customer) => (
+                        <td key={customer.customer.id} className="p-2 border-b text-right cost-section">
                           {formatCurrency(0)}
                         </td>
                       ))}
@@ -846,13 +842,13 @@ const ProfitAndLossByClass: React.FC = () => {
                     </tr>
                     <tr>
                       <td className="p-2 border-b font-bold cost-section">Total for Cost of Sales</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-b text-right font-bold cost-section">
-                          {formatCurrency(safeGetValue(employee, 'cost_of_sales.total_cost_of_sales'))}
+                      {data.map((customer) => (
+                        <td key={customer.customer.id} className="p-2 border-b text-right font-bold cost-section">
+                          {formatCurrency(safeGetValue(customer, 'cost_of_sales.total_cost_of_sales'))}
                         </td>
                       ))}
                       <td className="p-2 border-b text-right font-bold cost-section">
-                        {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'cost_of_sales.total_cost_of_sales'), 0) + inventoryShrinkage)}
+                        {formatCurrency(getTotal('cost_of_sales.total_cost_of_sales') + inventoryShrinkage)}
                       </td>
                     </tr>
                     
@@ -865,13 +861,13 @@ const ProfitAndLossByClass: React.FC = () => {
                     {/* Final Net Earnings */}
                     <tr>
                       <td className="p-2 border-t-2 border-gray-800 font-bold">Net Earnings</td>
-                      {data.map((employee) => (
-                        <td key={employee.employee.id} className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(safeGetValue(employee, 'profitability.net_earnings'))}
+                      {data.map((customer) => (
+                        <td key={customer.customer.id} className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(safeGetValue(customer, 'profitability.net_earnings'))}
                         </td>
                       ))}
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'profitability.net_earnings'), 0) - inventoryShrinkage)}
+                        {formatCurrency(getTotal('profitability.net_earnings') - inventoryShrinkage)}
                       </td>
                     </tr>
                   </tbody>
@@ -887,7 +883,7 @@ const ProfitAndLossByClass: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Profit and Loss by Class
+                        Profit and Loss by Customer
                       </p>
                     </div>
                   </div>
@@ -916,4 +912,4 @@ const ProfitAndLossByClass: React.FC = () => {
   );
 };
 
-export default ProfitAndLossByClass;
+export default ProfitAndLossByCustomer;

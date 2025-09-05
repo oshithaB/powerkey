@@ -33,6 +33,18 @@ import CommissionReportByEmployees from './components/reports/CommissionReportBy
 import SalesReport from './components/reports/SalesReport';
 import SalesReportByEmployees from './components/reports/SalesReportByEmployees';
 import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
+import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
+import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
+import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossByCustomerInDetail';
+import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
+import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
+
+import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
+import ProductAndServiceList from './components/reports/Sales&Customers/ProductAndServiceList';
+import SalesbyCustomerSummary from './components/reports/Sales&Customers/SalesbyCustomerSummary';
+import SalesbyCustomerDetail from './components/reports/Sales&Customers/SalesbyCustomerDetail';
+import SalesbyProductSummary from './components/reports/Sales&Customers/SalesbyProductSummary';
+import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyProductDetail';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -240,6 +252,30 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/reports/profit-and-loss-by-employee/:employeeId"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByClassInDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/profit&loss-by-customer"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByCustomer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/profit-and-loss-by-customer/:customerId"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByCustomerInDetail />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/reports/commission"
@@ -273,6 +309,79 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SalesReportByEmployees />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ar-aging-summary"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ar-aging-in-detail/:customerId"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryInDetails />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/reports/customer-contact-list"
+          element={
+            <ProtectedRoute>
+              <CustomerContactDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/product-service-list"
+          element={
+            <ProtectedRoute>
+              <ProductAndServiceList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-customer"
+          element={
+            <ProtectedRoute>
+              <SalesbyCustomerSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-customer-detail/:customerId"
+          element={
+            <ProtectedRoute>
+              <SalesbyCustomerDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-product"
+          element={
+            <ProtectedRoute>
+              <SalesbyProductSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/sales-by-product-detail/:productId"
+          element={
+            <ProtectedRoute>
+              <SalesbyProductDetail />
             </ProtectedRoute>
           }
         />

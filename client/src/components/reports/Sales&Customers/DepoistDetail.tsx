@@ -462,7 +462,7 @@ const DepositDetail: React.FC = () => {
                             </tr>
                           ))}
                           <tr>
-                            <td className="p-2 border-b text-center">
+                            <td className="p-2 border-b-2 border-gray-600 text-center">
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deposits[0].invoice_status)}`}>
                                   {deposits[0].invoice_status.replace('_', ' ').toUpperCase()}
                                 </span>
@@ -597,7 +597,7 @@ const DepositDetail: React.FC = () => {
                           </tr>
                         ))}
                         <tr>
-                            <td className="p-2 border-b text-center">
+                            <td className="p-2 border-b-2 border-gray-600 text-center">
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deposits[0].invoice_status)}`}>
                                     {deposits[0].invoice_status.replace('_', ' ').toUpperCase()}
                                 </span>

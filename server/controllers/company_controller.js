@@ -149,7 +149,7 @@ const getDashboardData = async (req, res) => {
         const [cheques] = await db.query(`SELECT COUNT(*) as count FROM cheques WHERE company_id = ? AND status = "pending" AND (cheque_date < CURDATE() OR cheque_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY))`,[companyId]);
         const [products] = await db.query('SELECT COUNT(*) as count FROM products WHERE company_id = ? AND quantity_on_hand <= reorder_level', [companyId]);
         const [overdue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status = "overdue"', [companyId]);
-        const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status != "cancelled"', [companyId]);
+        const [revenue] = await db.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE company_id = ? AND status IN ("opened", "partially_paid", "paid")', [companyId]);
 
         // Get recent invoices
         const [recentInvoices] = await db.query(`

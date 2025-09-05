@@ -45,6 +45,7 @@ import SalesbyCustomerSummary from './components/reports/Sales&Customers/Salesby
 import SalesbyCustomerDetail from './components/reports/Sales&Customers/SalesbyCustomerDetail';
 import SalesbyProductSummary from './components/reports/Sales&Customers/SalesbyProductSummary';
 import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyProductDetail';
+import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -382,6 +383,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SalesbyProductDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/deposit-detail"
+          element={
+            <ProtectedRoute>
+              <DepoistDetail />
             </ProtectedRoute>
           }
         />

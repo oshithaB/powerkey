@@ -399,6 +399,8 @@ const getSalesByProductServiceDetail = async (req, res) => {
           p.id AS product_id,
           p.name AS product_name,
           p.sku,
+          p.cost_price,
+          p.cost_price * ii.quantity AS total_cost,
           ii.description,
           ii.quantity,
           ii.unit_price,
@@ -406,6 +408,7 @@ const getSalesByProductServiceDetail = async (req, res) => {
           i.invoice_number,
           i.invoice_date,
           c.name AS customer_name
+          
        FROM products p
        JOIN invoice_items ii ON p.id = ii.product_id
        JOIN invoices i ON ii.invoice_id = i.id
@@ -478,7 +481,8 @@ const getDepositDetail = async (req, res) => {
           p.payment_method,
           p.deposit_to,
           c.name AS customer_name,
-          i.invoice_number
+          i.invoice_number,
+          i.status AS invoice_status
        FROM payments p
        JOIN customer c ON p.customer_id = c.id
        JOIN invoices i ON p.invoice_id = i.id
@@ -492,7 +496,7 @@ const getDepositDetail = async (req, res) => {
       queryParams.push(start_date, end_date);
     }
 
-    query += ` ORDER BY p.payment_date`;
+    query += ` ORDER BY i.invoice_number DESC, p.payment_date DESC, p.id DESC`;
 
     const [rows] = await db.query(query, queryParams);
 

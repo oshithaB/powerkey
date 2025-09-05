@@ -310,8 +310,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
     balance_due, // Add balance_due to destructured fields
     items,
     status,
-    attachment
+    attachment,
+    invoice_type
   } = req.body;
+
+  console.log('Updating invoice with data:', req.body);
 
   const invoiceId = req.params.invoiceId;
 
@@ -384,7 +387,9 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
       if (duplicateInvoice.length > 0) {
         await connection.rollback();
-        return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+        return res
+          .status(400)
+          .json({ error: `Invoice number '${invoice_number}' already exists` });
       }
     }
 
@@ -397,7 +402,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       head_note: head_note || null,
       invoice_date,
       due_date: due_date || null,
-      discount_type: discount_type || 'fixed',
+      discount_type: discount_type || "fixed",
       discount_value: discount_value || 0,
       notes: notes || null,
       terms: terms || null,
@@ -413,26 +418,69 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount: total_amount || 0,
       balance_due: balance_due || 0, // Add balance_due to invoiceData
       status,
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
-    if (status === 'opened') {
+    // --- Handle cancelled invoice ---
+    if (status === 'cancelled' && invoice_type !== 'proforma') {
+      // 1. Fetch all invoice items for this invoice
+      console.log("inside cancelled invoice handler");
+      const [cancelItems] = await connection.query(
+        `SELECT product_id, quantity FROM invoice_items WHERE invoice_id = ?`,
+        [invoiceId]
+      );
+
+      // 2. Restore stock for each item
+      for (const item of cancelItems) {
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand + ? 
+           WHERE id = ?`,
+          [item.quantity, item.product_id]
+        );
+      }
+
+      // 4. Reduce customer's current_balance by balance_due
+      await connection.query(
+        `UPDATE customer 
+         SET current_balance = current_balance - ? 
+         WHERE id = ? AND company_id = ?`,
+        [balance_due, customer_id, company_id]
+      );
+    }
+
+    console.log("passed cancelled invoice handler");
+
+    if (status === "opened") {
       const [customerRows] = await connection.query(
-      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
-      [customer_id, company_id]
+        `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+        [customer_id, company_id]
       );
 
       if (customerRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: "Customer not found" });
+        await connection.rollback();
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const [invoiceRows] = await connection.query(
+        `SELECT balance_due FROM invoices WHERE id = ? AND company_id = ?`,
+        [invoiceId, company_id]
+      );
+
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
       const currentBalance = Number(customerRows[0].current_balance) || 0;
-      const newBalance = currentBalance + (invoiceData.balance_due || 0);
+      const newBalance =
+        currentBalance -
+        Number(invoiceRows[0].balance_due || 0) +
+        (invoiceData.balance_due || 0);
 
       await connection.query(
-      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
-      [newBalance, customer_id, company_id]
+        `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+        [newBalance, customer_id, company_id]
       );
     }
 
@@ -455,42 +503,162 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
+    // // Insert updated invoice items
+    // const itemQuery = `INSERT INTO invoice_items
+    //                   (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+    //                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    // for (const item of items) {
+    //   const itemData = [
+    //     invoiceId,
+    //     item.product_id,
+    //     item.product_name || null,
+    //     item.description,
+    //     item.quantity,
+    //     item.unit_price,
+    //     item.actual_unit_price,
+    //     item.tax_rate,
+    //     item.tax_amount,
+    //     item.total_price
+    //   ];
+
+    //   const [itemResult] = await connection.query(itemQuery, itemData);
+    //   if (itemResult.affectedRows === 0) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ error: "Failed to create invoice items" });
+    //   }
+    // }
 
 
+    // --- Update invoice items with inventory control ---
 
+    // 1. Load old items
+    const [oldRows] = await connection.query(
+      "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
+      [invoiceId]
+    );
 
-    // Delete existing items
-    // await connection.query(
-    //   `DELETE FROM invoice_items WHERE invoice_id = ?`,
-    //   [invoiceId]
-    // );
+    const oldItems = {};
+    oldRows.forEach((r) => {
+      oldItems[r.id] = { product_id: r.product_id, qty: r.quantity };
+    });
 
-    // Insert updated invoice items
-    const itemQuery = `INSERT INTO invoice_items
-                      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const usedIds = new Set();
 
+    // 2. Process new items
     for (const item of items) {
-      const itemData = [
-        invoiceId,
-        item.product_id,
-        item.product_name || null,
-        item.description,
-        item.quantity,
-        item.unit_price,
-        item.actual_unit_price,
-        item.tax_rate,
-        item.tax_amount,
-        item.total_price
-      ];
-      const [itemResult] = await connection.query(itemQuery, itemData);
-      if (itemResult.affectedRows === 0) {
-        await connection.rollback();
-        return res.status(400).json({ error: "Failed to create invoice items" });
+      if (item.id && oldItems[item.id]) {
+        // --- Existing item ---
+        const oldQty = oldItems[item.id].qty;
+        const diff = item.quantity - oldQty;
+
+        if (diff > 0) {
+          // Check inventory before increasing
+          const [[{ quantity_on_hand }]] = await connection.query(
+            "SELECT quantity_on_hand FROM products WHERE id = ?",
+            [item.product_id]
+          );
+
+          if (quantity_on_hand < diff) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+            });
+          }
+        }
+
+        if (diff !== 0) {
+          // Update invoice_items row
+          await connection.query(
+            `UPDATE invoice_items 
+             SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
+                 tax_rate = ?, tax_amount = ?, total_price = ?, updated_at = ? 
+             WHERE id = ?`,
+            [
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              new Date(),
+              item.id,
+            ]
+          );
+
+          // Update inventory
+          await connection.query(
+            `UPDATE products 
+             SET quantity_on_hand = quantity_on_hand - ? 
+             WHERE id = ?`,
+            [diff, item.product_id]
+          );
+        }
+
+        usedIds.add(item.id);
+      } else if (!item.id) {
+        // --- New item ---
+        const [[{ quantity_on_hand }]] = await connection.query(
+          "SELECT quantity_on_hand FROM products WHERE id = ?",
+          [item.product_id]
+        );
+
+        if (quantity_on_hand < item.quantity) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${item.quantity}`,
+          });
+        }
+
+        const [result] = await connection.query(
+          `INSERT INTO invoice_items 
+           (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            invoiceId,
+            item.product_id,
+            item.product_name || null,
+            item.description,
+            item.quantity,
+            item.unit_price,
+            item.actual_unit_price,
+            item.tax_rate,
+            item.tax_amount,
+            item.total_price,
+          ]
+        );
+
+        // Decrease inventory
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand - ? 
+           WHERE id = ?`,
+          [item.quantity, item.product_id]
+        );
+
+        usedIds.add(result.insertId);
       }
     }
 
+    // 3. Handle deleted items
+    for (const oldId in oldItems) {
+      if (!usedIds.has(parseInt(oldId))) {
+        const { product_id, qty } = oldItems[oldId];
 
+        // Restore stock
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand + ? 
+           WHERE id = ?`,
+          [qty, product_id]
+        );
+
+        // Delete invoice item
+        await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [
+          oldId,
+        ]);
+      }
+    }
 
     // Handle file attachment if provided
     if (req.file) {
@@ -501,7 +669,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)`,
-        [invoiceId, req.file.path, req.file.originalname, new Date(), new Date()]
+        [
+          invoiceId,
+          req.file.path,
+          req.file.originalname,
+          new Date(),
+          new Date(),
+        ]
       );
     }
 
@@ -533,12 +707,19 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount,
       balance_due, // Include balance_due in response
       status,
-      created_at: existingInvoice[0].created_at?.toISOString() || new Date().toISOString(),
+      created_at:
+        existingInvoice[0].created_at?.toISOString() ||
+        new Date().toISOString(),
       updated_at: invoiceData.updated_at.toISOString(),
-      items
+      items,
     };
 
-    res.status(200).json({ message: 'Invoice updated successfully', invoice: updatedInvoice });
+    res
+      .status(200)
+      .json({
+        message: "Invoice updated successfully",
+        invoice: updatedInvoice,
+      });
   } catch (error) {
     await connection.rollback();
     console.error('Error updating invoice:', error);

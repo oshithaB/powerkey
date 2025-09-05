@@ -5,6 +5,7 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useSocket } from '../../contexts/SocketContext';
+import { id } from 'date-fns/locale';
 
 interface InvoiceItem {
   id?: number;
@@ -55,7 +56,7 @@ interface Invoice {
   total_amount: number;
   paid_amount: number;
   balance_due: number;
-  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
+  status: 'opened' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
   notes: string;
   terms: string;
   created_at: string;
@@ -95,6 +96,7 @@ export default function EditInvoice() {
   };
 
   const initialFormData = {
+    id: invoice?.id || 0,
     invoice_number: invoice?.invoice_number || `INV-${Date.now()}`,
     head_note: invoice?.head_note || '',
     customer_id: invoice?.customer_id?.toString() || '',
@@ -365,7 +367,8 @@ export default function EditInvoice() {
           tax_rate: Number(item.tax_rate),
           tax_amount: Number(item.tax_amount),
           total_price: Number(item.total_price)
-        }))
+        })),
+        invoice_type: formData.invoice_type || null
       };
   
       console.log('Submitting invoice update:', submitData);
@@ -464,6 +467,7 @@ export default function EditInvoice() {
                 <input
                   type="text"
                   className="input"
+                  disabled
                   value={formData.invoice_number}
                   onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
                   placeholder="Enter invoice number"
@@ -576,6 +580,7 @@ export default function EditInvoice() {
                 <input
                   type="date"
                   required
+                  disabled
                   className="input"
                   value={formData.invoice_date}
                   onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}

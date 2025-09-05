@@ -69,7 +69,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     employee_id: '',
     estimate_id: '',
     invoice_date: new Date().toISOString().split('T')[0],
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: '',
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
     shipping_cost: 0,
@@ -264,12 +264,12 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         billing_address: selectedCustomer.billing_address || selectedCustomer.shipping_address || '',
         due_date:
           selectedCustomer.terms === 'net15'
-            ? new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            ? new Date(new Date(initialFormData.invoice_date).getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             : selectedCustomer.terms === 'net30'
-            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            ? new Date(new Date(initialFormData.invoice_date).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             : selectedCustomer.terms === 'net60'
-            ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-            : prev.due_date,
+            ? new Date(new Date(initialFormData.invoice_date).getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            : initialFormData.invoice_date,
       }));
       if (!invoice && formData.customer_id) {
         fetchCustomerEstimates(formData.customer_id);
@@ -385,10 +385,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   
       const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
   
-      const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
-      if (selectedCustomer && selectedCustomer.credit_limit < total) {
-        throw new Error("Invoice total exceeds customer's credit limit");
-      }
+      // const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
+      // if (selectedCustomer && selectedCustomer.credit_limit < total) {
+      //   throw new Error("Invoice total exceeds customer's credit limit");
+      // }
   
       const submitData = {
         ...formData,
@@ -416,6 +416,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       };
   
       let response;
+
       if (invoice) {
         response = await axiosInstance.put(`/api/invoices/${selectedCompany?.company_id}/${invoice.id}`, submitData);
       } else {
@@ -428,7 +429,8 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
             const eligibilityRes = await axiosInstance.post(`/api/checkCustomerEligibility`, {
               company_id: selectedCompany?.company_id,
               customer_id: parseInt(formData.customer_id),
-              invoice_total: total
+              invoice_total: total,
+              operation_type: 'create'
             });
 
             console.log('Eligibility response:', eligibilityRes.data);
@@ -439,11 +441,6 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
 
             console.log('Customer is eligible to create invoice');
           }
-
-          // ✅ Only runs if:
-          // - User is admin OR
-          // - Status is proforma OR
-          // - Customer passed eligibility
 
           console.log('Submitting invoice data:', submitData);
 
@@ -460,21 +457,24 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
             });
           }
 
-          
-
           console.log('Invoice created:', response.data);
-          return response.data;
+
+          setFormData(initialFormData);
+          setItems(initialItems);
+      
+          navigate("/dashboard/sales", { state: { activeTab: 'invoices' } });
 
         } catch (error: any) {
-          console.error('Invoice creation failed:', error);
-          throw new Error(error.response?.data?.reason || error.message || 'Failed to create invoice');
+          console.error('Error saving invoice:', error);
+          const errorMessage = error.response?.data?.reason || error.response?.data?.error || error.message || 'Failed to save invoice';
+          setError(errorMessage);
+          alert(errorMessage);
+          setFormData(initialFormData);
+          setItems(initialItems);
+      
+          navigate("/dashboard/sales", { state: { activeTab: 'invoices' } });
         }
       }
-  
-      setFormData(initialFormData);
-      setItems(initialItems);
-  
-      navigate("/dashboard/sales", { state: { activeTab: 'invoices' } });
   
     } catch (error: any) {
       console.error('Error saving invoice:', error);

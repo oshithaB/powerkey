@@ -655,6 +655,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               <textarea
                 name="notes"
                 value={payment.notes || ''}
+                style={{ resize: 'none' }}
                 onChange={handlePaymentChange}
                 className="input w-full h-24"
                 placeholder="Add any notes about the payment"

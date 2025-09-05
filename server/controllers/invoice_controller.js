@@ -35,25 +35,25 @@ const createInvoice = asyncHandler(async (req, res) => {
 
   // Validate required fields
   if (!invoice_number) {
-    return res.status(400).json({ error: "Invoice number is required" });
+    return res.status(422).json({ error: "Invoice number is required" });
   }
   if (!company_id) {
-    return res.status(400).json({ error: "Company ID is required" });
+    return res.status(422).json({ error: "Company ID is required" });
   }
   if (!customer_id) {
-    return res.status(400).json({ error: "Customer ID is required" });
+    return res.status(422).json({ error: "Customer ID is required" });
   }
   if (!invoice_date) {
-    return res.status(400).json({ error: "Invoice date is required" });
+    return res.status(422).json({ error: "Invoice date is required" });
   }
   if (!subtotal || isNaN(subtotal)) {
-    return res.status(400).json({ error: "Valid subtotal is required" });
+    return res.status(422).json({ error: "Valid subtotal is required" });
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: "At least one valid item is required" });
+    return res.status(422).json({ error: "At least one valid item is required" });
   }
   if (!status || !['opened', 'proforma'].includes(status)) {
-    return res.status(400).json({ error: "Invalid invoice status" });
+    return res.status(422).json({ error: "Invalid invoice status" });
   }
 
   console.log('Validated required fields successfully');
@@ -61,25 +61,25 @@ const createInvoice = asyncHandler(async (req, res) => {
   // Validate items
   for (const item of items) {
     if (!item.product_id || item.product_id === 0) {
-      return res.status(400).json({ error: "Each item must have a valid product ID" });
+      return res.status(422).json({ error: "Each item must have a valid product ID" });
     }
     if (!item.description) {
-      return res.status(400).json({ error: "Each item must have a description" });
+      return res.status(422).json({ error: "Each item must have a description" });
     }
     if (!item.quantity || item.quantity <= 0) {
-      return res.status(400).json({ error: "Each item must have a valid quantity" });
+      return res.status(422).json({ error: "Each item must have a valid quantity" });
     }
     if (!item.unit_price || item.unit_price < 0) {
-      return res.status(400).json({ error: "Each item must have a valid unit price" });
+      return res.status(422).json({ error: "Each item must have a valid unit price" });
     }
     if (item.tax_rate < 0) {
-      return res.status(400).json({ error: "Tax rate cannot be negative" });
+      return res.status(422).json({ error: "Tax rate cannot be negative" });
     }
     if (item.tax_amount < 0) {
-      return res.status(400).json({ error: "Tax amount cannot be negative" });
+      return res.status(422).json({ error: "Tax amount cannot be negative" });
     }
     if (item.total_price < 0) {
-      return res.status(400).json({ error: "Total price cannot be negative" });
+      return res.status(422).json({ error: "Total price cannot be negative" });
     }
   }
 
@@ -176,11 +176,56 @@ const createInvoice = asyncHandler(async (req, res) => {
         item.tax_amount,
         item.total_price
       ];
+
+      if (status !== 'proforma') {
+        const [productRows] = await connection.query(
+          `SELECT quantity_on_hand FROM products WHERE id = ? AND company_id = ?`,
+          [item.product_id, company_id]
+        );
+
+        console.log(`Fetched product data for product_id ${item.product_id}:`, productRows);
+
+        if (productRows.length === 0) {
+          await connection.rollback();
+          return res.status(404).json({ error: `${item.product_name} not found.` });
+        }
+
+        console.log(`Available quantity for product_id ${item.product_id}:`, productRows[0].quantity_on_hand);
+
+        const availableQuantity = Number(productRows[0].quantity_on_hand);
+        if (availableQuantity < Number(item.quantity)) {
+          console.error(`Insufficient quantity for product_id ${item.product_id}: Available ${availableQuantity}, Requested ${item.quantity}`);
+          await connection.rollback();
+          return res.status(404).json({ error: `Insufficient quantity for ${item.product_name}. Available: ${availableQuantity}, Requested: ${item.quantity}` });
+        }
+
+        console.log(`Sufficient quantity for product_id ${item.product_id}:`, availableQuantity);
+      }
+
       const [itemResult] = await connection.query(itemQuery, itemData);
+
       if (itemResult.affectedRows === 0) {
         await connection.rollback();
-        return res.status(400).json({ error: "Failed to create invoice items" });
+        return res.status(404).json({ error: "Failed to create invoice items" });
       }
+
+      console.log('Inserted invoice item:', itemData);
+
+      if (status !== 'proforma') {
+        const [updateResult] = await connection.query(
+          `UPDATE products SET quantity_on_hand = quantity_on_hand - ? WHERE id = ? AND company_id = ?`,
+          [item.quantity, item.product_id, company_id]
+        );
+
+        console.log(`Updated product ID ${item.product_id} quantity_on_hand by -${item.quantity}`);
+
+        if (updateResult.affectedRows === 0) {
+          await connection.rollback();
+          console.error(`Failed to update product ID ${item.product_id} quantity_on_hand`);
+          return res.status(404).json({ error: "Failed to update product quantity" });
+        }
+      }
+      
     }
 
     // Handle file attachment if provided
@@ -229,7 +274,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     await connection.rollback();
     console.error('Error creating invoice:', error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+      return res.status(404).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
     res.status(500).json({ error: error.sqlMessage || 'Internal server error' });
   } finally {
@@ -265,8 +310,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
     balance_due, // Add balance_due to destructured fields
     items,
     status,
-    attachment
+    attachment,
+    invoice_type
   } = req.body;
+
+  console.log('Updating invoice with data:', req.body);
 
   const invoiceId = req.params.invoiceId;
 
@@ -339,7 +387,9 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
       if (duplicateInvoice.length > 0) {
         await connection.rollback();
-        return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
+        return res
+          .status(400)
+          .json({ error: `Invoice number '${invoice_number}' already exists` });
       }
     }
 
@@ -352,7 +402,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       head_note: head_note || null,
       invoice_date,
       due_date: due_date || null,
-      discount_type: discount_type || 'fixed',
+      discount_type: discount_type || "fixed",
       discount_value: discount_value || 0,
       notes: notes || null,
       terms: terms || null,
@@ -368,26 +418,69 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount: total_amount || 0,
       balance_due: balance_due || 0, // Add balance_due to invoiceData
       status,
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
-    if (status === 'opened') {
+    // --- Handle cancelled invoice ---
+    if (status === 'cancelled' && invoice_type !== 'proforma') {
+      // 1. Fetch all invoice items for this invoice
+      console.log("inside cancelled invoice handler");
+      const [cancelItems] = await connection.query(
+        `SELECT product_id, quantity FROM invoice_items WHERE invoice_id = ?`,
+        [invoiceId]
+      );
+
+      // 2. Restore stock for each item
+      for (const item of cancelItems) {
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand + ? 
+           WHERE id = ?`,
+          [item.quantity, item.product_id]
+        );
+      }
+
+      // 4. Reduce customer's current_balance by balance_due
+      await connection.query(
+        `UPDATE customer 
+         SET current_balance = current_balance - ? 
+         WHERE id = ? AND company_id = ?`,
+        [balance_due, customer_id, company_id]
+      );
+    }
+
+    console.log("passed cancelled invoice handler");
+
+    if (status === "opened") {
       const [customerRows] = await connection.query(
-      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
-      [customer_id, company_id]
+        `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+        [customer_id, company_id]
       );
 
       if (customerRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: "Customer not found" });
+        await connection.rollback();
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const [invoiceRows] = await connection.query(
+        `SELECT balance_due FROM invoices WHERE id = ? AND company_id = ?`,
+        [invoiceId, company_id]
+      );
+
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
       const currentBalance = Number(customerRows[0].current_balance) || 0;
-      const newBalance = currentBalance + (invoiceData.balance_due || 0);
+      const newBalance =
+        currentBalance -
+        Number(invoiceRows[0].balance_due || 0) +
+        (invoiceData.balance_due || 0);
 
       await connection.query(
-      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
-      [newBalance, customer_id, company_id]
+        `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+        [newBalance, customer_id, company_id]
       );
     }
 
@@ -410,34 +503,160 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
-    // Delete existing items
-    await connection.query(
-      `DELETE FROM invoice_items WHERE invoice_id = ?`,
+    // // Insert updated invoice items
+    // const itemQuery = `INSERT INTO invoice_items
+    //                   (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+    //                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    // for (const item of items) {
+    //   const itemData = [
+    //     invoiceId,
+    //     item.product_id,
+    //     item.product_name || null,
+    //     item.description,
+    //     item.quantity,
+    //     item.unit_price,
+    //     item.actual_unit_price,
+    //     item.tax_rate,
+    //     item.tax_amount,
+    //     item.total_price
+    //   ];
+
+    //   const [itemResult] = await connection.query(itemQuery, itemData);
+    //   if (itemResult.affectedRows === 0) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ error: "Failed to create invoice items" });
+    //   }
+    // }
+
+
+    // --- Update invoice items with inventory control ---
+
+    // 1. Load old items
+    const [oldRows] = await connection.query(
+      "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
       [invoiceId]
     );
 
-    // Insert updated invoice items
-    const itemQuery = `INSERT INTO invoice_items
-                      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const oldItems = {};
+    oldRows.forEach((r) => {
+      oldItems[r.id] = { product_id: r.product_id, qty: r.quantity };
+    });
 
+    const usedIds = new Set();
+
+    // 2. Process new items
     for (const item of items) {
-      const itemData = [
-        invoiceId,
-        item.product_id,
-        item.product_name || null,
-        item.description,
-        item.quantity,
-        item.unit_price,
-        item.actual_unit_price,
-        item.tax_rate,
-        item.tax_amount,
-        item.total_price
-      ];
-      const [itemResult] = await connection.query(itemQuery, itemData);
-      if (itemResult.affectedRows === 0) {
-        await connection.rollback();
-        return res.status(400).json({ error: "Failed to create invoice items" });
+      if (item.id && oldItems[item.id]) {
+        // --- Existing item ---
+        const oldQty = oldItems[item.id].qty;
+        const diff = item.quantity - oldQty;
+
+        if (diff > 0) {
+          // Check inventory before increasing
+          const [[{ quantity_on_hand }]] = await connection.query(
+            "SELECT quantity_on_hand FROM products WHERE id = ?",
+            [item.product_id]
+          );
+
+          if (quantity_on_hand < diff) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+            });
+          }
+        }
+
+        if (diff !== 0) {
+          // Update invoice_items row
+          await connection.query(
+            `UPDATE invoice_items 
+             SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
+                 tax_rate = ?, tax_amount = ?, total_price = ?, updated_at = ? 
+             WHERE id = ?`,
+            [
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              new Date(),
+              item.id,
+            ]
+          );
+
+          // Update inventory
+          await connection.query(
+            `UPDATE products 
+             SET quantity_on_hand = quantity_on_hand - ? 
+             WHERE id = ?`,
+            [diff, item.product_id]
+          );
+        }
+
+        usedIds.add(item.id);
+      } else if (!item.id) {
+        // --- New item ---
+        const [[{ quantity_on_hand }]] = await connection.query(
+          "SELECT quantity_on_hand FROM products WHERE id = ?",
+          [item.product_id]
+        );
+
+        if (quantity_on_hand < item.quantity) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${item.quantity}`,
+          });
+        }
+
+        const [result] = await connection.query(
+          `INSERT INTO invoice_items 
+           (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            invoiceId,
+            item.product_id,
+            item.product_name || null,
+            item.description,
+            item.quantity,
+            item.unit_price,
+            item.actual_unit_price,
+            item.tax_rate,
+            item.tax_amount,
+            item.total_price,
+          ]
+        );
+
+        // Decrease inventory
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand - ? 
+           WHERE id = ?`,
+          [item.quantity, item.product_id]
+        );
+
+        usedIds.add(result.insertId);
+      }
+    }
+
+    // 3. Handle deleted items
+    for (const oldId in oldItems) {
+      if (!usedIds.has(parseInt(oldId))) {
+        const { product_id, qty } = oldItems[oldId];
+
+        // Restore stock
+        await connection.query(
+          `UPDATE products 
+           SET quantity_on_hand = quantity_on_hand + ? 
+           WHERE id = ?`,
+          [qty, product_id]
+        );
+
+        // Delete invoice item
+        await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [
+          oldId,
+        ]);
       }
     }
 
@@ -450,7 +669,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)`,
-        [invoiceId, req.file.path, req.file.originalname, new Date(), new Date()]
+        [
+          invoiceId,
+          req.file.path,
+          req.file.originalname,
+          new Date(),
+          new Date(),
+        ]
       );
     }
 
@@ -482,12 +707,19 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount,
       balance_due, // Include balance_due in response
       status,
-      created_at: existingInvoice[0].created_at?.toISOString() || new Date().toISOString(),
+      created_at:
+        existingInvoice[0].created_at?.toISOString() ||
+        new Date().toISOString(),
       updated_at: invoiceData.updated_at.toISOString(),
-      items
+      items,
     };
 
-    res.status(200).json({ message: 'Invoice updated successfully', invoice: updatedInvoice });
+    res
+      .status(200)
+      .json({
+        message: "Invoice updated successfully",
+        invoice: updatedInvoice,
+      });
   } catch (error) {
     await connection.rollback();
     console.error('Error updating invoice:', error);
@@ -966,12 +1198,12 @@ const recordPayment = asyncHandler(async (req, res) => {
 });
 
 const checkCustomerEligibility = asyncHandler(async (req, res) => {
-  const { customer_id, company_id, invoice_total } = req.body;
+  const { customer_id, company_id, invoice_total, operation_type} = req.body;
 
   console.log('Checking customer eligibility:', { customer_id, company_id });
 
-  if (!customer_id || !company_id || !invoice_total) {
-    return res.status(400).json({ error: "Customer ID, Company ID, and Invoice Total are required" });
+  if (!customer_id || !company_id || !invoice_total || !operation_type) {
+    return res.status(400).json({ error: "Customer ID, Company ID, Invoice Total, and Operation Type are required" });
   }
 
   const connection = await db.getConnection();
@@ -989,6 +1221,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     const creditLimit = Number(customerRows[0].credit_limit) || 0;
     const currentBalance = Number(customerRows[0].current_balance) || 0;
+      
 
     const [hasOverdue] = await connection.query(
       `SELECT * FROM invoices 
@@ -1003,7 +1236,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
 
     let totalBalanceDue = currentBalance + invoice_total;
 
-    if (creditLimit <= totalBalanceDue) {
+    if (creditLimit < totalBalanceDue) {
       connection.release();
       return res.status(403).json({ eligible: false, reason: "Customer's credit limit exceeded" });
     }

@@ -686,6 +686,7 @@ export default function InvoicesPage() {
                           <button
                             onClick={() => handleAddPayment(invoice)}
                             className="text-green-600 hover:text-green-900"
+                            style={{ display: invoice.status === 'cancelled' || invoice.status === 'paid' ? 'none' : undefined }}
                             title="Add Payment"
                             disabled={!invoice.customer_id}
                           >

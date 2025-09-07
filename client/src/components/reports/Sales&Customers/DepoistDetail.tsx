@@ -16,6 +16,8 @@ interface DepositDetailData {
   customer_name: string;
   invoice_number: string;
   invoice_status: string;
+  balance_due: number;
+  total_amount: number;
 }
 
 const DepositDetail: React.FC = () => {
@@ -467,7 +469,13 @@ const DepositDetail: React.FC = () => {
                                   {deposits[0].invoice_status.replace('_', ' ').toUpperCase()}
                                 </span>
                             </td>
-                            <td colSpan={4} className="p-2 border-b-2 border-gray-600 font-bold text-right">
+                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
+                              Balance Due: {formatCurrency(deposits[0].balance_due)}
+                            </td>
+                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
+                              Total Amount: {formatCurrency(deposits[0].total_amount)}
+                            </td>
+                            <td colSpan={2} className="p-2 border-b-2 border-gray-600 font-bold text-right">
                               Total Payment: 
                             </td>
                             <td className="p-2 border-b-2 border-gray-600 font-bold text-right">

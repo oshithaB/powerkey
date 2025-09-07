@@ -121,11 +121,6 @@ export default function ReportsPage() {
       path: '/reports/sales-by-customer'
     },
     {
-      name: 'Sales by Customer Detail',
-      description: 'Detailed sales by customer',
-      path: '/reports/sales-by-customer-detail'
-    },
-    {
       name: 'Product/Service List',
       description: 'List of all products and services',
       path: '/reports/product-service-list'
@@ -149,11 +144,6 @@ export default function ReportsPage() {
       name: 'Sales by Product/Service Detail',
       description: 'Detailed sales by product/service',
       path: '/reports/sales-by-product-service-detail'
-    },
-    {
-      name: 'Customer Phone List',
-      description: 'List of customer phone numbers',
-      path: '/reports/customer-phone-list'
     },
     {
       name: 'Deposit Detail',

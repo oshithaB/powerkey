@@ -569,10 +569,10 @@ const getInventoryValuationSummary = async (req, res) => {
       `SELECT 
           p.name AS product_name,
           p.sku,
-          p.quantity_on_hand,
-          p.unit_price,
-          (p.quantity_on_hand * p.unit_price) AS total_value
-       FROM products p
+          p.quantity_on_hand AS qty,
+          p.cost_price AS cost_price,
+          (p.quantity_on_hand * p.cost_price) AS asset_value
+          FROM products p
        WHERE p.is_active = TRUE
          AND p.company_id = ?
        GROUP BY p.id, p.name, p.sku, p.quantity_on_hand, p.unit_price`,
@@ -670,15 +670,18 @@ const getStockTakeWorksheet = async (req, res) => {
     const [rows] = await db.query(
       `SELECT 
           p.name AS product_name,
-          p.sku,
+          p.description,
           p.quantity_on_hand,
           p.manual_count,
           p.reorder_level,
-          pc.name AS category_name
+          pc.name AS category_name,
+          v.name AS preferred_vendor
        FROM products p
        LEFT JOIN product_categories pc ON p.category_id = pc.id
+       LEFT JOIN vendor v ON p.preferred_vendor_id = v.vendor_id
        WHERE p.is_active = TRUE
-         AND p.company_id = ?`,
+         AND p.company_id = ?
+       ORDER BY p.id desc`,
       [company_id]
     );
 

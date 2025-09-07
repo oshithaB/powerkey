@@ -46,6 +46,8 @@ import SalesbyCustomerDetail from './components/reports/Sales&Customers/SalesbyC
 import SalesbyProductSummary from './components/reports/Sales&Customers/SalesbyProductSummary';
 import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyProductDetail';
 import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
+import EstimatesbyCustomers from './components/reports/Sales&Customers/EstimatesbyCustomers';
+import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -392,6 +394,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <DepoistDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/estimates-by-customer"
+          element={
+            <ProtectedRoute>
+              <EstimatesbyCustomers />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/stock-take-worksheet"
+          element={
+            <ProtectedRoute>
+              <StockTakeWorksheet />
             </ProtectedRoute>
           }
         />

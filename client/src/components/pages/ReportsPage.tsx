@@ -141,11 +141,6 @@ export default function ReportsPage() {
       path: '/reports/income-by-customer'
     },
     {
-      name: 'Sales by Product/Service Detail',
-      description: 'Detailed sales by product/service',
-      path: '/reports/sales-by-product-service-detail'
-    },
-    {
       name: 'Deposit Detail',
       description: 'Details of all deposits made',
       path: '/reports/deposit-detail'
@@ -180,11 +175,11 @@ export default function ReportsPage() {
       description: 'Detailed time activities by customer',
       path: '/reports/time-activities-by-customer-detail'
     },
-    {
-      name: 'Transaction List by Customer',
-      description: 'List of transactions by customer',
-      path: '/reports/transaction-list-by-customer'
-    }
+    // {
+    //   name: 'Transaction List by Customer',
+    //   description: 'List of transactions by customer',
+    //   path: '/reports/transaction-list-by-customer'
+    // }
 
   ];
 

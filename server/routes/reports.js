@@ -4,6 +4,7 @@ const reportController = require('../controllers/reports/profit&lossreport_contr
 const commissionReportController = require('../controllers/reports/commissionreport_controller');
 const salesReportController = require('../controllers/reports/salesreport_controller');
 const aragingReportController = require('../controllers/reports/ar_aging_controller');
+const balanceSheetController = require('../controllers/reports/balancesheet_controller');
 const salesAndCustomerController = require('../controllers/reports/Sales&Customers/sales$customers_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
@@ -38,6 +39,12 @@ const {
     getCustomerInvoices,
     getARAgingSummaryInDetails,
 } = aragingReportController;
+
+// Importing balance sheet report controller functions
+const {
+    getBalanceSheetData,
+    getFormattedBalanceSheet,
+} = balanceSheetController;
 
 // Importing customer contact controller functions
 const {
@@ -173,6 +180,21 @@ router.get(
     getARAgingSummaryInDetails
 );
 
+// Balance Sheet Report Route
+router.get(
+    '/balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getBalanceSheetData
+);
+
+router.get(
+    '/formatted-balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getFormattedBalanceSheet
+);
+
 
 // Sales and Customer routes
 router.get(
@@ -218,7 +240,7 @@ router.get(
 );
 
 router.get(
-    '/estimates-by-customer/:company_id/:customer_id',
+    '/estimates-by-customer/:company_id',
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getEstimatesByCustomer

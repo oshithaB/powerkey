@@ -306,7 +306,11 @@ const ProductList: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Quantity on Hand
+                          QTY on Hand
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Manual Count
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -341,6 +345,9 @@ const ProductList: React.FC = () => {
                           </td>
                           <td className="p-2 border-b text-right">
                             {product.quantity_on_hand}
+                          </td>
+                          <td className="p-2 border-b text-right">
+                            {product.manual_count}
                           </td>
                           <td className="p-2 border-b text-right">
                             {product.reorder_level}
@@ -428,7 +435,11 @@ const ProductList: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Quantity on Hand
+                        QTY on Hand
+                      </th>
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Manual Count
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -463,6 +474,9 @@ const ProductList: React.FC = () => {
                         </td>
                         <td className="p-2 border-b text-right">
                           {product.quantity_on_hand}
+                        </td>
+                        <td className="p-2 border-b text-right">
+                          {product.manual_count}
                         </td>
                         <td className="p-2 border-b text-right">
                           {product.reorder_level}

@@ -10,6 +10,7 @@ import { useCompany } from '../../../contexts/CompanyContext';
 interface CustomerContactData {
   id: string;
   name: string;
+  tax_number: string;
   email: string;
   phone: string;
   billing_address: string;
@@ -273,6 +274,10 @@ const CustomerContactDetails: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Tax Number
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Email
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
@@ -294,6 +299,9 @@ const CustomerContactDetails: React.FC = () => {
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="p-2 border-b font-medium">
                             {customer.name}
+                          </td>
+                          <td className="p-2 border-b">
+                            {customer.tax_number}
                           </td>
                           <td className="p-2 border-b">
                             {customer.email}
@@ -365,6 +373,10 @@ const CustomerContactDetails: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Name
                       </th>
+                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Tax Number
+                      </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Email
@@ -388,6 +400,9 @@ const CustomerContactDetails: React.FC = () => {
                       <tr key={index}>
                         <td className="p-2 border-b font-medium">
                           {customer.name}
+                        </td>
+                        <td className="p-2 border-b">
+                          {customer.tax_number}
                         </td>
                         <td className="p-2 border-b">
                           {customer.email}

@@ -9,6 +9,7 @@ const getCustomerContacts = async (req, res) => {
       `SELECT 
           id,
           name,
+          tax_number,
           email,
           phone,
           billing_address,
@@ -280,6 +281,7 @@ const getProductServiceList = async (req, res) => {
           p.sku,
           p.description,
           p.unit_price,
+          p.manual_count,
           p.quantity_on_hand,
           pc.name AS category_name
        FROM products p
@@ -315,6 +317,7 @@ const getSalesByProductServiceSummary = async (req, res) => {
           p.sku,
           p.unit_price,
           p.cost_price,
+          p.manual_count,
           SUM(p.cost_price * ii.quantity) AS total_cost,
           SUM(ii.quantity) AS total_quantity_sold,
           SUM(ii.total_price) AS total_sales
@@ -482,6 +485,8 @@ const getDepositDetail = async (req, res) => {
           p.deposit_to,
           c.name AS customer_name,
           i.invoice_number,
+          i.balance_due,
+          i.total_amount,
           i.status AS invoice_status
        FROM payments p
        JOIN customer c ON p.customer_id = c.id

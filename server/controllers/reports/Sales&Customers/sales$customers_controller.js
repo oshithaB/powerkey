@@ -364,7 +364,7 @@ const getIncomeByCustomerSummary = async (req, res) => {
           COUNT(p.id) AS total_payments
        FROM customer c
        LEFT JOIN payments p ON c.id = p.customer_id
-       WHERE c.company_id = ?
+       WHERE c.company_id = ? AND c.is_active = TRUE
     `;
     
     const queryParams = [company_id];
@@ -374,7 +374,7 @@ const getIncomeByCustomerSummary = async (req, res) => {
       queryParams.push(start_date, end_date);
     }
 
-    query += ` GROUP BY c.id, c.name`;
+    query += ` GROUP BY c.name`;
 
     const [rows] = await db.query(query, queryParams);
 

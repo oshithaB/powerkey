@@ -39,6 +39,7 @@ import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossB
 import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
 import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
 
+// Sales & Customers Reports
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
 import ProductAndServiceList from './components/reports/Sales&Customers/ProductAndServiceList';
 import SalesbyCustomerSummary from './components/reports/Sales&Customers/SalesbyCustomerSummary';
@@ -48,6 +49,9 @@ import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyPr
 import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
 import EstimatesbyCustomers from './components/reports/Sales&Customers/EstimatesbyCustomers';
 import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
+
+// Who Owes You Reports
+import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -412,6 +416,16 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <StockTakeWorksheet />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/reports/invoices-and-payments"
+          element={
+            <ProtectedRoute>
+              <InvoicesAndRecievePayments />
             </ProtectedRoute>
           }
         />

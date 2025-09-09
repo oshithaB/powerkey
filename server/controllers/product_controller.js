@@ -94,12 +94,12 @@ const createProduct = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Product name is required' });
             }
 
-            // Validate commission (assuming it's a percentage between 0 and 100)
+            // Validate commission - Changed to allow any positive number (currency amount)
             let validatedCommission = null;
-            if (commission !== undefined && commission !== null) {
+            if (commission !== undefined && commission !== null && commission !== '') {
                 const commissionValue = parseFloat(commission);
-                if (isNaN(commissionValue) || commissionValue < 0 || commissionValue > 100) {
-                    return res.status(400).json({ success: false, message: 'Commission must be a number between 0 and 100' });
+                if (isNaN(commissionValue) || commissionValue < 0) {
+                    return res.status(400).json({ success: false, message: 'Commission must be a positive number' });
                 }
                 validatedCommission = commissionValue;
             }
@@ -113,8 +113,7 @@ const createProduct = async (req, res) => {
 
             if (isNaN(validatedUnitPrice) || isNaN(validatedCostPrice) || 
                 isNaN(validatedQuantity) || isNaN(validatedReorderLevel) ||
-                isNaN(validateManualCount
-                )) {
+                isNaN(validateManualCount)) {
                 return res.status(400).json({ success: false, message: 'Invalid numeric values provided' });
             }
 

@@ -131,7 +131,7 @@ export default function ReportsPage() {
       path: '/reports/customer-contact-list'
     },
     {
-      name: 'Sales by Product/Service Summary',
+      name: 'Sales by Product Summary',
       description: 'Sales performance by product/service',
       path: '/reports/sales-by-product'
     },
@@ -159,11 +159,6 @@ export default function ReportsPage() {
       name: 'Inventory Valuation Detail',
       description: 'Detailed inventory valuation report',
       path: '/reports/inventory-valuation-detail'
-    },
-    {
-      name: 'Payment Method List',
-      description: 'List of all payment methods used',
-      path: '/reports/payment-method-list'
     },
     {
       name: 'Stock Take Worksheet',

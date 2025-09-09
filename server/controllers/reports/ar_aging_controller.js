@@ -45,8 +45,7 @@ const getARAgingSummary = async (req, res) => {
             LEFT JOIN 
                 company co ON i.company_id = co.company_id
             WHERE 
-                i.status IN ('opened', 'sent', 'partially_paid', 'overdue')
-                AND i.balance_due > 0
+                i.status != 'proforma'
                 AND i.company_id = ?
                 AND i.invoice_date >= ?
                 AND i.invoice_date <= ?
@@ -222,7 +221,7 @@ const getARAgingSummaryInDetails = async (req, res) => {
             LEFT JOIN 
                 company co ON i.company_id = co.company_id
             WHERE 
-                i.status IN ('opened', 'sent', 'partially_paid', 'overdue')
+                i.status != 'proforma'
                 AND i.balance_due > 0
                 AND i.company_id = ?
                 AND i.customer_id = ?

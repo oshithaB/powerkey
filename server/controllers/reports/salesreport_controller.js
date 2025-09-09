@@ -6,7 +6,7 @@ const getSalesReport = async (req, res) => {
         let whereClause = '';
         let params = [];
         if (start_date && end_date) {
-            whereClause = 'WHERE i.invoice_date >= ? AND i.invoice_date <= ?';
+            whereClause = 'WHERE i.invoice_date >= ? AND i.invoice_date <= ? AND i.status != "proforma"';
             params = [start_date, end_date];
         }
 
@@ -96,6 +96,7 @@ const getSalesReportByEmployeeId = async (req, res) => {
                 i.customer_id,
                 i.company_id,
                 i.total_amount,
+                i.status,
                 i.discount_amount,
                 co.name AS company_name,
                 c.name AS customer_name
@@ -138,6 +139,7 @@ const getSalesReportByEmployeeId = async (req, res) => {
                 invoiceDate: invoice.invoice_date,
                 discountAmount: parseFloat(invoice.discount_amount).toFixed(2),
                 totalAmount: parseFloat(invoice.total_amount).toFixed(2),
+                status: invoice.status,
                 customerId: invoice.customer_id,
                 customerName: invoice.customer_name
             }))

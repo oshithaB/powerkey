@@ -1251,6 +1251,58 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
   }
 });
 
+// get sales page data
+const getSalesPageDate = async(req, res) => {
+  const { company_id } = req.params;
+
+  if (!company_id) {
+    return res.status(400).json({ error: "Company ID is required" });
+  }
+
+  try {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+
+    let query = `
+      SELECT 
+        -- Current year data
+        SUM(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status != 'proforma' THEN total_amount ELSE 0 END) AS current_year_sales,
+        COUNT(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status != 'proforma' THEN 1 END) AS current_year_invoices,
+        COUNT(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status = 'proforma' THEN 1 END) AS current_year_proforma,
+        
+        -- Previous year data for growth calculation
+        SUM(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${previousYear} AND status != 'proforma' THEN total_amount ELSE 0 END) AS previous_year_sales
+      FROM invoices 
+      WHERE company_id = ? 
+        AND YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) IN (${currentYear}, ${previousYear})
+    `;
+
+    const [results] = await db.execute(query, [company_id]);
+    const data = results[0];
+
+    // Calculate growth percentage
+    let growthPercentage = 0;
+    if (data.previous_year_sales > 0) {
+      growthPercentage = ((data.current_year_sales - data.previous_year_sales) / data.previous_year_sales * 100).toFixed(1);
+    } else if (data.current_year_sales > 0) {
+      growthPercentage = 100;
+    }
+
+    const responseData = {
+      totalSales: data.current_year_sales || 0,
+      totalInvoices: data.current_year_invoices || 0,
+      totalProformaInvoices: data.current_year_proforma || 0,
+      growthPercentage: parseFloat(growthPercentage)
+    };
+
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('Error fetching sales page data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createInvoice,
   updateInvoice,
@@ -1259,6 +1311,7 @@ module.exports = {
   getInvoices,
   getInvoiceById,
   getInvoiceItems,
+  getSalesPageDate,
   getInvoicesByCustomer,
   recordPayment,
   checkCustomerEligibility

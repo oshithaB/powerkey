@@ -57,7 +57,7 @@ const getSalesByEmployeeSummary = async (req, res) => {
        WHERE e.is_active = TRUE
          AND i.company_id = ?
          AND i.total_amount IS NOT NULL
-         AND i.status IN ('opened', 'partially_paid', 'overdue')
+         AND i.status != 'proforma'
     `;
     
     const queryParams = [company_id];
@@ -103,7 +103,7 @@ const getSalesByCustomerSummary = async (req, res) => {
        WHERE c.is_active = TRUE
          AND c.company_id = ?
          AND i.total_amount IS NOT NULL
-         AND i.status IN ('opened', 'partially_paid')
+         AND i.status != 'proforma'
     `;
     
     const queryParams = [company_id];
@@ -197,7 +197,6 @@ const getSalesByCustomerIDDetail = async (req, res) => {
         WHERE c.is_active = TRUE
           AND c.company_id = ?
           AND c.id = ?
-          AND i.status IN ('opened', 'partially_paid')
     `;
     
     const queryParams = [company_id, customer_id];
@@ -228,7 +227,7 @@ const getSalesByCustomerIDDetail = async (req, res) => {
 const getSalesByEmployeeDetail = async (req, res) => {
   const { company_id } = req.params;
   const { start_date, end_date } = req.query;
-  
+
   try {
     let query = `
       SELECT
@@ -245,7 +244,7 @@ const getSalesByEmployeeDetail = async (req, res) => {
         WHERE e.is_active = TRUE
           AND i.company_id = ?
     `;
-    
+
     const queryParams = [company_id];
 
     if (start_date && end_date) {
@@ -324,7 +323,7 @@ const getSalesByProductServiceSummary = async (req, res) => {
        FROM products p
        JOIN invoice_items ii ON p.id = ii.product_id
        JOIN invoices i ON ii.invoice_id = i.id
-       WHERE p.company_id = ?
+       WHERE p.company_id = ? AND i.status != 'proforma'
     `;
     
     const queryParams = [company_id];
@@ -410,6 +409,7 @@ const getSalesByProductServiceDetail = async (req, res) => {
           ii.total_price,
           i.invoice_number,
           i.invoice_date,
+          i.status,
           c.name AS customer_name
           
        FROM products p

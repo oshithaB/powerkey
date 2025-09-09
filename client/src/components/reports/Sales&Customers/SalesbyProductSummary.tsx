@@ -411,7 +411,7 @@ const SalesbyProductSummary: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Quantity Sold
+                          Total QTY Sold
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -464,7 +464,7 @@ const SalesbyProductSummary: React.FC = () => {
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {getTotal('total_quantity_sold')}
                         </td>
-                        <td className='p-3 border-t-2 border-gray-800 font-bold text-right'>
+                        <td className='border-t-2 border-gray-800 font-bold text-right'>
                           {formatCurrency(getTotal('total_cost'))}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
@@ -543,7 +543,7 @@ const SalesbyProductSummary: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total Quantity Sold
+                            Total QTY Sold
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -583,7 +583,7 @@ const SalesbyProductSummary: React.FC = () => {
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {getTotal('total_quantity_sold')}
                         </td>
-                        <td className='p-3 border-t-2 border-gray-800 font-bold text-right'>
+                        <td className='border-t-2 border-gray-800 font-bold text-right'>
                           {formatCurrency(getTotal('total_cost'))}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">

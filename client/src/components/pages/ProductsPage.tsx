@@ -286,11 +286,11 @@ export default function ProductsPage() {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await axios.put(`/api/categories/${selectedCompany?.company_id}/${editingCategory.id}`, {
+        await axiosInstance.put(`/api/categories/${selectedCompany?.company_id}/${editingCategory.id}`, {
           name: categoryFormData.name,
         });
       } else {
-        await axios.post(`/api/categories/${selectedCompany?.company_id}`, {
+        await axiosInstance.post(`/api/createCategory/${selectedCompany?.company_id}`, {
           name: categoryFormData.name,
         });
       }

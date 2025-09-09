@@ -1,18 +1,49 @@
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, TrendingUp, DollarSign, Users } from 'lucide-react';
+import { TrendingUp, DollarSign, Receipt, FileClock } from 'lucide-react';
 import EstimatesPage from './EstimatesPage';
 import InvoicesPage from './InvoicesPage';
 import { useLocation } from 'react-router-dom';
+import { useCompany } from '../../contexts/CompanyContext';
+import axiosInstance from '../../axiosInstance';
 
 export default function SalesPage() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [salesData, setSalesData] = useState({
+    totalSales: 0,
+    totalInvoices: 0,
+    totalProformaInvoices: 0,
+    growthPercentage: 0
+  });
   const location = useLocation();
+  const { selectedCompany } = useCompany();
 
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
     }
-  }, [location.state]);
+    if (selectedCompany?.company_id) {
+      fetchSalesData();
+    }
+  }, [location.state, selectedCompany?.company_id]);
+
+  const fetchSalesData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await axiosInstance.get(`/api/getSalesPageData/${selectedCompany?.company_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 200) {
+        setSalesData(response.data);
+      }
+
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -69,7 +100,7 @@ export default function SalesPage() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                    <p className="text-2xl font-bold text-gray-900">Rs. 0</p>
+                    <p className="text-2xl font-bold text-gray-900">Rs. {salesData.totalSales.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -79,11 +110,11 @@ export default function SalesPage() {
               <div className="card-content p-6">
                 <div className="flex items-center">
                   <div className="bg-blue-100 p-3 rounded-lg">
-                    <ShoppingCart className="h-6 w-6 text-blue-600" />
+                    <Receipt className="h-6 w-6 text-blue-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Orders</p>
-                    <p className="text-2xl font-bold text-gray-900">0</p>
+                    <p className="text-sm font-medium text-gray-600">Invoices</p>
+                    <p className="text-2xl font-bold text-gray-900">{salesData.totalInvoices}</p>
                   </div>
                 </div>
               </div>
@@ -93,11 +124,11 @@ export default function SalesPage() {
               <div className="card-content p-6">
                 <div className="flex items-center">
                   <div className="bg-purple-100 p-3 rounded-lg">
-                    <Users className="h-6 w-6 text-purple-600" />
+                    <FileClock className="h-6 w-6 text-purple-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Customers</p>
-                    <p className="text-2xl font-bold text-gray-900">0</p>
+                    <p className="text-sm font-medium text-gray-600">Proforma Invoices</p>
+                    <p className="text-2xl font-bold text-gray-900">{salesData.totalProformaInvoices}</p>
                   </div>
                 </div>
               </div>
@@ -111,23 +142,16 @@ export default function SalesPage() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Growth</p>
-                    <p className="text-2xl font-bold text-gray-900">0%</p>
+                    <p className={`text-2xl font-bold ${salesData.growthPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {salesData.growthPercentage >= 0 ? '+' : ''}{salesData.growthPercentage}%
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Coming Soon */}
-          <div className="card mt-6">
-            <div className="card-content p-12 text-center">
-              <ShoppingCart className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Sales Module Coming Soon</h3>
-              <p className="text-gray-600">
-                Advanced sales tracking, order management, and sales analytics will be available in the next update.
-              </p>
-            </div>
-          </div>
+          
         </div>
       )}
 

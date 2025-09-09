@@ -40,7 +40,7 @@ class ReportController {
                 FROM invoices i
                 INNER JOIN invoice_items ii ON i.id = ii.invoice_id
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -50,7 +50,7 @@ class ReportController {
                     COALESCE(SUM(i.shipping_cost), 0) as shipping_income
                 FROM invoices i
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -60,7 +60,7 @@ class ReportController {
                     COALESCE(SUM(i.discount_amount), 0) as discounts_given
                 FROM invoices i
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -70,7 +70,7 @@ class ReportController {
                     COALESCE(SUM(i.tax_amount), 0) as tax_income
                 FROM invoices i
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -84,7 +84,7 @@ class ReportController {
                 INNER JOIN invoice_items ii ON i.id = ii.invoice_id
                 LEFT JOIN products p ON ii.product_id = p.id
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -128,7 +128,7 @@ class ReportController {
                     COALESCE(SUM(i.paid_amount), 0) as total_paid
                 FROM invoices i
                 WHERE i.company_id = ? 
-                AND i.status IN ('paid', 'partially_paid')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
@@ -378,7 +378,7 @@ class ReportController {
                 INNER JOIN invoice_items ii ON i.id = ii.invoice_id
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -389,7 +389,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -400,7 +400,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -411,7 +411,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -425,7 +425,7 @@ class ReportController {
                 LEFT JOIN products p ON ii.product_id = p.id
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -442,7 +442,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.employee_id = ?
-                AND i.status IN ('paid', 'partially_paid')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
@@ -717,7 +717,7 @@ class ReportController {
                 INNER JOIN employees e ON i.employee_id = e.id
                 WHERE i.company_id = ?
                 AND e.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
@@ -731,7 +731,7 @@ class ReportController {
                 INNER JOIN employees e ON i.employee_id = e.id
                 WHERE i.company_id = ?
                 AND e.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
@@ -745,7 +745,7 @@ class ReportController {
                 INNER JOIN employees e ON i.employee_id = e.id
                 WHERE i.company_id = ?
                 AND e.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
@@ -759,7 +759,7 @@ class ReportController {
                 INNER JOIN employees e ON i.employee_id = e.id
                 WHERE i.company_id = ?
                 AND e.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
@@ -776,7 +776,7 @@ class ReportController {
                 INNER JOIN employees e ON i.employee_id = e.id
                 WHERE i.company_id = ?
                 AND e.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
@@ -1011,7 +1011,7 @@ class ReportController {
                 INNER JOIN customer c ON i.customer_id = c.id
                 WHERE i.company_id = ?
                 AND c.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
@@ -1027,7 +1027,7 @@ class ReportController {
                 INNER JOIN customer c ON i.customer_id = c.id
                 WHERE i.company_id = ?
                 AND c.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
@@ -1043,7 +1043,7 @@ class ReportController {
                 INNER JOIN customer c ON i.customer_id = c.id
                 WHERE i.company_id = ?
                 AND c.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
@@ -1059,7 +1059,7 @@ class ReportController {
                 INNER JOIN customer c ON i.customer_id = c.id
                 WHERE i.company_id = ?
                 AND c.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
@@ -1078,7 +1078,7 @@ class ReportController {
                 INNER JOIN customer c ON i.customer_id = c.id
                 WHERE i.company_id = ?
                 AND c.is_active = TRUE
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
@@ -1268,7 +1268,7 @@ class ReportController {
                 INNER JOIN invoice_items ii ON i.id = ii.invoice_id
                 WHERE i.company_id = ? 
                 AND i.customer_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 
@@ -1279,7 +1279,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.customer_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 
@@ -1290,7 +1290,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.customer_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 
@@ -1301,7 +1301,7 @@ class ReportController {
                 FROM invoices i
                 WHERE i.company_id = ? 
                 AND i.customer_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 
@@ -1315,7 +1315,7 @@ class ReportController {
                 LEFT JOIN products p ON ii.product_id = p.id
                 WHERE i.company_id = ? 
                 AND i.customer_id = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
+                AND i.status != 'proforma'
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 

@@ -12,7 +12,7 @@ const getTop10Products = async (companyId) => {
             FROM products p
             JOIN invoice_items ii ON p.id = ii.product_id
             JOIN invoices i ON ii.invoice_id = i.id
-            WHERE i.company_id = ? AND i.status IN ('opened', 'partially_paid', 'paid')
+            WHERE i.company_id = ? AND i.status != 'proforma'
             GROUP BY p.id, p.name, p.sku
             ORDER BY total_quantity DESC
             LIMIT 10
@@ -34,7 +34,7 @@ async function getTop5Salespersons(companyId) {
                 SUM(i.total_amount) as total_sales
             FROM employees e
             JOIN invoices i ON e.id = i.employee_id
-            WHERE i.company_id = ? AND i.status IN ('Opened', 'Partially_Paid', 'Paid')
+            WHERE i.company_id = ? AND i.status != 'proforma'
             GROUP BY e.id, e.name
             ORDER BY total_sales DESC
             LIMIT 5
@@ -78,7 +78,7 @@ async function getCustomerPurchaseFrequency(companyId) {
                 SUM(i.total_amount) as total_spent
             FROM customer c
             JOIN invoices i ON c.id = i.customer_id
-            WHERE c.company_id = ? AND i.status IN ('Opened', 'Partially_Paid', 'Paid')
+            WHERE c.company_id = ? AND i.status != 'proforma'
             GROUP BY c.id, c.name, c.email
             ORDER BY total_spent DESC
             LIMIT 5
@@ -142,7 +142,7 @@ async function getMonthlySalesTrendComparison(companyId) {
                 SUM(total_amount) as total_sales,
                 COUNT(id) as invoice_count
             FROM invoices
-            WHERE company_id = ? AND status IN ('opened', 'partially_paid', 'paid')
+            WHERE company_id = ? AND status != 'proforma'
             AND YEAR(invoice_date) = YEAR(CURDATE())
             AND MONTH(invoice_date) = MONTH(CURDATE())
         `, [companyId]);

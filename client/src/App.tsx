@@ -53,6 +53,9 @@ import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWo
 // Who Owes You Reports
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 
+// Sales Tax
+import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
+import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
 
 // Employees
 import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
@@ -325,25 +328,6 @@ function AppContent() {
         />
 
         <Route
-          path="/reports/ar-aging-summary"
-          element={
-            <ProtectedRoute>
-              <ARAgingSummaryReport />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/reports/ar-aging-in-detail/:customerId"
-          element={
-            <ProtectedRoute>
-              <ARAgingSummaryInDetails />
-            </ProtectedRoute>
-          }
-        />
-
-
-        <Route
           path="/reports/customer-contact-list"
           element={
             <ProtectedRoute>
@@ -424,6 +408,24 @@ function AppContent() {
           }
         />
 
+        {/* Who Owes you section */}
+        <Route
+          path="/reports/ar-aging-summary"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ar-aging-in-detail/:customerId"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryInDetails />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/reports/invoices-and-payments"
@@ -434,6 +436,27 @@ function AppContent() {
           }
         />
 
+        {/* Sales Tax section */}
+        <Route
+          path="/reports/sscl-tax-detail"
+          element={
+            <ProtectedRoute>
+              <SSCL100percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/vat-18-tax-detail"
+          element={
+            <ProtectedRoute>
+              <VAT18percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* Employee section */}
         <Route
           path="/reports/employee-contact-list"
           element={

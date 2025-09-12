@@ -203,7 +203,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
   const updateItem = (index: number, field: keyof EstimateItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
-  
+
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -213,15 +213,15 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
         updatedItems[index].product_id = product.id;
       }
     }
-  
+
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
+      item.actual_unit_price = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
       item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));
-      item.total_price = Number(subtotal.toFixed(2));
+      item.total_price = Number((subtotal).toFixed(2));
     }
-  
+
     setItems(updatedItems);
   };
 
@@ -252,7 +252,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
     
     let discountAmount = 0;
     if (formData.discount_type === 'percentage') {
-      discountAmount = Number(((subtotal * formData.discount_value) / 100).toFixed(2));
+      discountAmount = Number(((subtotal * Number(formData.discount_value)) / 100).toFixed(2));
     } else {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
@@ -719,7 +719,7 @@ export default function EstimateModal({ estimate, onSave }: EstimateModalProps) 
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 1,
+                                      quantity: 0,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',

@@ -7,6 +7,7 @@ const aragingReportController = require('../controllers/reports/ar_aging_control
 const balanceSheetController = require('../controllers/reports/balancesheet_controller');
 const salesAndCustomerController = require('../controllers/reports/Sales&Customers/sales$customers_controller');
 const employeeController = require('../controllers/reports/Employees/Employee_controller');
+const salesTaxController = require('../controllers/reports/SalesTax/sales_tax_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -69,6 +70,19 @@ const {
     getCustomerPhoneList,
     getSalesByCustomerIDDetail,
 } = salesAndCustomerController;
+
+// Importing sales tax controller functions
+const {
+    SSCL100percentTaxDetail,
+    VAT18percentTaxDetail,
+    SSCL100percentTaxException,
+    VAT18percentTaxException,
+    SSCL100percentTaxSummary,
+    VAT18percentTaxSummary,
+    taxLiabilityReport,
+    transactionDetailByTaxCode
+} = salesTaxController;
+
 
 // Importing employee report controller functions
 const {
@@ -336,6 +350,62 @@ router.get(
     getSalesByCustomerIDDetail
 );
 
+// Sales Tax routes
+router.get(
+    '/sscl-100percent-tax-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxDetail
+);
+
+router.get(
+    '/vat-18percent-tax-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxDetail
+);
+
+router.get(
+    '/sscl-100percent-tax-exception/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxException
+);
+
+router.get(
+    '/vat-18percent-tax-exception/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxException
+);
+
+router.get(
+    '/sscl-100percent-tax-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxSummary
+);
+
+router.get(
+    '/vat-18percent-tax-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxSummary
+);
+
+router.get(
+    '/tax-liability-report/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    taxLiabilityReport
+);
+
+router.get(
+    '/transaction-detail-by-tax-code/:company_id/:tax_code',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    transactionDetailByTaxCode
+);
 
 // Employee routes
 router.get(

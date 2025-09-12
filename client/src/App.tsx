@@ -53,6 +53,10 @@ import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWo
 // Who Owes You Reports
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 
+
+// Employees
+import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
+
 import NotFound from './components/NotFound/NotFound';
 
 interface Cheque {
@@ -426,6 +430,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <InvoicesAndRecievePayments />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/employee-contact-list"
+          element={
+            <ProtectedRoute>
+              <EmployeeContactDetails />
             </ProtectedRoute>
           }
         />

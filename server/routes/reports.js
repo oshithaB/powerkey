@@ -6,6 +6,7 @@ const salesReportController = require('../controllers/reports/salesreport_contro
 const aragingReportController = require('../controllers/reports/ar_aging_controller');
 const balanceSheetController = require('../controllers/reports/balancesheet_controller');
 const salesAndCustomerController = require('../controllers/reports/Sales&Customers/sales$customers_controller');
+const employeeController = require('../controllers/reports/Employees/Employee_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -68,6 +69,11 @@ const {
     getCustomerPhoneList,
     getSalesByCustomerIDDetail,
 } = salesAndCustomerController;
+
+// Importing employee report controller functions
+const {
+    getEmployeeContacts,
+} = employeeController;
 
 //====================================================================================================================
 
@@ -328,6 +334,15 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getSalesByCustomerIDDetail
+);
+
+
+// Employee routes
+router.get(
+    '/employee-contacts/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'hr']),
+    getEmployeeContacts
 );
 
 module.exports = router;

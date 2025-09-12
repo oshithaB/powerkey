@@ -518,6 +518,9 @@ const transactionDetailByTaxCode = async (req, res) => {
 
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number, ii.tax_rate DESC`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
         console.log(`Found ${results.length} records`);

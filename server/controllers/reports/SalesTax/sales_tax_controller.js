@@ -6,33 +6,39 @@ const SSCL100percentTaxDetail = async (req, res) => {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
 
+        console.log('Received params:', { company_id, start_date, end_date });
+
         let query = `
-            SELECT 
+            SELECT
                 i.invoice_number,
                 i.invoice_date,
-                c.name as customer_name,
-                ii.product_name,
-                ii.description,
-                ii.quantity,
-                ii.unit_price,
-                ii.tax_rate,
-                ii.tax_amount,
-                ii.total_price,
-                tr.name as tax_rate_name
+                c.name AS customer_name,
+                ii.tax_rate AS tax_rate,
+                SUM(ii.tax_amount) AS total_tax_amount,
+                i.total_amount,
+                'SSCL' AS tax_rate_name
             FROM invoices i
             JOIN invoice_items ii ON i.id = ii.invoice_id
             JOIN customer c ON i.customer_id = c.id
-            LEFT JOIN tax_rates tr ON ii.tax_rate = tr.rate AND tr.company_id = i.company_id
-            WHERE i.company_id = ? 
-            AND ii.tax_rate = 100.00
-            AND i.status != 'cancelled'
+            WHERE i.company_id = ?
+                AND (ii.tax_rate = 2.564 OR ii.tax_rate = 5.00)
+                AND i.status != 'cancelled' 
+                AND i.status != 'proforma'
+            GROUP BY 
+                i.invoice_number,
+                i.invoice_date,
+                c.name,
+                ii.tax_rate,
+                i.total_amount,
+                'SSCL'
         `;
 
         const queryParams = [company_id];
 
         if (start_date && end_date) {
-            query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+            query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date })
         }
 
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
@@ -56,6 +62,8 @@ const VAT18percentTaxDetail = async (req, res) => {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
 
+        console.log('Received params:', { company_id, start_date, end_date });
+
         let query = `
             SELECT
                 i.invoice_number,
@@ -71,24 +79,38 @@ const VAT18percentTaxDetail = async (req, res) => {
             WHERE i.company_id = ?
             AND ii.tax_rate = 18.00
             AND i.status != 'cancelled' AND i.status != 'proforma'
-            GROUP BY i.id, i.invoice_number, i.invoice_date, c.name, i.total_amount
         `;
 
         const queryParams = [company_id];
 
+        // Add date filtering if provided
         if (start_date && end_date) {
-            query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
+            query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
+        query += ` GROUP BY i.id, i.invoice_number, i.invoice_date, c.name, i.total_amount`;
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
+        
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
         
         res.json({
             success: true,
             data: results,
-            total_records: results.length
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching VAT 18% tax detail report:', error);

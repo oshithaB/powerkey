@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axiosInstance from '../../axiosInstance';
+import axiosInstance from '../../../axiosInstance';
 import { X, Printer, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { useCompany } from '../../contexts/CompanyContext';
+import { useCompany } from '../../../contexts/CompanyContext';
 
 interface Invoice {
   invoiceId: string;

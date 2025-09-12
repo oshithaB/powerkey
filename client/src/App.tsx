@@ -36,8 +36,6 @@ import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
 import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
 import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
 import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossByCustomerInDetail';
-import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
-import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
 
 // Sales & Customers Reports
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
@@ -51,7 +49,11 @@ import EstimatesbyCustomers from './components/reports/Sales&Customers/Estimates
 import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
 
 // Who Owes You Reports
+import ARAgingSummaryReport from './components/reports/WhoOwesYou/ARAgingSummaryReport';
+import ARAgingSummaryInDetails from './components/reports/WhoOwesYou/ARAgingSummaryInDetails';
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
+import OpenInvoices from './components/reports/WhoOwesYou/OpenInvoices';
+import InvoiceList from './components/reports/WhoOwesYou/InvoiceList';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -436,6 +438,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <InvoicesAndRecievePayments />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/open-invoices"
+          element={
+            <ProtectedRoute>
+              <OpenInvoices />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/invoice-list"
+          element={
+            <ProtectedRoute>
+              <InvoiceList />
             </ProtectedRoute>
           }
         />

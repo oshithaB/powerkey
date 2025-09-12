@@ -53,9 +53,13 @@ import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWo
 // Who Owes You Reports
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 
+// Expense and Suppliers Reports
+import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
+
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
 import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
+import TransactionDetailsByTaxCode from './components/reports/SalesTax/TransactionDetailsByTaxCode';
 
 // Employees
 import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
@@ -436,6 +440,16 @@ function AppContent() {
           }
         />
 
+        {/* Expense & Suppliers section */}
+        <Route
+          path="/reports/supplier-contact-list"
+          element={
+            <ProtectedRoute>
+              <SupplierContactDetails />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Sales Tax section */}
         <Route
           path="/reports/sscl-tax-detail"
@@ -451,6 +465,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <VAT18percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/transaction-detail-by-tax-code"
+          element={
+            <ProtectedRoute>
+              <TransactionDetailsByTaxCode />
             </ProtectedRoute>
           }
         />

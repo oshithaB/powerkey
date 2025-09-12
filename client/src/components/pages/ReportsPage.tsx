@@ -267,11 +267,6 @@ export default function ReportsPage() {
       description: 'Expense summary by supplier',
       path: '/reports/expense-by-supplier'
     },
-    {
-      name: 'Supplier Phone List',
-      description: 'List of supplier phone numbers',
-      path: '/reports/supplier-phone-list'
-    }
   ];
 
   const salesTax = [

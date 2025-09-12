@@ -24,31 +24,38 @@ const SSCL100percentTaxDetail = async (req, res) => {
                 AND (ii.tax_rate = 2.564 OR ii.tax_rate = 5.00)
                 AND i.status != 'cancelled' 
                 AND i.status != 'proforma'
-            GROUP BY 
-                i.invoice_number,
-                i.invoice_date,
-                c.name,
-                ii.tax_rate,
-                i.total_amount,
-                'SSCL'
         `;
 
         const queryParams = [company_id];
 
+        // Add date filtering if provided
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
             queryParams.push(start_date, end_date);
-            console.log('Date filter applied:', { start_date, end_date })
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
+        query += ` GROUP BY i.id, i.invoice_number, i.invoice_date, c.name, ii.tax_rate, i.total_amount, 'SSCL'`;
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
+        
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
         
         res.json({
             success: true,
             data: results,
-            total_records: results.length
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching SSCL 100% tax detail report:', error);
@@ -118,11 +125,12 @@ const VAT18percentTaxDetail = async (req, res) => {
     }
 };
 
-// SSCL (100%) - Tax Exception Report
 const SSCL100percentTaxException = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
 
         let query = `
             SELECT 
@@ -160,16 +168,29 @@ const SSCL100percentTaxException = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
+
         res.json({
             success: true,
             data: results,
-            total_records: results.length
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching SSCL 100% tax exception report:', error);
@@ -177,11 +198,12 @@ const SSCL100percentTaxException = async (req, res) => {
     }
 };
 
-// VAT 18% - Tax Exception Report
 const VAT18percentTaxException = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
 
         let query = `
             SELECT 
@@ -219,16 +241,29 @@ const VAT18percentTaxException = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
+
         res.json({
             success: true,
             data: results,
-            total_records: results.length
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching VAT 18% tax exception report:', error);
@@ -236,11 +271,12 @@ const VAT18percentTaxException = async (req, res) => {
     }
 };
 
-// SSCL (100%) - Tax Summary Report
 const SSCL100percentTaxSummary = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
 
         let query = `
             SELECT 
@@ -262,13 +298,24 @@ const SSCL100percentTaxSummary = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         query += ` GROUP BY DATE_FORMAT(DATE(i.invoice_date), '%Y-%m') ORDER BY period DESC`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
-        // Calculate totals
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].period,
+                latest: results[0].period
+            });
+        }
+
         const totals = results.reduce((acc, row) => {
             acc.total_invoices += row.total_invoices;
             acc.total_items += row.total_items;
@@ -280,7 +327,8 @@ const SSCL100percentTaxSummary = async (req, res) => {
         res.json({
             success: true,
             data: results,
-            totals: totals
+            totals: totals,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching SSCL 100% tax summary report:', error);
@@ -288,11 +336,12 @@ const SSCL100percentTaxSummary = async (req, res) => {
     }
 };
 
-// VAT 18% - Tax Summary Report
 const VAT18percentTaxSummary = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
 
         let query = `
             SELECT 
@@ -314,13 +363,24 @@ const VAT18percentTaxSummary = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         query += ` GROUP BY DATE_FORMAT(DATE(i.invoice_date), '%Y-%m') ORDER BY period DESC`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
-        // Calculate totals
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].period,
+                latest: results[0].period
+            });
+        }
+
         const totals = results.reduce((acc, row) => {
             acc.total_invoices += row.total_invoices;
             acc.total_items += row.total_items;
@@ -332,7 +392,8 @@ const VAT18percentTaxSummary = async (req, res) => {
         res.json({
             success: true,
             data: results,
-            totals: totals
+            totals: totals,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching VAT 18% tax summary report:', error);
@@ -340,11 +401,12 @@ const VAT18percentTaxSummary = async (req, res) => {
     }
 };
 
-// Tax Liability Report
 const taxLiabilityReport = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
 
         let query = `
             SELECT 
@@ -368,13 +430,24 @@ const taxLiabilityReport = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         query += ` GROUP BY tr.name, tr.rate, ii.tax_rate ORDER BY ii.tax_rate DESC`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
-        // Calculate totals
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
+
         const totals = results.reduce((acc, row) => {
             acc.total_invoices += row.total_invoices;
             acc.taxable_amount += parseFloat(row.taxable_amount);
@@ -387,7 +460,8 @@ const taxLiabilityReport = async (req, res) => {
         res.json({
             success: true,
             data: results,
-            totals: totals
+            totals: totals,
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
         console.error('Error fetching tax liability report:', error);
@@ -395,11 +469,12 @@ const taxLiabilityReport = async (req, res) => {
     }
 };
 
-// Transaction Detail by Tax Code
 const transactionDetailByTaxCode = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date, tax_code } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date, tax_code });
 
         let query = `
             SELECT 
@@ -433,6 +508,7 @@ const transactionDetailByTaxCode = async (req, res) => {
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN ? AND ?`;
             queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
         }
 
         if (tax_code) {
@@ -442,9 +518,19 @@ const transactionDetailByTaxCode = async (req, res) => {
 
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number, ii.tax_rate DESC`;
 
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
         const [results] = await db.execute(query, queryParams);
         
-        // Group by tax rate for summary
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
+
         const summaryByTaxRate = results.reduce((acc, row) => {
             const taxRate = row.tax_rate;
             if (!acc[taxRate]) {
@@ -466,7 +552,8 @@ const transactionDetailByTaxCode = async (req, res) => {
             success: true,
             data: results,
             summary: Object.values(summaryByTaxRate),
-            total_records: results.length
+            total_records: results.length,
+            filter_applied: { start_date, end_date, tax_code }
         });
     } catch (error) {
         console.error('Error fetching transaction detail by tax code report:', error);

@@ -123,185 +123,216 @@ const getEstimatesByCustomer = async (req, res) => {
 }
 
 const createEstimate = async (req, res) => {
-    try {
-      const {
-        estimate_number,
-        company_id,
-        customer_id,
-        employee_id,
-        estimate_date,
-        expiry_date,
-        head_note,
-        subtotal,
-        discount_type,
-        discount_amount,
-        shipping_cost,
-        tax_amount,
-        total_amount,
-        status,
-        is_active,
-        notes,
-        terms,
-        shipping_address,
-        billing_address,
-        ship_via,
-        shipping_date,
-        tracking_number,
-        items
-      } = req.body;
-  
-      // Validate required fields
-      if (!estimate_number) {
-        return res.status(400).json({ error: "Estimate number is required" });
-      }
-      if (!company_id) {
-        return res.status(400).json({ error: "Company ID is required" });
-      }
-      if (!customer_id) {
-        return res.status(400).json({ error: "Customer ID is required" });
-      }
-      if (!estimate_date) {
-        return res.status(400).json({ error: "Estimate date is required" });
-      }
-      if (!subtotal || isNaN(subtotal)) {
-        return res.status(400).json({ error: "Valid subtotal is required" });
-      }
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: "At least one valid item is required" });
-      }
-  
-      // Validate items
-      for (const item of items) {
-        if (!item.product_id || item.product_id === 0) {
-          return res.status(400).json({ error: "Each item must have a valid product ID" });
-        }
-        if (!item.description) {
-          return res.status(400).json({ error: "Each item must have a description" });
-        }
-        if (!item.quantity || item.quantity <= 0) {
-          return res.status(400).json({ error: "Each item must have a valid quantity" });
-        }
-        if (!item.unit_price || item.unit_price < 0) {
-          return res.status(400).json({ error: "Each item must have a valid unit price" });
-        }
-        if (item.tax_rate < 0) {
-          return res.status(400).json({ error: "Tax rate cannot be negative" });
-        }
-        if (item.tax_amount < 0) {
-          return res.status(400).json({ error: "Tax amount cannot be negative" });
-        }
-        if (item.total_price < 0) {
-          return res.status(400).json({ error: "Total price cannot be negative" });
-        }
-      }
-  
-      // Start transaction
-      await db.query('START TRANSACTION');
-  
-      // Insert into estimates table
-      const estimateQuery = `INSERT INTO estimates
-                      (estimate_number, company_id, customer_id, employee_id, estimate_date, expiry_date, head_note, 
-                       subtotal, discount_type, discount_amount, shipping_cost, tax_amount, total_amount, 
-                       status, is_active, notes, terms, shipping_address, billing_address, ship_via, 
-                       shipping_date, tracking_number)
-                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?)`;
-  
-      const estimateValues = [
-        estimate_number,
-        company_id,
-        customer_id,
-        employee_id || null,
-        estimate_date,
-        expiry_date || null,
-        head_note || null,
-        subtotal,
-        discount_type || 'fixed',
-        discount_amount || 0,
-        shipping_cost || 0,
-        tax_amount || 0,
-        total_amount || 0,
-        status || 'pending',
-        is_active !== undefined ? is_active : true,
-        notes || null,
-        terms || null,
-        shipping_address || null,
-        billing_address || null,
-        ship_via || null,
-        shipping_date || null,
-        tracking_number || null
-      ];
-  
-      const [estimateResult] = await db.query(estimateQuery, estimateValues);
-      
-      if (estimateResult.affectedRows === 0) {
-        await db.query('ROLLBACK');
-        return res.status(400).json({ error: "Failed to create estimate" });
-      }
-  
-      // Insert estimate items
-      const itemQuery = `INSERT INTO estimate_items
-                        (estimate_id, product_id, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  
-      for (const item of items) {
-        const itemValues = [
-          estimateResult.insertId,
-          item.product_id,
-          item.description,
-          item.quantity,
-          item.unit_price,
-          item.actual_unit_price,
-          item.tax_rate,
-          item.tax_amount,
-          item.total_price
-        ];
-        const [itemResult] = await db.query(itemQuery, itemValues);
-        if (itemResult.affectedRows === 0) {
-          await db.query('ROLLBACK');
-          return res.status(400).json({ error: "Failed to create estimate items" });
-        }
-      }
-  
-      // Commit transaction
-      await db.query('COMMIT');
-  
-      const newEstimate = {
-        id: estimateResult.insertId,
-        estimate_number,
-        company_id,
-        customer_id,
-        employee_id,
-        estimate_date,
-        expiry_date,
-        head_note,
-        subtotal,
-        discount_type,
-        discount_amount,
-        shipping_cost,
-        tax_amount,
-        total_amount,
-        status,
-        is_active,
-        notes,
-        terms,
-        shipping_address,
-        billing_address,
-        ship_via,
-        shipping_date,
-        tracking_number,
-        created_at: new Date().toISOString(),
-        items
-      };
-  
-      res.status(201).json(newEstimate);
-    } catch (error) {
-      await db.query('ROLLBACK');
-      console.error("Error creating estimate:", error);
-      if (error.code === 'ER_DUP_ENTRY') {
-        return res.status(400).json({ error: `Estimate number '${req.body.estimate_number}' already exists` });
-      }
-      res.status(500).json({ error: error.sqlMessage || "Internal server error" });
+  let connection;
+  try {
+    const {
+      estimate_number,
+      company_id,
+      customer_id,
+      employee_id,
+      estimate_date,
+      expiry_date,
+      head_note,
+      discount_type,
+      discount_value,
+      shipping_cost,
+      status,
+      is_active,
+      notes,
+      terms,
+      shipping_address,
+      billing_address,
+      ship_via,
+      shipping_date,
+      tracking_number,
+      items
+    } = req.body;
+
+    // Validate required fields
+    if (!estimate_number) {
+      return res.status(400).json({ error: "Estimate number is required" });
     }
+    if (!company_id) {
+      return res.status(400).json({ error: "Company ID is required" });
+    }
+    if (!customer_id) {
+      return res.status(400).json({ error: "Customer ID is required" });
+    }
+    if (!estimate_date) {
+      return res.status(400).json({ error: "Estimate date is required" });
+    }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "At least one valid item is required" });
+    }
+
+    // Validate items (only input fields, not calculations)
+    for (const item of items) {
+      if (!item.product_id || item.product_id === 0) {
+        return res.status(400).json({ error: "Each item must have a valid product ID" });
+      }
+      if (!item.description) {
+        return res.status(400).json({ error: "Each item must have a description" });
+      }
+      if (!item.quantity || item.quantity <= 0) {
+        return res.status(400).json({ error: "Each item must have a valid quantity" });
+      }
+      if (!item.unit_price || item.unit_price < 0) {
+        return res.status(400).json({ error: "Each item must have a valid unit price" });
+      }
+      if (item.tax_rate < 0 || isNaN(item.tax_rate)) {
+        return res.status(400).json({ error: "Tax rate must be a non-negative number" });
+      }
+    }
+
+    // Initialize database connection
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // Prevent duplicate estimate numbers
+    const [duplicateEstimate] = await connection.query(
+      `SELECT id FROM estimates WHERE estimate_number = ? AND company_id = ?`,
+      [estimate_number, company_id]
+    );
+    if (duplicateEstimate.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: `Estimate number '${estimate_number}' already exists` });
+    }
+
+    // Recalculate item values
+    const updatedItems = items.map(item => {
+      const subtotal = item.quantity * item.unit_price;
+      const actualUnitPrice = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
+      const taxAmount = Number((actualUnitPrice * item.tax_rate / 100 * item.quantity).toFixed(2));
+      const totalPrice = Number(subtotal.toFixed(2));
+
+      return {
+        ...item,
+        actual_unit_price: actualUnitPrice,
+        tax_amount: taxAmount,
+        total_price: totalPrice
+      };
+    });
+
+    // Calculate totals
+    const calculatedSubtotal = Number(updatedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
+    const calculatedTaxAmount = Number(updatedItems.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
+    const calculatedDiscountAmount = discount_type === 'percentage'
+      ? Number((calculatedSubtotal * (discount_value || 0) / 100).toFixed(2))
+      : Number((discount_value || 0).toFixed(2));
+    const calculatedTotalAmount = Number((calculatedSubtotal + (shipping_cost || 0) - calculatedDiscountAmount).toFixed(2));
+
+    // Insert into estimates table
+    const estimateQuery = `INSERT INTO estimates
+                    (estimate_number, company_id, customer_id, employee_id, estimate_date, expiry_date, head_note, 
+                     subtotal, discount_type, discount_amount, shipping_cost, tax_amount, total_amount, 
+                     status, is_active, notes, terms, shipping_address, billing_address, ship_via, 
+                     shipping_date, tracking_number)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    const estimateValues = [
+      estimate_number,
+      company_id,
+      customer_id,
+      employee_id || null,
+      estimate_date,
+      expiry_date || null,
+      head_note || null,
+      calculatedSubtotal,
+      discount_type || 'fixed',
+      calculatedDiscountAmount,
+      shipping_cost || 0,
+      calculatedTaxAmount,
+      calculatedTotalAmount,
+      status || 'pending',
+      is_active !== undefined ? is_active : true,
+      notes || null,
+      terms || null,
+      shipping_address || null,
+      billing_address || null,
+      ship_via || null,
+      shipping_date || null,
+      tracking_number || null
+    ];
+
+    const [estimateResult] = await connection.query(estimateQuery, estimateValues);
+    
+    if (estimateResult.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: "Failed to create estimate" });
+    }
+
+    // Insert estimate items
+    const itemQuery = `INSERT INTO estimate_items
+                      (estimate_id, product_id, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    for (const item of updatedItems) {
+      const itemValues = [
+        estimateResult.insertId,
+        item.product_id,
+        item.description,
+        item.quantity,
+        item.unit_price,
+        item.actual_unit_price,
+        item.tax_rate,
+        item.tax_amount,
+        item.total_price
+      ];
+      const [itemResult] = await connection.query(itemQuery, itemValues);
+      if (itemResult.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: "Failed to create estimate items" });
+      }
+    }
+
+    // Commit transaction
+    await connection.commit();
+
+    // Response object
+    const newEstimate = {
+      id: estimateResult.insertId,
+      estimate_number,
+      company_id,
+      customer_id,
+      employee_id,
+      estimate_date,
+      expiry_date,
+      head_note,
+      subtotal: calculatedSubtotal,
+      discount_type,
+      discount_value,
+      discount_amount: calculatedDiscountAmount,
+      shipping_cost,
+      tax_amount: calculatedTaxAmount,
+      total_amount: calculatedTotalAmount,
+      status,
+      is_active,
+      notes,
+      terms,
+      shipping_address,
+      billing_address,
+      ship_via,
+      shipping_date,
+      tracking_number,
+      created_at: new Date().toISOString(),
+      items: updatedItems
+    };
+
+    res.status(201).json(newEstimate);
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error("Error creating estimate:", error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: `Estimate number '${req.body.estimate_number}' already exists` });
+    }
+    res.status(500).json({ error: error.sqlMessage || "Internal server error" });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
 };
 
 const editEstimate = async (req, res) => {

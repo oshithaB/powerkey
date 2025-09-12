@@ -7,24 +7,44 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface SSCL100percentTaxDetailData {
+interface TransactionDetailData {
   invoice_number: string;
   invoice_date: string;
+  due_date: string;
   customer_name: string;
+  customer_tax_number: string;
+  product_name: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  actual_unit_price: number;
   tax_rate: number;
-  total_tax_amount: number;
-  total_amount: number;
+  tax_amount: number;
+  total_price: number;
   tax_rate_name: string;
+  invoice_status: string;
+  paid_amount: number;
+  balance_due: number;
 }
 
-const SSCL100percentTaxDetails: React.FC = () => {
+interface SummaryData {
+  tax_rate: number;
+  tax_rate_name: string;
+  transaction_count: number;
+  total_taxable_amount: number;
+  total_tax_amount: number;
+}
+
+const TransactionDetailsByTaxCode: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<SSCL100percentTaxDetailData[]>([]);
+  const [data, setData] = useState<TransactionDetailData[]>([]);
+  const [summary, setSummary] = useState<SummaryData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [customerFilter, setCustomerFilter] = useState<string>('');
-  const [filteredData, setFilteredData] = useState<SSCL100percentTaxDetailData[]>([]);
+  const [taxCode, setTaxCode] = useState<string>('');
+  const [filteredData, setFilteredData] = useState<TransactionDetailData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
@@ -50,7 +70,16 @@ const SSCL100percentTaxDetails: React.FC = () => {
     });
   };
 
-  const fetchSSCL100percentTaxDetail = async (startDate?: string, endDate?: string) => {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-LK', { 
+      style: 'currency', 
+      currency: 'LKR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
+  const fetchTransactionDetails = async (startDate?: string, endDate?: string, taxCode?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -59,21 +88,23 @@ const SSCL100percentTaxDetails: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/sscl-100percent-tax-detail/${selectedCompany.company_id}`, {
-        params: { start_date: startDate, end_date: endDate },
+      const response = await axiosInstance.get(`/api/transaction-detail-by-tax-code/${selectedCompany.company_id}`, {
+        params: { start_date: startDate, end_date: endDate, tax_code: taxCode },
       });
       console.log('API Response:', response.data);
       
-      if (response.data?.data && Array.isArray(response.data.data)) {
+      if (response.data?.data && Array.isArray(response.data.data) && response.data?.summary && Array.isArray(response.data.summary)) {
         setData(response.data.data);
+        setSummary(response.data.summary);
         setFilteredData(response.data.data);
       } else {
         setData([]);
+        setSummary([]);
         setFilteredData([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch SSCL 100% Tax Detail data. Please try again.');
+      setError('Failed to fetch transaction details by tax code. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -100,20 +131,11 @@ const SSCL100percentTaxDetails: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchSSCL100percentTaxDetail(startDate, endDate);
+      fetchTransactionDetails(startDate, endDate, taxCode);
     }
-  }, [selectedCompany?.company_id, filter, isCustomRange]);
+  }, [selectedCompany?.company_id, filter, isCustomRange, taxCode]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-LK', { 
-      style: 'currency', 
-      currency: 'LKR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
-
-  const getTotal = (field: keyof SSCL100percentTaxDetailData) => {
+  const getTotal = (field: keyof TransactionDetailData) => {
     return filteredData.reduce((total, item) => {
       const value = Number(item[field]) || 0;
       return total + value;
@@ -135,7 +157,8 @@ const SSCL100percentTaxDetails: React.FC = () => {
     } else {
       const filtered = data.filter(item =>
         item.customer_name.toLowerCase().includes(value.toLowerCase()) ||
-        item.invoice_number.toLowerCase().includes(value.toLowerCase())
+        item.invoice_number.toLowerCase().includes(value.toLowerCase()) ||
+        item.product_name.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredData(filtered);
     }
@@ -194,7 +217,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
         }
       }
 
-      const filename = `sscl-100percent-tax-detail-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `transaction-detail-by-tax-code-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -224,7 +247,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view SSCL 100% Tax Details.</p>
+          <p className="text-gray-600">Please select a company to view Transaction Details by Tax Code.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -256,7 +279,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">SSCL 100% Tax Details</h1>
+                <h1 className="text-2xl font-bold mb-4">Transaction Details by Tax Code</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
@@ -296,7 +319,6 @@ const SSCL100percentTaxDetails: React.FC = () => {
                     <option value="custom">Custom Range</option>
                   </select>
                 </div>
-                
                 {isCustomRange && (
                   <>
                     <div className="flex flex-col">
@@ -323,7 +345,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                           console.log('Custom date range selected:', { startDate, endDate });
                           setPeriodStart(startDate);
                           setPeriodEnd(endDate);
-                          fetchSSCL100percentTaxDetail(startDate, endDate);
+                          fetchTransactionDetails(startDate, endDate, taxCode);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -333,7 +355,6 @@ const SSCL100percentTaxDetails: React.FC = () => {
                     </button>
                   </>
                 )}
-                
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600"
@@ -352,12 +373,13 @@ const SSCL100percentTaxDetails: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">SSCL 100% Tax Details Report</p>
+                <p className="text-sm font-medium">Transaction Details by Tax Code Report</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
+                  {taxCode && ` | Tax Code: ${taxCode}%`}
                 </p>
               </div>
 
@@ -376,78 +398,86 @@ const SSCL100percentTaxDetails: React.FC = () => {
               
               {!loading && !error && filteredData.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No SSCL 100% tax data available.
+                  No transaction data available.
                 </div>
               )}
               
               {!loading && !error && filteredData.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-full">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Invoice Number
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Date
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Customer
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Tax Rate (%)
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Tax Amount
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredData.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="p-2 border-b font-medium">
-                            {item.invoice_number}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatInvoiceDate(item.invoice_date)}
-                          </td>
-                          <td className="p-2 border-b">
-                            {item.customer_name}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {item.tax_rate}%
-                          </td>
-                          <td className="p-2 border-b text-right font-semibold">
-                            {formatCurrency(item.total_tax_amount)}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {formatCurrency(item.total_amount)}
-                          </td>
+                <>
+                  <div className="overflow-x-auto mb-6">
+                    <table className="w-full border-collapse min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Invoice Number
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Date
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Customer
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Product
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Quantity
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Unit Price
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Tax Rate (%)
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Tax Amount
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Total Price
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Status
+                          </th>
                         </tr>
-                      ))}
-                      <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>
-                          Total
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_tax_amount'))}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_amount'))}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filteredData.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="p-2 border-b font-medium">{item.invoice_number}</td>
+                            <td className="p-2 border-b">{formatInvoiceDate(item.invoice_date)}</td>
+                            <td className="p-2 border-b">{item.customer_name}</td>
+                            <td className="p-2 border-b">{item.product_name}</td>
+                            <td className="p-2 border-b text-right">{item.quantity}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(item.unit_price)}</td>
+                            <td className="p-2 border-b text-right">{item.tax_rate}%</td>
+                            <td className="p-2 border-b text-right font-semibold">{formatCurrency(item.tax_amount)}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(item.total_price)}</td>
+                            <td className="p-2 border-b">{item.invoice_status}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>Total</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{getTotal('quantity')}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('tax_amount'))}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('total_price'))}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
               
               <p className="text-sm mt-5 text-gray-600">
@@ -463,7 +493,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - SSCL 100% Tax Details
+                Print Preview - Transaction Details by Tax Code
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -478,19 +508,19 @@ const SSCL100percentTaxDetails: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">SSCL 100% Tax Details</h1>
+                    <h1 className="text-3xl font-bold mb-2">Transaction Details by Tax Code</h1>
                     <h2 className="text-xl text-gray-600 mb-2">Tax Detail Report</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                        {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                        {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                        {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                        {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
+                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
+                      {taxCode && ` | Tax Code: ${taxCode}%`}
                     </p>
                   </div>
-
                   {selectedCompany?.company_logo && (
                     <img
                       src={`http://localhost:3000${selectedCompany.company_logo}`}
@@ -515,6 +545,18 @@ const SSCL100percentTaxDetails: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Customer
                       </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Product
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Quantity
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Unit Price
+                      </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Tax Rate (%)
@@ -525,43 +567,37 @@ const SSCL100percentTaxDetails: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Total Amount
+                        Total Price
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Status
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredData.map((item, index) => (
                       <tr key={index}>
-                        <td className="p-2 border-b font-medium">
-                          {item.invoice_number}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatInvoiceDate(item.invoice_date)}
-                        </td>
-                        <td className="p-2 border-b">
-                          {item.customer_name}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {item.tax_rate}%
-                        </td>
-                        <td className="p-2 border-b text-right font-semibold">
-                          {formatCurrency(item.total_tax_amount)}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {formatCurrency(item.total_amount)}
-                        </td>
+                        <td className="p-2 border-b font-medium">{item.invoice_number}</td>
+                        <td className="p-2 border-b">{formatInvoiceDate(item.invoice_date)}</td>
+                        <td className="p-2 border-b">{item.customer_name}</td>
+                        <td className="p-2 border-b">{item.product_name}</td>
+                        <td className="p-2 border-b text-right">{item.quantity}</td>
+                        <td className="p-2 border-b text-right">{formatCurrency(item.unit_price)}</td>
+                        <td className="p-2 border-b text-right">{item.tax_rate}%</td>
+                        <td className="p-2 border-b text-right font-semibold">{formatCurrency(item.tax_amount)}</td>
+                        <td className="p-2 border-b text-right">{formatCurrency(item.total_price)}</td>
+                        <td className="p-2 border-b">{item.invoice_status}</td>
                       </tr>
                     ))}
                     <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={4}>
-                        Total
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_tax_amount'))}
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_amount'))}
-                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={4}>Total</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{getTotal('quantity')}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('tax_amount'))}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('total_price'))}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
                     </tr>
                   </tbody>
                 </table>
@@ -575,7 +611,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        SSCL 100% Tax Details Report
+                        Transaction Details by Tax Code Report
                       </p>
                     </div>
                   </div>
@@ -604,4 +640,4 @@ const SSCL100percentTaxDetails: React.FC = () => {
   );
 };
 
-export default SSCL100percentTaxDetails;
+export default TransactionDetailsByTaxCode;

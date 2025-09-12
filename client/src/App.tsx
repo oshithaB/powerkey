@@ -56,6 +56,7 @@ import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/Invoices
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
 import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
+import TransactionDetailsByTaxCode from './components/reports/SalesTax/TransactionDetailsByTaxCode';
 
 // Employees
 import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
@@ -451,6 +452,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <VAT18percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/transaction-detail-by-tax-code"
+          element={
+            <ProtectedRoute>
+              <TransactionDetailsByTaxCode />
             </ProtectedRoute>
           }
         />

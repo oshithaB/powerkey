@@ -401,7 +401,7 @@ router.get(
 );
 
 router.get(
-    '/transaction-detail-by-tax-code/:company_id/:tax_code',
+    '/transaction-detail-by-tax-code/:company_id',
     verifyToken,
     authorizedRoles(['admin', 'accountant']),
     transactionDetailByTaxCode

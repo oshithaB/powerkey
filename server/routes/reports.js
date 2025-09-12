@@ -9,6 +9,7 @@ const salesAndCustomerController = require('../controllers/reports/Sales&Custome
 const employeeController = require('../controllers/reports/Employees/Employee_controller');
 const salesTaxController = require('../controllers/reports/SalesTax/sales_tax_controller');
 const expensesAndSuppliersController = require('../controllers/reports/Expenses&Suppliers/expenses_and_suppliers');
+const whoOwesYouController = require('../controllers/reports/WhoOwesYou/whoOwesYou_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -48,6 +49,20 @@ const {
     getBalanceSheetData,
     getFormattedBalanceSheet,
 } = balanceSheetController;
+
+// Import who owes you controller functions
+const {
+    getOpenInvoices,
+    getCollectionReport,
+    getCustomerBalanceSummary,
+    getCustomerBalanceDetail,
+    getInvoiceList,
+    getTermsList,
+    getStatementList,
+    getUnbilledCharges,
+    getUnbilledTime,
+} = whoOwesYouController
+
 
 // Importing customer contact controller functions
 const {
@@ -184,7 +199,22 @@ router.get (
     getSalesReportByEmployeeId
 );
 
-// A/R Aging Summary Report Route
+// Balance Sheet Report Route
+router.get(
+    '/balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getBalanceSheetData
+);
+
+router.get(
+    '/formatted-balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getFormattedBalanceSheet
+);
+
+// Who Owes you routes
 router.get(
     '/ar-aging-summary/:company_id',
     verifyToken,
@@ -206,19 +236,18 @@ router.get(
     getARAgingSummaryInDetails
 );
 
-// Balance Sheet Report Route
 router.get(
-    '/balance-sheet/:company_id',
+    '/open-invoices/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'staff', 'sales']),
-    getBalanceSheetData
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getOpenInvoices
 );
 
 router.get(
-    '/formatted-balance-sheet/:company_id',
+    '/invoice-list/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'staff', 'sales']),
-    getFormattedBalanceSheet
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getInvoiceList
 );
 
 // Expenses and Suppliers routes

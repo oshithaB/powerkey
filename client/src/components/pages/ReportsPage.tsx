@@ -60,6 +60,11 @@ export default function ReportsPage() {
       path: '/reports/profit&loss-by-class'
     },
     {
+      name: 'Commissions Report',
+      description: 'Commission details for sales persons',
+      path: '/reports/commission'
+    },
+    {
       name: 'Profit & Loss By All Customer',
       description: 'P&L statement segmented by Customers',
       path: '/reports/profit&loss-by-customer'
@@ -71,11 +76,6 @@ export default function ReportsPage() {
       name: 'Accounts receivable ageing summary',
       description: 'Current month P&L statement',
       path: '/reports/ar-aging-summary'
-    },
-    {
-      name: 'Commissions Report',
-      description: 'Commission details for sales persons',
-      path: '/reports/commission'
     },
     {
       name: 'Customer Balance Summary',
@@ -98,14 +98,34 @@ export default function ReportsPage() {
       path: '/reports/collection'
     },
     {
-      name: 'Invoice List By Today',
-      description: 'Today\'s invoices',
-      path: '/reports/invoice-list-by-date'
-    },
-    {
       name: 'Open Invoices',
       description: 'List of all open invoices',
       path: '/reports/open-invoices'
+    },
+    {
+      name: 'Statement List',
+      description: 'List of all customer statements',
+      path: '/reports/statement-list'
+    },
+    {
+      name: 'Invoice List',
+      description: 'List of all invoices',
+      path: '/reports/invoice-list'
+    },
+    {
+      name: 'Terms List',
+      description: 'List of payment terms',
+      path: '/reports/terms-list'
+    },
+    {
+      name: 'Unbilled Charges',
+      description: 'List of all unbilled charges',
+      path: '/reports/unbilled-charges'
+    },
+    {
+      name: 'Unbilled Time',
+      description: 'List of all unbilled time entries',
+      path: '/reports/unbilled-time'
     }
   ];
 

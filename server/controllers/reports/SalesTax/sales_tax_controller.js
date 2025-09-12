@@ -516,7 +516,7 @@ const transactionDetailByTaxCode = async (req, res) => {
             queryParams.push(parseFloat(tax_code));
         }
 
-        query += ` ORDER BY i.invoice_date DESC, i.invoice_number, ii.tax_rate DESC`;
+        query += ` ORDER BY c.name, i.invoice_date DESC, i.invoice_number`;
 
         console.log('Final query:', query);
         console.log('Query params:', queryParams);

@@ -316,9 +316,9 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));  
-      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
-      item.total_price = Number(subtotal.toFixed(2));
+      item.actual_unit_price = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
+      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));
+      item.total_price = Number((subtotal).toFixed(2));
     }
 
     setItems(updatedItems);

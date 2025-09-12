@@ -53,6 +53,9 @@ import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWo
 // Who Owes You Reports
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 
+// Expense and Suppliers Reports
+import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
+
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
 import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
@@ -433,6 +436,16 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <InvoicesAndRecievePayments />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Expense & Suppliers section */}
+        <Route
+          path="/reports/supplier-contact-list"
+          element={
+            <ProtectedRoute>
+              <SupplierContactDetails />
             </ProtectedRoute>
           }
         />

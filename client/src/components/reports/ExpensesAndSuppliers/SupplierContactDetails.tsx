@@ -7,26 +7,27 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface EmployeeContactData {
-  id: string;
+interface VendorContactData {
+  vendor_id: string;
   name: string;
   email: string;
   phone: string;
   address: string;
+  tax_number: string;
 }
 
-const EmployeeContactDetails: React.FC = () => {
+const SupplierContactDetails: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<EmployeeContactData[]>([]);
+  const [data, setData] = useState<VendorContactData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [employeeFilter, setEmployeeFilter] = useState<string>('');
-  const [employeeSuggestions, setEmployeeSuggestions] = useState<EmployeeContactData[]>([]);
+  const [vendorFilter, setVendorFilter] = useState<string>('');
+  const [vendorSuggestions, setVendorSuggestions] = useState<VendorContactData[]>([]);
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchEmployeeContacts = async () => {
+  const fetchVendorContacts = async () => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -35,18 +36,18 @@ const EmployeeContactDetails: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/employee-contacts`);
+      const response = await axiosInstance.get(`/api/vendor-contacts/${selectedCompany.company_id}`);
       
       if (response.data?.data && Array.isArray(response.data.data)) {
         setData(response.data.data);
-        setEmployeeSuggestions(response.data.data);
+        setVendorSuggestions(response.data.data);
       } else {
         setData([]);
-        setEmployeeSuggestions([]);
+        setVendorSuggestions([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch employee contact data. Please try again.');
+      setError('Failed to fetch vendor contact data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -55,20 +56,20 @@ const EmployeeContactDetails: React.FC = () => {
 
   useEffect(() => {
     if (selectedCompany?.company_id) {
-      fetchEmployeeContacts();
+      fetchVendorContacts();
     }
   }, [selectedCompany?.company_id]);
 
-  const handleEmployeeSearch = (value: string) => {
-    setEmployeeFilter(value);
-    const filtered = data.filter(employee =>
-      employee.name.toLowerCase().includes(value.toLowerCase())
+  const handleVendorSearch = (value: string) => {
+    setVendorFilter(value);
+    const filtered = data.filter(vendor =>
+      vendor.name.toLowerCase().includes(value.toLowerCase())
     );
-    setEmployeeSuggestions(filtered.length > 0 ? filtered : data);
+    setVendorSuggestions(filtered.length > 0 ? filtered : data);
   };
 
   const handlePrint = () => {
-    if (employeeSuggestions.length === 0) {
+    if (vendorSuggestions.length === 0) {
       alert('No data available to print');
       return;
     }
@@ -128,7 +129,7 @@ const EmployeeContactDetails: React.FC = () => {
         }
       }
 
-      const filename = `employee-contact-details-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `vendor-contact-details-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -174,31 +175,31 @@ const EmployeeContactDetails: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">Employee Contact Details</h1>
+                <h1 className="text-2xl font-bold mb-4">Vendor Contact Details</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
-                  <label className="text-xs text-gray-600 mb-1">Search Employee</label>
+                  <label className="text-xs text-gray-600 mb-1">Search Vendor</label>
                   <div className="relative">
                     <input
                       type="text"
                       className="border rounded-md p-2 w-40"
-                      value={employeeFilter}
-                      onChange={(e) => handleEmployeeSearch(e.target.value)}
-                      placeholder="Search employees..."
+                      value={vendorFilter}
+                      onChange={(e) => handleVendorSearch(e.target.value)}
+                      placeholder="Search vendors..."
                     />
-                    {employeeFilter && employeeSuggestions.length > 0 && (
+                    {vendorFilter && vendorSuggestions.length > 0 && (
                       <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-40 mt-1">
-                        {employeeSuggestions.map((employee) => (
+                        {vendorSuggestions.map((vendor) => (
                           <li
-                            key={employee.id}
+                            key={vendor.vendor_id}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
-                              setEmployeeFilter(employee.name);
-                              setEmployeeSuggestions([employee]);
+                              setVendorFilter(vendor.name);
+                              setVendorSuggestions([vendor]);
                             }}
                           >
-                            {employee.name}
+                            {vendor.name}
                           </li>
                         ))}
                       </ul>
@@ -223,7 +224,7 @@ const EmployeeContactDetails: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Employee Contact Details</p>
+                <p className="text-sm font-medium">Vendor Contact Details</p>
               </div>
 
               {error && (
@@ -239,13 +240,13 @@ const EmployeeContactDetails: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && employeeSuggestions.length === 0 && (
+              {!loading && !error && vendorSuggestions.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No employee contact data available.
+                  No vendor contact data available.
                 </div>
               )}
               
-              {!loading && !error && employeeSuggestions.length > 0 && (
+              {!loading && !error && vendorSuggestions.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
@@ -266,22 +267,29 @@ const EmployeeContactDetails: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Address
                         </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Tax Number
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {employeeSuggestions.map((employee, index) => (
+                      {vendorSuggestions.map((vendor, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="p-2 border-b font-medium">
-                            {employee.name}
+                            {vendor.name}
                           </td>
                           <td className="p-2 border-b">
-                            {employee.email}
+                            {vendor.email}
                           </td>
                           <td className="p-2 border-b">
-                            {employee.phone}
+                            {vendor.phone}
                           </td>
                           <td className="p-2 border-b">
-                            {employee.address}
+                            {vendor.address}
+                          </td>
+                          <td className="p-2 border-b">
+                            {vendor.tax_number}
                           </td>
                         </tr>
                       ))}
@@ -298,12 +306,12 @@ const EmployeeContactDetails: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && employeeSuggestions.length > 0 && (
+      {showPrintPreview && vendorSuggestions.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Employee Contact Details
+                Print Preview - Vendor Contact Details
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -318,8 +326,8 @@ const EmployeeContactDetails: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Employee Contact Details</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Contact Information</h2>
+                    <h1 className="text-3xl font-bold mb-2">Vendor Contact Details</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Vendor Contact Information</h2>
                   </div>
                 </div>
 
@@ -342,22 +350,29 @@ const EmployeeContactDetails: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Address
                       </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Tax Number
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {employeeSuggestions.map((employee, index) => (
+                    {vendorSuggestions.map((vendor, index) => (
                       <tr key={index}>
                         <td className="p-2 border-b font-medium">
-                          {employee.name}
+                          {vendor.name}
                         </td>
                         <td className="p-2 border-b">
-                          {employee.email}
+                          {vendor.email}
                         </td>
                         <td className="p-2 border-b">
-                          {employee.phone}
+                          {vendor.phone}
                         </td>
                         <td className="p-2 border-b">
-                          {employee.address}
+                          {vendor.address}
+                        </td>
+                        <td className="p-2 border-b">
+                          {vendor.tax_number}
                         </td>
                       </tr>
                     ))}
@@ -373,7 +388,7 @@ const EmployeeContactDetails: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Employee Contact Details
+                        Vendor Contact Details
                       </p>
                     </div>
                   </div>
@@ -402,4 +417,4 @@ const EmployeeContactDetails: React.FC = () => {
   );
 };
 
-export default EmployeeContactDetails;
+export default SupplierContactDetails;

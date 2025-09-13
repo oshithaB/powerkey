@@ -12,6 +12,7 @@ const {
     getInvoiceItems,
     deleteInvoice,
     getInvoiceById,
+    getSalesPageDate,
     getInvoicesByCustomer,
     recordPayment,
     checkCustomerEligibility
@@ -104,6 +105,13 @@ router.post(
     '/checkCustomerEligibility',
     verifyToken,
     checkCustomerEligibility
+);
+
+router.get(
+    '/getSalesPageData/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getSalesPageDate
 );
 
 module.exports = router;

@@ -258,7 +258,7 @@ const SalesReport: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm">Employee Sales Summary</p>
+                <p className="text-sm">Employee Sales Summary for All Companies</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -331,7 +331,7 @@ const SalesReport: React.FC = () => {
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">Sales Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Summary</h2>
+                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Summary for All Companies</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>

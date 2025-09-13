@@ -1,76 +1,79 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../axiosInstance';
 import { X, Printer, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface SalesByProductDetailData {
-  product_id: number;
-  product_name: string;
-  sku: string;
-  description: string;
-  quantity: number;
-  cost_price: number;
-  total_cost: number;
-  unit_price: number;
-  total_price: number;
+interface VAT18percentTaxDetailData {
   invoice_number: string;
   invoice_date: string;
-  status: string;
   customer_name: string;
+  tax_rate: number;
+  total_tax_amount: number;
+  total_amount: number;
+  tax_rate_name: string;
 }
 
-const SalesbyProductDetail: React.FC = () => {
-  const { productId } = useParams<{ productId: string }>();
+const VAT18percentTaxDetails: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<SalesByProductDetailData[]>([]);
+  const [data, setData] = useState<VAT18percentTaxDetailData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [productName, setProductName] = useState<string>('');
-  const navigate = useNavigate();
-  const printRef = useRef<HTMLDivElement>(null);
+  const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [filteredData, setFilteredData] = useState<VAT18percentTaxDetailData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomRange, setIsCustomRange] = useState(false);
+  const navigate = useNavigate();
+  const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchSalesByProductDetail = async (startDate?: string, endDate?: string) => {
-    if (!selectedCompany?.company_id || !productId) {
-      setError('Missing company or product information');
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  };
+
+  const formatInvoiceDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const fetchVAT18percentTaxDetail = async (startDate?: string, endDate?: string) => {
+    if (!selectedCompany?.company_id) {
+      setError('No company selected');
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(
-        `/api/sales-by-product-service-detail/${selectedCompany.company_id}/${productId}`,
-        {
-          params: { 
-            start_date: startDate, 
-            end_date: endDate 
-          }
-        }
-      );
+      const response = await axiosInstance.get(`/api/vat-18percent-tax-detail/${selectedCompany.company_id}`, {
+        params: { start_date: startDate, end_date: endDate },
+      });
       console.log('API Response:', response.data);
       
-      if (response.data?.status === 'success' && Array.isArray(response.data.data)) {
+      if (response.data?.data && Array.isArray(response.data.data)) {
         setData(response.data.data);
-        if (response.data.data.length > 0) {
-          setProductName(response.data.data[0].product_name);
-        }
+        setFilteredData(response.data.data);
       } else {
         setData([]);
+        setFilteredData([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch Sales by Product Detail data. Please try again.');
+      setError('Failed to fetch VAT 18% Tax Detail data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -78,32 +81,28 @@ const SalesbyProductDetail: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id && productId) {
+    if (selectedCompany?.company_id) {
       if (isCustomRange) {
         return;
       }
       
       const today = new Date();
-      let calculatedStartDate: string | undefined;
-      let calculatedEndDate: string = today.toISOString().split('T')[0];
-
+      let startDate: string | undefined;
+      let endDate: string = today.toISOString().split('T')[0];
+  
       if (filter === 'week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        calculatedStartDate = weekAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
       } else if (filter === 'month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        calculatedStartDate = monthAgo.toISOString().split('T')[0];
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
       } else if (filter === 'year') {
-        calculatedStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       }
 
-      setPeriodStart(calculatedStartDate || '');
-      setPeriodEnd(calculatedEndDate);
-      fetchSalesByProductDetail(calculatedStartDate, calculatedEndDate);
+      setPeriodStart(startDate || '');
+      setPeriodEnd(endDate);
+      fetchVAT18percentTaxDetail(startDate, endDate);
     }
-  }, [selectedCompany?.company_id, productId, filter, isCustomRange]);
+  }, [selectedCompany?.company_id, filter, isCustomRange]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-LK', { 
@@ -114,35 +113,32 @@ const SalesbyProductDetail: React.FC = () => {
     }).format(value);
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric',
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
-  const formatDateRange = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  };
-
-  const getTotal = (field: keyof SalesByProductDetailData) => {
-    return data.reduce((total, item) => {
+  const getTotal = (field: keyof VAT18percentTaxDetailData) => {
+    return filteredData.reduce((total, item) => {
       const value = Number(item[field]) || 0;
       return total + value;
     }, 0);
   };
 
   const handlePrint = () => {
-    if (data.length === 0) {
+    if (filteredData.length === 0) {
       alert('No data available to print');
       return;
     }
     setShowPrintPreview(true);
+  };
+
+  const handleCustomerSearch = (value: string) => {
+    setCustomerFilter(value);
+    if (value.trim() === '') {
+      setFilteredData(data);
+    } else {
+      const filtered = data.filter(item =>
+        item.customer_name.toLowerCase().includes(value.toLowerCase()) ||
+        item.invoice_number.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredData(filtered);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -198,7 +194,7 @@ const SalesbyProductDetail: React.FC = () => {
         }
       }
 
-      const filename = `sales-by-product-detail-${productName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `vat-18percent-tax-detail-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -228,7 +224,7 @@ const SalesbyProductDetail: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view Sales by Product Detail.</p>
+          <p className="text-gray-600">Please select a company to view VAT 18% Tax Details.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -260,14 +256,21 @@ const SalesbyProductDetail: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <div>
-                  <h1 className="text-2xl font-bold">Sales by Product Detail</h1>
-                  {productName && (
-                    <h2 className="text-lg text-gray-600 mt-1">Product: {productName}</h2>
-                  )}
-                </div>
+                <h1 className="text-2xl font-bold mb-4">VAT 18% Tax Details</h1>
               </div>
               <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Search</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="border rounded-md p-2 w-40"
+                      value={customerFilter}
+                      onChange={(e) => handleCustomerSearch(e.target.value)}
+                      placeholder="Search invoices..."
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-600 mb-1">Filter Period</label>
                   <select
@@ -317,7 +320,10 @@ const SalesbyProductDetail: React.FC = () => {
                     <button
                       onClick={() => {
                         if (startDate && endDate) {
-                          fetchSalesByProductDetail(startDate, endDate);
+                          console.log('Custom date range selected:', { startDate, endDate });
+                          setPeriodStart(startDate);
+                          setPeriodEnd(endDate);
+                          fetchVAT18percentTaxDetail(startDate, endDate);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -327,6 +333,7 @@ const SalesbyProductDetail: React.FC = () => {
                     </button>
                   </>
                 )}
+                
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600"
@@ -335,7 +342,7 @@ const SalesbyProductDetail: React.FC = () => {
                   <Printer className="h-6 w-6" />
                 </button>
                 <button
-                  onClick={() => navigate('/dashboard/reports')}
+                  onClick={() => navigate(-1)}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-6 w-6" />
@@ -345,12 +352,12 @@ const SalesbyProductDetail: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Sales by Product Detail</p>
+                <p className="text-sm font-medium">VAT 18% Tax Details Report</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDateRange(startDate)} - ${formatDateRange(endDate)}`}
+                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                 </p>
               </div>
 
@@ -367,13 +374,13 @@ const SalesbyProductDetail: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && data.length === 0 && (
+              {!loading && !error && filteredData.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No sales data available for this product.
+                  No VAT 18% tax data available.
                 </div>
               )}
               
-              {!loading && !error && data.length > 0 && (
+              {!loading && !error && filteredData.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
@@ -384,7 +391,7 @@ const SalesbyProductDetail: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Invoice Date
+                          Date
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -392,76 +399,51 @@ const SalesbyProductDetail: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Unit
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Cost
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Status
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          QTY
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Cost
+                          Tax Rate (%)
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Price
+                          Tax Amount
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Total Amount
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.map((item, index) => (
+                      {filteredData.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="p-2 border-b font-medium">
                             {item.invoice_number}
                           </td>
                           <td className="p-2 border-b">
-                            {formatDate(item.invoice_date)}
+                            {formatInvoiceDate(item.invoice_date)}
                           </td>
                           <td className="p-2 border-b">
                             {item.customer_name}
                           </td>
                           <td className="p-2 border-b text-right">
-                            {formatCurrency(item.unit_price)}
+                            {item.tax_rate}%
                           </td>
-                          <td className="p-2 border-b">
-                            {formatCurrency(item.cost_price)}
+                          <td className="p-2 border-b text-right font-semibold">
+                            {formatCurrency(item.total_tax_amount)}
                           </td>
                           <td className="p-2 border-b text-right">
-                            {item.status}
-                        </td>
-                          <td className="p-2 border-b text-right">
-                            {item.quantity}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatCurrency(item.total_cost)}
-                          </td>
-                          <td className="p-2 border-b text-right font-bold">
-                            {formatCurrency(item.total_price)}
+                            {formatCurrency(item.total_amount)}
                           </td>
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={5} className="p-3 border-t-2 border-gray-800 font-bold">
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>
                           Total
                         </td>
-                      <td className="p-2 border-t-2 border-gray-800"></td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {getTotal('quantity')}
-                      </td>
-                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
-                        {formatCurrency(getTotal('total_cost'))}
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_price'))}
-                      </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('total_tax_amount'))}
+                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                          {formatCurrency(getTotal('total_amount'))}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -476,12 +458,12 @@ const SalesbyProductDetail: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && data.length > 0 && (
+      {showPrintPreview && filteredData.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Sales by Product Detail
+                Print Preview - VAT 18% Tax Details
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -496,16 +478,16 @@ const SalesbyProductDetail: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Sales by Product Detail</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Product: {productName}</h2>
+                    <h1 className="text-3xl font-bold mb-2">VAT 18% Tax Details</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Tax Detail Report</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
                     <p className="text-sm text-gray-600">
-                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                      {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                      {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDateRange(startDate)} - ${formatDateRange(endDate)}`}
+                        {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                        {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                        {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                        {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                     </p>
                   </div>
 
@@ -521,89 +503,64 @@ const SalesbyProductDetail: React.FC = () => {
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Invoice Number
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Invoice Date
+                        Date
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Customer
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Unit
+                        Tax Rate (%)
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Cost
+                        Tax Amount
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Status
-                      </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        QTY
-                      </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Total Cost
-                      </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Total Price
+                        Total Amount
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((item, index) => (
+                    {filteredData.map((item, index) => (
                       <tr key={index}>
                         <td className="p-2 border-b font-medium">
                           {item.invoice_number}
                         </td>
                         <td className="p-2 border-b">
-                          {formatDate(item.invoice_date)}
+                          {formatInvoiceDate(item.invoice_date)}
                         </td>
                         <td className="p-2 border-b">
                           {item.customer_name}
                         </td>
                         <td className="p-2 border-b text-right">
-                          {formatCurrency(item.unit_price)}
+                          {item.tax_rate}%
                         </td>
-                        <td className="p-2 border-b">
-                          {formatCurrency(item.cost_price)}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                            {item.status}
+                        <td className="p-2 border-b text-right font-semibold">
+                          {formatCurrency(item.total_tax_amount)}
                         </td>
                         <td className="p-2 border-b text-right">
-                          {item.quantity}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatCurrency(item.total_cost)}
-                        </td>
-                        <td className="p-2 border-b text-right font-bold">
-                          {formatCurrency(item.total_price)}
+                          {formatCurrency(item.total_amount)}
                         </td>
                       </tr>
                     ))}
                     <tr>
-                      <td colSpan={5} className="p-2 border-t-2 border-gray-800 font-bold">
+                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={4}>
                         Total
                       </td>
-                      <td className="p-2 border-t-2 border-gray-800"></td>
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {getTotal('quantity')}
-                      </td>
-                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
-                        {formatCurrency(getTotal('total_cost'))}
+                        {formatCurrency(getTotal('total_tax_amount'))}
                       </td>
                       <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_price'))}
+                        {formatCurrency(getTotal('total_amount'))}
                       </td>
                     </tr>
                   </tbody>
@@ -618,7 +575,7 @@ const SalesbyProductDetail: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Sales by Product Detail - {productName}
+                        VAT 18% Tax Details Report
                       </p>
                     </div>
                   </div>
@@ -647,4 +604,4 @@ const SalesbyProductDetail: React.FC = () => {
   );
 };
 
-export default SalesbyProductDetail;
+export default VAT18percentTaxDetails;

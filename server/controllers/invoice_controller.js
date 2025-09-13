@@ -26,29 +26,19 @@ const createInvoice = asyncHandler(async (req, res) => {
     discount_amount,
     shipping_cost,
     total_amount,
-    status, // Added status
+    status,
     items,
     attachment
   } = req.body;
 
   console.log('Creating invoice with data:', req.body);
 
-  // Validate required fields
-  if (!invoice_number) {
-    return res.status(422).json({ error: "Invoice number is required" });
-  }
-  if (!company_id) {
-    return res.status(422).json({ error: "Company ID is required" });
-  }
-  if (!customer_id) {
-    return res.status(422).json({ error: "Customer ID is required" });
-  }
-  if (!invoice_date) {
-    return res.status(422).json({ error: "Invoice date is required" });
-  }
-  if (!subtotal || isNaN(subtotal)) {
-    return res.status(422).json({ error: "Valid subtotal is required" });
-  }
+  // --- VALIDATION ---
+  if (!invoice_number) return res.status(422).json({ error: "Invoice number is required" });
+  if (!company_id) return res.status(422).json({ error: "Company ID is required" });
+  if (!customer_id) return res.status(422).json({ error: "Customer ID is required" });
+  if (!invoice_date) return res.status(422).json({ error: "Invoice date is required" });
+  if (!subtotal || isNaN(subtotal)) return res.status(422).json({ error: "Valid subtotal is required" });
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(422).json({ error: "At least one valid item is required" });
   }
@@ -56,9 +46,7 @@ const createInvoice = asyncHandler(async (req, res) => {
     return res.status(422).json({ error: "Invalid invoice status" });
   }
 
-  console.log('Validated required fields successfully');
-
-  // Validate items
+  // Validate items (only input fields, not calculations)
   for (const item of items) {
     if (!item.product_id || item.product_id === 0) {
       return res.status(422).json({ error: "Each item must have a valid product ID" });
@@ -72,34 +60,26 @@ const createInvoice = asyncHandler(async (req, res) => {
     if (!item.unit_price || item.unit_price < 0) {
       return res.status(422).json({ error: "Each item must have a valid unit price" });
     }
-    if (item.tax_rate < 0) {
-      return res.status(422).json({ error: "Tax rate cannot be negative" });
-    }
-    if (item.tax_amount < 0) {
-      return res.status(422).json({ error: "Tax amount cannot be negative" });
-    }
-    if (item.total_price < 0) {
-      return res.status(422).json({ error: "Total price cannot be negative" });
+    if (item.tax_rate < 0 || isNaN(item.tax_rate)) {
+      return res.status(422).json({ error: "Tax rate must be a non-negative number" });
     }
   }
-
-  console.log('Validated items successfully');
 
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
 
-    // Check for duplicate invoice number
+    // --- Prevent duplicate invoice numbers ---
     const [duplicateInvoice] = await connection.query(
       `SELECT id FROM invoices WHERE invoice_number = ? AND company_id = ?`,
       [invoice_number, company_id]
     );
-
     if (duplicateInvoice.length > 0) {
       await connection.rollback();
       return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
 
+    // --- Prepare invoice data ---
     const invoiceData = {
       company_id,
       customer_id,
@@ -119,51 +99,50 @@ const createInvoice = asyncHandler(async (req, res) => {
       shipping_date: shipping_date || null,
       tracking_number: tracking_number || null,
       subtotal,
-      tax_amount: tax_amount || 0,
+      tax_amount,
       discount_amount: discount_amount || 0,
       shipping_cost: shipping_cost || 0,
-      total_amount: total_amount || 0,
-      balance_due: status === 'proforma' ? 0 : (total_amount || 0), // If proforma, balance_due = 0
-      status, // Use provided status
+      total_amount,
+      balance_due: status === 'proforma' ? 0 : (total_amount || 0),
+      status,
       created_at: new Date(),
       updated_at: new Date()
     };
 
-    // Only update customer balance if invoice is NOT proforma
+    // --- Update customer balance (if not proforma) ---
     if (status !== 'proforma') {
       const [customerRows] = await connection.query(
-      `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
-      [customer_id, company_id]
+        `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
+        [customer_id, company_id]
       );
-
       if (customerRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ error: "Customer not found" });
+        await connection.rollback();
+        return res.status(404).json({ error: "Customer not found" });
       }
-
       const currentBalance = Number(customerRows[0].current_balance) || 0;
       const newBalance = currentBalance + (invoiceData.balance_due || 0);
-
       await connection.query(
-      `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
-      [newBalance, customer_id, company_id]
+        `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
+        [newBalance, customer_id, company_id]
       );
     }
 
-    // Create new invoice
-    const [result] = await connection.query(
-      `INSERT INTO invoices SET ?`,
-      invoiceData
-    );
-
+    // --- Insert invoice ---
+    const [result] = await connection.query(`INSERT INTO invoices SET ?`, invoiceData);
     const invoiceId = result.insertId;
 
-    // Insert invoice items
+    // --- Insert invoice items ---
     const itemQuery = `INSERT INTO invoice_items
-                      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     for (const item of items) {
+      // Backend recalculates tax_amount and total_price
+      const subtotal = item.quantity * item.unit_price;
+      const actualUnitPrice = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
+      const taxAmount = Number((actualUnitPrice * item.tax_rate / 100 * item.quantity).toFixed(2));
+      const totalPrice = Number((subtotal).toFixed(2));
+
       const itemData = [
         invoiceId,
         item.product_id,
@@ -171,64 +150,48 @@ const createInvoice = asyncHandler(async (req, res) => {
         item.description,
         item.quantity,
         item.unit_price,
-        item.actual_unit_price,
+        actualUnitPrice,
         item.tax_rate,
-        item.tax_amount,
-        item.total_price
+        taxAmount,
+        totalPrice
       ];
 
+      // Check stock (if not proforma)
       if (status !== 'proforma') {
         const [productRows] = await connection.query(
           `SELECT quantity_on_hand FROM products WHERE id = ? AND company_id = ?`,
           [item.product_id, company_id]
         );
-
-        console.log(`Fetched product data for product_id ${item.product_id}:`, productRows);
-
         if (productRows.length === 0) {
           await connection.rollback();
           return res.status(404).json({ error: `${item.product_name} not found.` });
         }
-
-        console.log(`Available quantity for product_id ${item.product_id}:`, productRows[0].quantity_on_hand);
-
         const availableQuantity = Number(productRows[0].quantity_on_hand);
         if (availableQuantity < Number(item.quantity)) {
-          console.error(`Insufficient quantity for product_id ${item.product_id}: Available ${availableQuantity}, Requested ${item.quantity}`);
           await connection.rollback();
-          return res.status(404).json({ error: `Insufficient quantity for ${item.product_name}. Available: ${availableQuantity}, Requested: ${item.quantity}` });
+          return res.status(404).json({
+            error: `Insufficient quantity for ${item.product_name}. Available: ${availableQuantity}, Requested: ${item.quantity}`
+          });
         }
-
-        console.log(`Sufficient quantity for product_id ${item.product_id}:`, availableQuantity);
       }
 
+      // Insert item
       const [itemResult] = await connection.query(itemQuery, itemData);
-
       if (itemResult.affectedRows === 0) {
         await connection.rollback();
         return res.status(404).json({ error: "Failed to create invoice items" });
       }
 
-      console.log('Inserted invoice item:', itemData);
-
+      // Reduce product stock (if not proforma)
       if (status !== 'proforma') {
-        const [updateResult] = await connection.query(
+        await connection.query(
           `UPDATE products SET quantity_on_hand = quantity_on_hand - ? WHERE id = ? AND company_id = ?`,
           [item.quantity, item.product_id, company_id]
         );
-
-        console.log(`Updated product ID ${item.product_id} quantity_on_hand by -${item.quantity}`);
-
-        if (updateResult.affectedRows === 0) {
-          await connection.rollback();
-          console.error(`Failed to update product ID ${item.product_id} quantity_on_hand`);
-          return res.status(404).json({ error: "Failed to update product quantity" });
-        }
       }
-      
     }
 
-    // Handle file attachment if provided
+    // --- Handle file attachment ---
     if (req.file) {
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
@@ -239,6 +202,7 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     await connection.commit();
 
+    // Response object
     const newInvoice = {
       id: invoiceId,
       invoice_number,
@@ -270,11 +234,12 @@ const createInvoice = asyncHandler(async (req, res) => {
     };
 
     res.status(201).json(newInvoice);
+
   } catch (error) {
     await connection.rollback();
     console.error('Error creating invoice:', error);
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(404).json({ error: `Invoice number '${invoice_number}' already exists` });
+      return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
     res.status(500).json({ error: error.sqlMessage || 'Internal server error' });
   } finally {
@@ -307,7 +272,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
     discount_amount,
     shipping_cost,
     total_amount,
-    balance_due, // Add balance_due to destructured fields
+    balance_due,
     items,
     status,
     attachment,
@@ -393,6 +358,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
       }
     }
 
+    // --- Calculate total tax amount from items ---
+    const totalTaxAmount = items.reduce((sum, item) => {
+      return sum + Number(item.tax_amount);
+    }, 0);
+
     const invoiceData = {
       company_id,
       customer_id,
@@ -412,25 +382,23 @@ const updateInvoice = asyncHandler(async (req, res) => {
       shipping_date: shipping_date || null,
       tracking_number: tracking_number || null,
       subtotal,
-      tax_amount: tax_amount || 0,
+      tax_amount: totalTaxAmount,
       discount_amount: discount_amount || 0,
       shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
-      balance_due: balance_due || 0, // Add balance_due to invoiceData
+      balance_due: balance_due || 0,
       status,
       updated_at: new Date(),
     };
 
     // --- Handle cancelled invoice ---
     if (status === 'cancelled' && invoice_type !== 'proforma') {
-      // 1. Fetch all invoice items for this invoice
       console.log("inside cancelled invoice handler");
       const [cancelItems] = await connection.query(
         `SELECT product_id, quantity FROM invoice_items WHERE invoice_id = ?`,
         [invoiceId]
       );
 
-      // 2. Restore stock for each item
       for (const item of cancelItems) {
         await connection.query(
           `UPDATE products 
@@ -440,7 +408,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
         );
       }
 
-      // 4. Reduce customer's current_balance by balance_due
       await connection.query(
         `UPDATE customer 
          SET current_balance = current_balance - ? 
@@ -490,49 +457,12 @@ const updateInvoice = asyncHandler(async (req, res) => {
       [invoiceData, invoiceId, company_id]
     );
 
-    // Update estimate's shipping cost and total amount if estimate_id is provided
-    if (estimate_id) {
-      await connection.query(
-        `UPDATE estimates SET shipping_cost = ?, total_amount = ?, updated_at = ? WHERE id = ? AND company_id = ?`,
-        [shipping_cost, total_amount, new Date(), estimate_id, company_id]
-      );
-    }
-
     if (updateResult.affectedRows === 0) {
       await connection.rollback();
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
-    // // Insert updated invoice items
-    // const itemQuery = `INSERT INTO invoice_items
-    //                   (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-    //                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-    // for (const item of items) {
-    //   const itemData = [
-    //     invoiceId,
-    //     item.product_id,
-    //     item.product_name || null,
-    //     item.description,
-    //     item.quantity,
-    //     item.unit_price,
-    //     item.actual_unit_price,
-    //     item.tax_rate,
-    //     item.tax_amount,
-    //     item.total_price
-    //   ];
-
-    //   const [itemResult] = await connection.query(itemQuery, itemData);
-    //   if (itemResult.affectedRows === 0) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ error: "Failed to create invoice items" });
-    //   }
-    // }
-
-
     // --- Update invoice items with inventory control ---
-
-    // 1. Load old items
     const [oldRows] = await connection.query(
       "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
       [invoiceId]
@@ -545,15 +475,12 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
     const usedIds = new Set();
 
-    // 2. Process new items
     for (const item of items) {
       if (item.id && oldItems[item.id]) {
-        // --- Existing item ---
         const oldQty = oldItems[item.id].qty;
         const diff = item.quantity - oldQty;
 
         if (diff > 0) {
-          // Check inventory before increasing
           const [[{ quantity_on_hand }]] = await connection.query(
             "SELECT quantity_on_hand FROM products WHERE id = ?",
             [item.product_id]
@@ -568,7 +495,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
         }
 
         if (diff !== 0) {
-          // Update invoice_items row
           await connection.query(
             `UPDATE invoice_items 
              SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
@@ -586,7 +512,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
             ]
           );
 
-          // Update inventory
           await connection.query(
             `UPDATE products 
              SET quantity_on_hand = quantity_on_hand - ? 
@@ -597,7 +522,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
         usedIds.add(item.id);
       } else if (!item.id) {
-        // --- New item ---
         const [[{ quantity_on_hand }]] = await connection.query(
           "SELECT quantity_on_hand FROM products WHERE id = ?",
           [item.product_id]
@@ -628,7 +552,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
           ]
         );
 
-        // Decrease inventory
         await connection.query(
           `UPDATE products 
            SET quantity_on_hand = quantity_on_hand - ? 
@@ -640,12 +563,10 @@ const updateInvoice = asyncHandler(async (req, res) => {
       }
     }
 
-    // 3. Handle deleted items
     for (const oldId in oldItems) {
       if (!usedIds.has(parseInt(oldId))) {
         const { product_id, qty } = oldItems[oldId];
 
-        // Restore stock
         await connection.query(
           `UPDATE products 
            SET quantity_on_hand = quantity_on_hand + ? 
@@ -653,7 +574,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
           [qty, product_id]
         );
 
-        // Delete invoice item
         await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [
           oldId,
         ]);
@@ -701,11 +621,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
       shipping_date,
       tracking_number,
       subtotal,
-      tax_amount,
+      tax_amount: totalTaxAmount,
       discount_amount,
       shipping_cost,
       total_amount,
-      balance_due, // Include balance_due in response
+      balance_due,
       status,
       created_at:
         existingInvoice[0].created_at?.toISOString() ||
@@ -1252,6 +1172,58 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
   }
 });
 
+// get sales page data
+const getSalesPageDate = async(req, res) => {
+  const { company_id } = req.params;
+
+  if (!company_id) {
+    return res.status(400).json({ error: "Company ID is required" });
+  }
+
+  try {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+
+    let query = `
+      SELECT 
+        -- Current year data
+        SUM(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status != 'proforma' THEN total_amount ELSE 0 END) AS current_year_sales,
+        COUNT(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status != 'proforma' THEN 1 END) AS current_year_invoices,
+        COUNT(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${currentYear} AND status = 'proforma' THEN 1 END) AS current_year_proforma,
+        
+        -- Previous year data for growth calculation
+        SUM(CASE WHEN YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) = ${previousYear} AND status != 'proforma' THEN total_amount ELSE 0 END) AS previous_year_sales
+      FROM invoices 
+      WHERE company_id = ? 
+        AND YEAR(STR_TO_DATE(invoice_date, '%Y-%m-%d')) IN (${currentYear}, ${previousYear})
+    `;
+
+    const [results] = await db.execute(query, [company_id]);
+    const data = results[0];
+
+    // Calculate growth percentage
+    let growthPercentage = 0;
+    if (data.previous_year_sales > 0) {
+      growthPercentage = ((data.current_year_sales - data.previous_year_sales) / data.previous_year_sales * 100).toFixed(1);
+    } else if (data.current_year_sales > 0) {
+      growthPercentage = 100;
+    }
+
+    const responseData = {
+      totalSales: data.current_year_sales || 0,
+      totalInvoices: data.current_year_invoices || 0,
+      totalProformaInvoices: data.current_year_proforma || 0,
+      growthPercentage: parseFloat(growthPercentage)
+    };
+
+    res.json(responseData);
+
+  } catch (error) {
+    console.error('Error fetching sales page data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createInvoice,
   updateInvoice,
@@ -1260,6 +1232,7 @@ module.exports = {
   getInvoices,
   getInvoiceById,
   getInvoiceItems,
+  getSalesPageDate,
   getInvoicesByCustomer,
   recordPayment,
   checkCustomerEligibility

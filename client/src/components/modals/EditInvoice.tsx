@@ -254,8 +254,8 @@ export default function EditInvoice() {
     if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
       const subtotal = item.quantity * item.unit_price;
-      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100).toFixed(2));
-      item.actual_unit_price = Number(((item.unit_price * 100) / (100 + item.tax_rate)).toFixed(2));
+      item.actual_unit_price = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
+      item.tax_amount = Number((item.actual_unit_price * item.tax_rate / 100 * item.quantity).toFixed(2));
       item.total_price = Number(subtotal.toFixed(2));
     }
 
@@ -283,12 +283,8 @@ export default function EditInvoice() {
   };
 
   const calculateTotals = () => {
-    const subtotal = items.length > 0 
-      ? Number(items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unit_price)), 0).toFixed(2))
-      : 0;
-    const totalTax = items.length > 0 
-      ? Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2))
-      : 0;
+    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
+    const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
     const shippingCost = Number(formData.shipping_cost || 0);
     
     let discountAmount = 0;

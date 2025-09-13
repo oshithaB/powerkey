@@ -1,109 +1,74 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../axiosInstance';
 import { X, Printer, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface SalesByProductDetailData {
-  product_id: number;
-  product_name: string;
-  sku: string;
-  description: string;
-  quantity: number;
-  cost_price: number;
-  total_cost: number;
-  unit_price: number;
-  total_price: number;
+interface TransactionDetailData {
   invoice_number: string;
   invoice_date: string;
-  status: string;
+  due_date: string;
   customer_name: string;
+  customer_tax_number: string;
+  product_name: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  actual_unit_price: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_price: number;
+  tax_rate_name: string;
+  invoice_status: string;
+  paid_amount: number;
+  balance_due: number;
 }
 
-const SalesbyProductDetail: React.FC = () => {
-  const { productId } = useParams<{ productId: string }>();
+interface SummaryData {
+  tax_rate: number;
+  tax_rate_name: string;
+  transaction_count: number;
+  total_taxable_amount: number;
+  total_tax_amount: number;
+}
+
+const TransactionDetailsByTaxCode: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<SalesByProductDetailData[]>([]);
+  const [data, setData] = useState<TransactionDetailData[]>([]);
+  const [summary, setSummary] = useState<SummaryData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [productName, setProductName] = useState<string>('');
-  const navigate = useNavigate();
-  const printRef = useRef<HTMLDivElement>(null);
+  const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [taxCode, setTaxCode] = useState<string>('');
+  const [filteredData, setFilteredData] = useState<TransactionDetailData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomRange, setIsCustomRange] = useState(false);
+  const navigate = useNavigate();
+  const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchSalesByProductDetail = async (startDate?: string, endDate?: string) => {
-    if (!selectedCompany?.company_id || !productId) {
-      setError('Missing company or product information');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axiosInstance.get(
-        `/api/sales-by-product-service-detail/${selectedCompany.company_id}/${productId}`,
-        {
-          params: { 
-            start_date: startDate, 
-            end_date: endDate 
-          }
-        }
-      );
-      console.log('API Response:', response.data);
-      
-      if (response.data?.status === 'success' && Array.isArray(response.data.data)) {
-        setData(response.data.data);
-        if (response.data.data.length > 0) {
-          setProductName(response.data.data[0].product_name);
-        }
-      } else {
-        setData([]);
-        setError('Invalid data format received from server');
-      }
-    } catch (err) {
-      setError('Failed to fetch Sales by Product Detail data. Please try again.');
-      console.error('API Error:', err);
-    } finally {
-      setLoading(false);
-    }
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  useEffect(() => {
-    if (selectedCompany?.company_id && productId) {
-      if (isCustomRange) {
-        return;
-      }
-      
-      const today = new Date();
-      let calculatedStartDate: string | undefined;
-      let calculatedEndDate: string = today.toISOString().split('T')[0];
-
-      if (filter === 'week') {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        calculatedStartDate = weekAgo.toISOString().split('T')[0];
-      } else if (filter === 'month') {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        calculatedStartDate = monthAgo.toISOString().split('T')[0];
-      } else if (filter === 'year') {
-        calculatedStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
-      }
-
-      setPeriodStart(calculatedStartDate || '');
-      setPeriodEnd(calculatedEndDate);
-      fetchSalesByProductDetail(calculatedStartDate, calculatedEndDate);
-    }
-  }, [selectedCompany?.company_id, productId, filter, isCustomRange]);
+  const formatInvoiceDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-LK', { 
@@ -114,35 +79,89 @@ const SalesbyProductDetail: React.FC = () => {
     }).format(value);
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric',
-      month: 'short', 
-      day: 'numeric' 
-    });
+  const fetchTransactionDetails = async (startDate?: string, endDate?: string, taxCode?: string) => {
+    if (!selectedCompany?.company_id) {
+      setError('No company selected');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axiosInstance.get(`/api/transaction-detail-by-tax-code/${selectedCompany.company_id}`, {
+        params: { start_date: startDate, end_date: endDate, tax_code: taxCode },
+      });
+      console.log('API Response:', response.data);
+      
+      if (response.data?.data && Array.isArray(response.data.data) && response.data?.summary && Array.isArray(response.data.summary)) {
+        setData(response.data.data);
+        setSummary(response.data.summary);
+        setFilteredData(response.data.data);
+      } else {
+        setData([]);
+        setSummary([]);
+        setFilteredData([]);
+        setError('Invalid data format received from server');
+      }
+    } catch (err) {
+      setError('Failed to fetch transaction details by tax code. Please try again.');
+      console.error('API Error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formatDateRange = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  };
+  useEffect(() => {
+    if (selectedCompany?.company_id) {
+      if (isCustomRange) {
+        return;
+      }
+      
+      const today = new Date();
+      let startDate: string | undefined;
+      let endDate: string = today.toISOString().split('T')[0];
+  
+      if (filter === 'week') {
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+      } else if (filter === 'month') {
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
+      } else if (filter === 'year') {
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+      }
 
-  const getTotal = (field: keyof SalesByProductDetailData) => {
-    return data.reduce((total, item) => {
+      setPeriodStart(startDate || '');
+      setPeriodEnd(endDate);
+      fetchTransactionDetails(startDate, endDate, taxCode);
+    }
+  }, [selectedCompany?.company_id, filter, isCustomRange, taxCode]);
+
+  const getTotal = (field: keyof TransactionDetailData) => {
+    return filteredData.reduce((total, item) => {
       const value = Number(item[field]) || 0;
       return total + value;
     }, 0);
   };
 
   const handlePrint = () => {
-    if (data.length === 0) {
+    if (filteredData.length === 0) {
       alert('No data available to print');
       return;
     }
     setShowPrintPreview(true);
+  };
+
+  const handleCustomerSearch = (value: string) => {
+    setCustomerFilter(value);
+    if (value.trim() === '') {
+      setFilteredData(data);
+    } else {
+      const filtered = data.filter(item =>
+        item.customer_name.toLowerCase().includes(value.toLowerCase()) ||
+        item.invoice_number.toLowerCase().includes(value.toLowerCase()) ||
+        item.product_name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredData(filtered);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -198,7 +217,7 @@ const SalesbyProductDetail: React.FC = () => {
         }
       }
 
-      const filename = `sales-by-product-detail-${productName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `transaction-detail-by-tax-code-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -228,7 +247,7 @@ const SalesbyProductDetail: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view Sales by Product Detail.</p>
+          <p className="text-gray-600">Please select a company to view Transaction Details by Tax Code.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -260,14 +279,21 @@ const SalesbyProductDetail: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <div>
-                  <h1 className="text-2xl font-bold">Sales by Product Detail</h1>
-                  {productName && (
-                    <h2 className="text-lg text-gray-600 mt-1">Product: {productName}</h2>
-                  )}
-                </div>
+                <h1 className="text-2xl font-bold mb-4">Transaction Details by Tax Code</h1>
               </div>
               <div className="flex space-x-2 items-end">
+                <div className="flex flex-col">
+                  <label className="text-xs text-gray-600 mb-1">Search</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="border rounded-md p-2 w-40"
+                      value={customerFilter}
+                      onChange={(e) => handleCustomerSearch(e.target.value)}
+                      placeholder="Search invoices..."
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-col">
                   <label className="text-xs text-gray-600 mb-1">Filter Period</label>
                   <select
@@ -293,7 +319,6 @@ const SalesbyProductDetail: React.FC = () => {
                     <option value="custom">Custom Range</option>
                   </select>
                 </div>
-                
                 {isCustomRange && (
                   <>
                     <div className="flex flex-col">
@@ -317,7 +342,10 @@ const SalesbyProductDetail: React.FC = () => {
                     <button
                       onClick={() => {
                         if (startDate && endDate) {
-                          fetchSalesByProductDetail(startDate, endDate);
+                          console.log('Custom date range selected:', { startDate, endDate });
+                          setPeriodStart(startDate);
+                          setPeriodEnd(endDate);
+                          fetchTransactionDetails(startDate, endDate, taxCode);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -335,7 +363,7 @@ const SalesbyProductDetail: React.FC = () => {
                   <Printer className="h-6 w-6" />
                 </button>
                 <button
-                  onClick={() => navigate('/dashboard/reports')}
+                  onClick={() => navigate(-1)}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-6 w-6" />
@@ -345,12 +373,13 @@ const SalesbyProductDetail: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Sales by Product Detail</p>
+                <p className="text-sm font-medium">Transaction Details by Tax Code Report</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDateRange(startDate)} - ${formatDateRange(endDate)}`}
+                  {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
+                  {taxCode && ` | Tax Code: ${taxCode}%`}
                 </p>
               </div>
 
@@ -367,105 +396,88 @@ const SalesbyProductDetail: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && data.length === 0 && (
+              {!loading && !error && filteredData.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No sales data available for this product.
+                  No transaction data available.
                 </div>
               )}
               
-              {!loading && !error && data.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-full">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Invoice Number
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Invoice Date
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Customer
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Unit
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Cost
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Status
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          QTY
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Cost
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Price
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="p-2 border-b font-medium">
-                            {item.invoice_number}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatDate(item.invoice_date)}
-                          </td>
-                          <td className="p-2 border-b">
-                            {item.customer_name}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {formatCurrency(item.unit_price)}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatCurrency(item.cost_price)}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {item.status}
-                        </td>
-                          <td className="p-2 border-b text-right">
-                            {item.quantity}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatCurrency(item.total_cost)}
-                          </td>
-                          <td className="p-2 border-b text-right font-bold">
-                            {formatCurrency(item.total_price)}
-                          </td>
+              {!loading && !error && filteredData.length > 0 && (
+                <>
+                  <div className="overflow-x-auto mb-6">
+                    <table className="w-full border-collapse min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Invoice Number
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Date
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Customer
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Product
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Quantity
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Unit Price
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Tax Rate (%)
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Tax Amount
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Total Price
+                          </th>
+                          <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                              style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Status
+                          </th>
                         </tr>
-                      ))}
-                      <tr>
-                        <td colSpan={5} className="p-3 border-t-2 border-gray-800 font-bold">
-                          Total
-                        </td>
-                      <td className="p-2 border-t-2 border-gray-800"></td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {getTotal('quantity')}
-                      </td>
-                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
-                        {formatCurrency(getTotal('total_cost'))}
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_price'))}
-                      </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filteredData.map((item, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="p-2 border-b font-medium">{item.invoice_number}</td>
+                            <td className="p-2 border-b">{formatInvoiceDate(item.invoice_date)}</td>
+                            <td className="p-2 border-b">{item.customer_name}</td>
+                            <td className="p-2 border-b">{item.product_name}</td>
+                            <td className="p-2 border-b text-right">{item.quantity}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(item.unit_price)}</td>
+                            <td className="p-2 border-b text-right">{item.tax_rate}%</td>
+                            <td className="p-2 border-b text-right font-semibold">{formatCurrency(item.tax_amount)}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(item.total_price)}</td>
+                            <td className="p-2 border-b">{item.invoice_status}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>Total</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{getTotal('quantity')}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('tax_amount'))}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('total_price'))}</td>
+                          <td className="p-3 border-t-2 border-gray-800 font-bold text-right"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
               
               <p className="text-sm mt-5 text-gray-600">
@@ -476,12 +488,12 @@ const SalesbyProductDetail: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && data.length > 0 && (
+      {showPrintPreview && filteredData.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Sales by Product Detail
+                Print Preview - Transaction Details by Tax Code
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -496,8 +508,8 @@ const SalesbyProductDetail: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Sales by Product Detail</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Product: {productName}</h2>
+                    <h1 className="text-3xl font-bold mb-2">Transaction Details by Tax Code</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Tax Detail Report</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
@@ -505,10 +517,10 @@ const SalesbyProductDetail: React.FC = () => {
                       {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
-                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDateRange(startDate)} - ${formatDateRange(endDate)}`}
+                      {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
+                      {taxCode && ` | Tax Code: ${taxCode}%`}
                     </p>
                   </div>
-
                   {selectedCompany?.company_logo && (
                     <img
                       src={`http://localhost:3000${selectedCompany.company_logo}`}
@@ -521,90 +533,71 @@ const SalesbyProductDetail: React.FC = () => {
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Invoice Number
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Invoice Date
+                        Date
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Customer
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Unit
+                        Product
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Cost
+                        Quantity
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Status
+                        Unit Price
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[100px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        QTY
+                        Tax Rate (%)
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Total Cost
+                        Tax Amount
                       </th>
-                      <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Total Price
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Status
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((item, index) => (
+                    {filteredData.map((item, index) => (
                       <tr key={index}>
-                        <td className="p-2 border-b font-medium">
-                          {item.invoice_number}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatDate(item.invoice_date)}
-                        </td>
-                        <td className="p-2 border-b">
-                          {item.customer_name}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {formatCurrency(item.unit_price)}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatCurrency(item.cost_price)}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                            {item.status}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {item.quantity}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatCurrency(item.total_cost)}
-                        </td>
-                        <td className="p-2 border-b text-right font-bold">
-                          {formatCurrency(item.total_price)}
-                        </td>
+                        <td className="p-2 border-b font-medium">{item.invoice_number}</td>
+                        <td className="p-2 border-b">{formatInvoiceDate(item.invoice_date)}</td>
+                        <td className="p-2 border-b">{item.customer_name}</td>
+                        <td className="p-2 border-b">{item.product_name}</td>
+                        <td className="p-2 border-b text-right">{item.quantity}</td>
+                        <td className="p-2 border-b text-right">{formatCurrency(item.unit_price)}</td>
+                        <td className="p-2 border-b text-right">{item.tax_rate}%</td>
+                        <td className="p-2 border-b text-right font-semibold">{formatCurrency(item.tax_amount)}</td>
+                        <td className="p-2 border-b text-right">{formatCurrency(item.total_price)}</td>
+                        <td className="p-2 border-b">{item.invoice_status}</td>
                       </tr>
                     ))}
                     <tr>
-                      <td colSpan={5} className="p-2 border-t-2 border-gray-800 font-bold">
-                        Total
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800"></td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {getTotal('quantity')}
-                      </td>
-                      <td className='p2 border-t-2 border-gray-800 font-bold text-center'>
-                        {formatCurrency(getTotal('total_cost'))}
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_price'))}
-                      </td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={4}>Total</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{getTotal('quantity')}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('tax_amount'))}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(getTotal('total_price'))}</td>
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right"></td>
                     </tr>
                   </tbody>
                 </table>
@@ -618,7 +611,7 @@ const SalesbyProductDetail: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Sales by Product Detail - {productName}
+                        Transaction Details by Tax Code Report
                       </p>
                     </div>
                   </div>
@@ -647,4 +640,4 @@ const SalesbyProductDetail: React.FC = () => {
   );
 };
 
-export default SalesbyProductDetail;
+export default TransactionDetailsByTaxCode;

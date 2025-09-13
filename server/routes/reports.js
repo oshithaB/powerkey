@@ -6,6 +6,10 @@ const salesReportController = require('../controllers/reports/salesreport_contro
 const aragingReportController = require('../controllers/reports/ar_aging_controller');
 const balanceSheetController = require('../controllers/reports/balancesheet_controller');
 const salesAndCustomerController = require('../controllers/reports/Sales&Customers/sales$customers_controller');
+const employeeController = require('../controllers/reports/Employees/Employee_controller');
+const salesTaxController = require('../controllers/reports/SalesTax/sales_tax_controller');
+const expensesAndSuppliersController = require('../controllers/reports/Expenses&Suppliers/expenses_and_suppliers');
+const whoOwesYouController = require('../controllers/reports/WhoOwesYou/whoOwesYou_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -46,6 +50,20 @@ const {
     getFormattedBalanceSheet,
 } = balanceSheetController;
 
+// Import who owes you controller functions
+const {
+    getOpenInvoices,
+    getCollectionReport,
+    getCustomerBalanceSummary,
+    getCustomerBalanceDetail,
+    getInvoiceList,
+    getTermsList,
+    getStatementList,
+    getUnbilledCharges,
+    getUnbilledTime,
+} = whoOwesYouController
+
+
 // Importing customer contact controller functions
 const {
     getCustomerContacts,
@@ -68,6 +86,29 @@ const {
     getCustomerPhoneList,
     getSalesByCustomerIDDetail,
 } = salesAndCustomerController;
+
+// Importing expenses and suppliers controller functions
+const {
+    getVendorsContactDetails,
+} = expensesAndSuppliersController;
+
+// Importing sales tax controller functions
+const {
+    SSCL100percentTaxDetail,
+    VAT18percentTaxDetail,
+    SSCL100percentTaxException,
+    VAT18percentTaxException,
+    SSCL100percentTaxSummary,
+    VAT18percentTaxSummary,
+    taxLiabilityReport,
+    transactionDetailByTaxCode
+} = salesTaxController;
+
+
+// Importing employee report controller functions
+const {
+    getEmployeeContacts,
+} = employeeController;
 
 //====================================================================================================================
 
@@ -158,7 +199,22 @@ router.get (
     getSalesReportByEmployeeId
 );
 
-// A/R Aging Summary Report Route
+// Balance Sheet Report Route
+router.get(
+    '/balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getBalanceSheetData
+);
+
+router.get(
+    '/formatted-balance-sheet/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getFormattedBalanceSheet
+);
+
+// Who Owes you routes
 router.get(
     '/ar-aging-summary/:company_id',
     verifyToken,
@@ -180,19 +236,26 @@ router.get(
     getARAgingSummaryInDetails
 );
 
-// Balance Sheet Report Route
 router.get(
-    '/balance-sheet/:company_id',
+    '/open-invoices/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'staff', 'sales']),
-    getBalanceSheetData
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getOpenInvoices
 );
 
 router.get(
-    '/formatted-balance-sheet/:company_id',
+    '/invoice-list/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'staff', 'sales']),
-    getFormattedBalanceSheet
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getInvoiceList
+);
+
+// Expenses and Suppliers routes
+router.get(
+    '/vendor-contacts/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'accountant']),
+    getVendorsContactDetails
 );
 
 
@@ -328,6 +391,71 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getSalesByCustomerIDDetail
+);
+
+// Sales Tax routes
+router.get(
+    '/sscl-100percent-tax-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxDetail
+);
+
+router.get(
+    '/vat-18percent-tax-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxDetail
+);
+
+router.get(
+    '/sscl-100percent-tax-exception/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxException
+);
+
+router.get(
+    '/vat-18percent-tax-exception/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxException
+);
+
+router.get(
+    '/sscl-100percent-tax-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    SSCL100percentTaxSummary
+);
+
+router.get(
+    '/vat-18percent-tax-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    VAT18percentTaxSummary
+);
+
+router.get(
+    '/tax-liability-report/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    taxLiabilityReport
+);
+
+router.get(
+    '/transaction-detail-by-tax-code/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'accountant']),
+    transactionDetailByTaxCode
+);
+
+// Employee routes
+router.get(
+    '/employee-contacts',
+    verifyToken,
+    authorizedRoles(['admin', 'manager', 'hr']),
+    getEmployeeContacts
 );
 
 module.exports = router;

@@ -36,9 +36,8 @@ import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
 import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
 import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
 import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossByCustomerInDetail';
-import ARAgingSummaryReport from './components/reports/ARAgingSummaryReport';
-import ARAgingSummaryInDetails from './components/reports/ARAgingSummaryInDetails';
 
+// Sales & Customers Reports
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
 import ProductAndServiceList from './components/reports/Sales&Customers/ProductAndServiceList';
 import SalesbyCustomerSummary from './components/reports/Sales&Customers/SalesbyCustomerSummary';
@@ -48,6 +47,24 @@ import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyPr
 import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
 import EstimatesbyCustomers from './components/reports/Sales&Customers/EstimatesbyCustomers';
 import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
+
+// Who Owes You Reports
+import ARAgingSummaryReport from './components/reports/WhoOwesYou/ARAgingSummaryReport';
+import ARAgingSummaryInDetails from './components/reports/WhoOwesYou/ARAgingSummaryInDetails';
+import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
+import OpenInvoices from './components/reports/WhoOwesYou/OpenInvoices';
+import InvoiceList from './components/reports/WhoOwesYou/InvoiceList';
+
+// Expense and Suppliers Reports
+import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
+
+// Sales Tax
+import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
+import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
+import TransactionDetailsByTaxCode from './components/reports/SalesTax/TransactionDetailsByTaxCode';
+
+// Employees
+import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
 
 import NotFound from './components/NotFound/NotFound';
 
@@ -317,25 +334,6 @@ function AppContent() {
         />
 
         <Route
-          path="/reports/ar-aging-summary"
-          element={
-            <ProtectedRoute>
-              <ARAgingSummaryReport />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/reports/ar-aging-in-detail/:customerId"
-          element={
-            <ProtectedRoute>
-              <ARAgingSummaryInDetails />
-            </ProtectedRoute>
-          }
-        />
-
-
-        <Route
           path="/reports/customer-contact-list"
           element={
             <ProtectedRoute>
@@ -412,6 +410,101 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <StockTakeWorksheet />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Who Owes you section */}
+        <Route
+          path="/reports/ar-aging-summary"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/ar-aging-in-detail/:customerId"
+          element={
+            <ProtectedRoute>
+              <ARAgingSummaryInDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/invoices-and-payments"
+          element={
+            <ProtectedRoute>
+              <InvoicesAndRecievePayments />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/open-invoices"
+          element={
+            <ProtectedRoute>
+              <OpenInvoices />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/invoice-list"
+          element={
+            <ProtectedRoute>
+              <InvoiceList />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Expense & Suppliers section */}
+        <Route
+          path="/reports/supplier-contact-list"
+          element={
+            <ProtectedRoute>
+              <SupplierContactDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Sales Tax section */}
+        <Route
+          path="/reports/sscl-tax-detail"
+          element={
+            <ProtectedRoute>
+              <SSCL100percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/vat-18-tax-detail"
+          element={
+            <ProtectedRoute>
+              <VAT18percentTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/transaction-detail-by-tax-code"
+          element={
+            <ProtectedRoute>
+              <TransactionDetailsByTaxCode />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* Employee section */}
+        <Route
+          path="/reports/employee-contact-list"
+          element={
+            <ProtectedRoute>
+              <EmployeeContactDetails />
             </ProtectedRoute>
           }
         />

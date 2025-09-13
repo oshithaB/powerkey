@@ -17,6 +17,7 @@ interface Invoice {
   totalAmount: string;
   customerId: string;
   customerName: string;
+  status: string;
 }
 
 interface SalesData {
@@ -272,7 +273,7 @@ const SalesReportByEmployees: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm">Employee Sales Details</p>
+                <p className="text-sm">Employee Sales Details for All Companies</p>
                 <p className="text-sm">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -298,6 +299,7 @@ const SalesReportByEmployees: React.FC = () => {
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Company</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Date</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Customer</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Status</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Discount Amount</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Amount</th>
                         </tr>
@@ -309,12 +311,13 @@ const SalesReportByEmployees: React.FC = () => {
                             <td className="p-2 border-b">{invoice.companyName}</td>
                             <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
                             <td className="p-2 border-b">{invoice.customerName}</td>
+                            <td className="p-2 border-b">{invoice.status}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
                           </tr>
                         ))}
                         <tr>
-                          <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={5}>Total Sales</td>
+                          <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={6}>Total Sales</td>
                           <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totalSalesAmount)}</td>
                         </tr>
                       </tbody>
@@ -358,7 +361,7 @@ const SalesReportByEmployees: React.FC = () => {
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">Employee Sales Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Details</h2>
+                    <h2 className="text-xl text-gray-600 mb-2">Employee Sales Details for All Companies</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
                     </h2>

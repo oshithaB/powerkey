@@ -449,7 +449,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
         `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
         [newBalance, customer_id, company_id]
       );
-    }
+    } 
 
     // Update existing invoice
     const [updateResult] = await connection.query(
@@ -1089,9 +1089,10 @@ const recordPayment = asyncHandler(async (req, res) => {
       // Update customer credit limit
       await connection.query(
         `UPDATE customer 
-         SET credit_limit = credit_limit - ?
+         SET credit_limit = credit_limit - ?,
+         current_balance = current_balance - ?
          WHERE id = ? AND company_id = ?`,
-        [invoicePaymentAmount, customerId, company_id]
+        [invoicePaymentAmount, invoicePaymentAmount, customerId, company_id]
       );
       
       // Update invoice - paid_amount and balance_due are updated, but status is preserved for proforma

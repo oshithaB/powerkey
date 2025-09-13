@@ -70,6 +70,8 @@ const createExpense = async (req, res) => {
 const getExpenses = async (req, res) => {
   const { company_id } = req.params;
 
+  console.log('Fetching expenses for company ID:', company_id);
+
   if (!company_id) {
     return res.status(400).json({ error: 'Company ID is required.' });
   }
@@ -167,6 +169,8 @@ const addCategory = async (req, res) => {
 const getExpenseCategories = async (req, res) => {
   const { company_id } = req.params;
 
+  console.log('Fetching categories for company ID:', company_id);
+
   if (!company_id) {
     return res.status(400).json({ error: 'Company ID is required.' });
   }
@@ -183,20 +187,28 @@ const getExpenseCategories = async (req, res) => {
 };
 
 const addPaymentAccount = async (req, res) => {
-  const { name, company_id } = req.body;
+  const { company_id } = req.params;
 
-  if (!name || name.trim() === '' || !company_id) {
-    return res.status(400).json({ error: 'Payment account name and company ID are required.' });
-  }
+  const { name, account_type, detail_type, description } = req.body;
+
+  console.log('Received data:', req.body);
+
+  // if (!name || name.trim() === '' || !company_id) {
+  //   return res.status(400).json({ error: 'Payment account name and company ID are required.' });
+  // }
+
+  console.log('Creating payment account with:', { name, account_type, detail_type, company_id, description });
 
   try {
-    const query = 'INSERT INTO payment_accounts (name, company_id) VALUES (?, ?)';
-    const [result] = await db.execute(query, [name.trim(), company_id]);
+    const query = 'INSERT INTO payment_account (payment_account_name, account_type_id, detail_type_id, company_id, description) VALUES (?, ?, ?, ?, ?)';
+    const [result] = await db.execute(query, [name, account_type, detail_type, company_id, description]);
+
+    console.log('Insert result:', result);
 
     res.status(201).json({
-      message: 'Payment account created successfully.',
-      paymentAccountId: result.insertId,
-      name: name.trim()
+      id: result.insertId,
+      name: name?.trim(),
+      message: "Payment account created successfully.",
     });
   } catch (error) {
     console.error('Error creating payment account:', error);
@@ -212,13 +224,110 @@ const getPaymentAccounts = async (req, res) => {
   }
 
   try {
-    const query = 'SELECT * FROM payment_accounts WHERE company_id = ?';
+    const query = 'SELECT * FROM payment_account WHERE company_id = ?';
     const [paymentAccounts] = await db.execute(query, [company_id]);
 
     res.status(200).json(paymentAccounts);
   } catch (error) {
     console.error('Error fetching payment accounts:', error);
     res.status(500).json({ error: 'Failed to fetch payment accounts.' });
+  }
+};
+
+const addPaymentAccountType = async (req, res) => {
+  const { company_id } = req.params;
+  const { account_type, details } = req.body;
+
+  console.log('Received data:', { company_id, account_type, details });
+
+  if (!company_id || !account_type || !details || !Array.isArray(details) || details.length === 0) {
+    return res.status(400).json({ error: 'Company ID, account type, and at least one detail are required.' });
+  }
+
+  try {
+
+    await db.query('START TRANSACTION');
+
+    // Insert into account_type table
+    const typeQuery = `
+      INSERT INTO account_type (company_id, account_type_name) 
+      VALUES (?, ?)
+    `;
+    const [typeResult] = await db.execute(typeQuery, [company_id, account_type.trim()]);
+    const accountTypeId = typeResult.insertId;
+
+    // Insert details into detail_type table
+    const detailQuery = `
+      INSERT INTO detail_type (account_type_id, detail_type_name) 
+      VALUES (?, ?)
+    `;
+    for (const detail of details) {
+      if (!detail || detail.trim() === '') {
+        throw new Error('Each detail must be a non-empty string.');
+      }
+      await db.execute(detailQuery, [accountTypeId, detail.trim()]);
+    }
+
+    // ✅ Use query for transaction control
+    await db.query('COMMIT');
+
+    res.status(201).json({
+      message: 'Payment account type and details created successfully.',
+      accountTypeId,
+      account_type: account_type.trim(),
+      details
+    });
+  } catch (err) {
+    // Rollback on error
+    await db.query('ROLLBACK');
+    console.error('Error creating payment account type:', err);
+    res.status(500).json({ error: 'Failed to create payment account type.' });
+  }
+};
+
+const getPaymentAccountTypes = async (req, res) => {
+  const { company_id } = req.params;
+
+  if (!company_id) {
+    return res.status(400).json({ error: 'Company ID is required.' });
+  }
+
+  try {
+    const typeQuery = `
+      SELECT * FROM account_type WHERE company_id = ?
+    `;
+    const [types] = await db.execute(typeQuery, [company_id]);
+
+    if (types.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    return res.status(200).json(types);
+
+  } catch (error) {
+    console.error('Error fetching payment account types:', error);
+    res.status(500).json({ error: 'Failed to fetch payment account types.' });
+  }
+};
+
+const getDetailTypesByAccountTypeId = async (req, res) => {
+  const { account_type_id } = req.params;
+
+  if (!account_type_id) {
+    return res.status(400).json({ error: 'Account Type ID is required.' });
+  }
+
+  try {
+    const detailQuery = `
+      SELECT * 
+      FROM detail_type WHERE account_type_id = ?
+    `;
+    const [details] = await db.execute(detailQuery, [account_type_id]);
+
+    return res.status(200).json(details);
+  } catch (error) {
+    console.error('Error fetching detail types:', error);
+    res.status(500).json({ error: 'Failed to fetch detail types.' });
   }
 };
 
@@ -230,5 +339,8 @@ module.exports = {
   addCategory,
   getExpenseCategories,
   addPaymentAccount,
-  getPaymentAccounts
+  getPaymentAccounts,
+  addPaymentAccountType,
+  getPaymentAccountTypes,
+  getDetailTypesByAccountTypeId
 };

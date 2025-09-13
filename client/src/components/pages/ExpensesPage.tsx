@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, Receipt, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -57,7 +57,8 @@ export default function ExpensesPage() {
 
   const fetchExpenses = async () => {
     try {
-      const response = await axios.get(`/api/getExpenses/${selectedCompany?.company_id}`);
+      console.log('Fetching expenses for company:', selectedCompany?.company_id);
+      const response = await axiosInstance.get(`/api/getExpenses/${selectedCompany?.company_id}`);
       setExpenses(response.data);
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -80,11 +81,11 @@ export default function ExpensesPage() {
       }
 
       if (editingExpense) {
-        await axios.put(`/api/expenses/${selectedCompany?.company_id}/${editingExpense.id}`, submitData, {
+        await axiosInstance.put(`/api/expenses/${selectedCompany?.company_id}/${editingExpense.id}`, submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       } else {
-        await axios.post(`/api/expenses/${selectedCompany?.company_id}`, submitData, {
+        await axiosInstance.post(`/api/expenses/${selectedCompany?.company_id}`, submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       }
@@ -116,7 +117,7 @@ export default function ExpensesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        await axios.delete(`/api/expenses/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/expenses/${selectedCompany?.company_id}/${id}`);
         fetchExpenses();
       } catch (error) {
         console.error('Error deleting expense:', error);

@@ -11,28 +11,29 @@ interface ExpenseModalProps {
 }
 
 interface ExpenseItem {
-  product_id: number;
-  product_name: string;
+  category_id: number;
+  category_name: string;
   description: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
+  amount: number;
 }
 
 interface Category {
   id: number;
-  name: string;
+  category_name: string;
 }
 
 interface PaymentAccount {
   id: number;
-  name: string;
+  payment_account_name: string;
+  account_type_id: number;
+  detail_type_id: number;
+  description?: string;
 }
 
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, accountType?: string, description?: string) => Promise<void>;
+  onCreate: (name: string, accountType?: string, detailType?: string, description?: string) => Promise<void>;
   existingMethods: string[];
   title: string;
   label: string;
@@ -43,10 +44,8 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [paymentAccountFilter, setPaymentAccountFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
@@ -57,11 +56,11 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
   const [isCreatePaymentAccountModalOpen, setIsCreatePaymentAccountModalOpen] = useState(false);
   const [isCreatePaymentMethodModalOpen, setIsCreatePaymentMethodModalOpen] = useState(false);
+  const [isCreatePaymentAccountTypeModalOpen, setIsCreatePaymentAccountTypeModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const initialFormData = {
     expense_number: `EXP-${Date.now()}`,
-    category_id: '',
     payment_account_id: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: '',
@@ -76,18 +75,17 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   } : initialFormData);
 
   const initialItems = [{
-    product_id: 0,
-    product_name: '',
+    category_id: 0,
+    category_name: '',
     description: '',
-    quantity: 0,
-    unit_price: 0,
-    total_price: 0,
+    amount: 0,
   }];
 
   const [items, setItems] = useState<ExpenseItem[]>(expense?.items || initialItems);
 
   const fetchCategories = async () => {
     try {
+      console.log('Fetching expense categories for company:', selectedCompany?.company_id);
       const response = await axiosInstance.get(`/api/getExpenseCategories/${selectedCompany?.company_id}`);
       setCategories(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
@@ -103,16 +101,6 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     } catch (error) {
       console.error('Error fetching payment accounts:', error);
       setError('Failed to fetch payment accounts');
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const response = await axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`);
-      setProducts(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setError('Failed to fetch products');
     }
   };
 
@@ -138,12 +126,10 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
-  const handleCreateCategory = async (name: string, type?: string, description?: string) => {
+  const handleCreateCategory = async (name: string) => {
     try {
       const response = await axiosInstance.post(`/api/categories/${selectedCompany?.company_id}`, {
         name,
-        category_type: type || null,
-        description: description || null,
       });
       const newCategory = response.data;
       setCategories((prev) => [...prev, newCategory]);
@@ -156,10 +142,13 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
-  const handleCreatePaymentAccount = async (name: string) => {
+  const  handleCreatePaymentAccount = async (name: string, accountType?: string, detailType?: string, description?: string) => {
     try {
-      const response = await axiosInstance.post(`/api/payment-accounts/${selectedCompany?.company_id}`, {
+      const response = await axiosInstance.post(`/api/addPaymentAccount/${selectedCompany?.company_id}`, {
         name,
+        account_type: accountType,
+        detail_type: detailType,
+        description,
       });
       const newAccount = response.data;
       setPaymentAccounts((prev) => [...prev, newAccount]);
@@ -190,11 +179,25 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
+  const handleCreatePaymentAccountType = async (accountType: string, details: string[]) => {
+    try {
+      await axiosInstance.post(`/api/addPaymentAccountType/${selectedCompany?.company_id}`, {
+        account_type: accountType,
+        details,
+      });
+      setIsCreatePaymentAccountTypeModalOpen(false);
+      alert('Payment account type created successfully.');
+    } catch (error) {
+      console.error('Error creating payment account type:', error);
+      alert('Failed to create payment account type.');
+    }
+  };
+
   useEffect(() => {
     if (selectedCompany) {
       fetchCategories();
       fetchPaymentAccounts();
-      fetchProducts();
+      // fetchProducts();
       fetchPaymentMethods();
     }
   }, [selectedCompany]);
@@ -202,36 +205,33 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   useEffect(() => {
     if (activeSuggestionIndex !== null) {
       const activeItem = items[activeSuggestionIndex];
-      if (activeItem?.product_name) {
-        const filteredSuggestions = products.filter(product =>
-          product.name.toLowerCase().includes(activeItem.product_name.toLowerCase())
+      if (activeItem?.category_name) {
+        const filteredSuggestions = categories.filter(category =>
+          category.category_name.toLowerCase().includes(activeItem.category_name.toLowerCase())
         );
-        setProductSuggestions(filteredSuggestions);
+        setCategorySuggestions(filteredSuggestions);
       } else {
-        setProductSuggestions(products);
+        setCategorySuggestions(categories);
       }
     } else {
-      setProductSuggestions([]);
+      setCategorySuggestions([]);
     }
-  }, [items, products, activeSuggestionIndex]);
+  }, [items, categories, activeSuggestionIndex]);
 
   const updateItem = (index: number, field: keyof ExpenseItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
-    if (field === 'product_id' && value) {
-      const product = products.find(p => p.id === parseInt(value));
-      if (product) {
-        updatedItems[index].product_name = product.name;
-        updatedItems[index].description = product.description || '';
-        updatedItems[index].unit_price = product.unit_price || 0;
-        updatedItems[index].product_id = product.id;
+    if (field === 'category_id' && value) {
+      const category = categories.find(c => c.id === parseInt(value));
+      if (category) {
+        updatedItems[index].category_name = category.category_name;
       }
     }
 
-    if (field === 'quantity' || field === 'unit_price') {
+    if (field === 'amount') {
       const item = updatedItems[index];
-      item.total_price = Number((item.quantity * item.unit_price).toFixed(2));
+      item.amount = Number((item.amount).toFixed(2));
     }
 
     setItems(updatedItems);
@@ -239,14 +239,12 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
   const addItem = () => {
     setItems([...items, {
-      product_id: 0,
-      product_name: '',
+      category_id: 0,
+      category_name: '',
       description: '',
-      quantity: 0,
-      unit_price: 0,
-      total_price: 0,
+      amount: 0,
     }]);
-    setProductSuggestions(products);
+    setCategorySuggestions(categories);
   };
 
   const removeItem = (index: number) => {
@@ -254,7 +252,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   };
 
   const calculateTotal = () => {
-    return Number(items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2));
+    return Number(items.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -272,7 +270,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       if (!formData.payment_date) {
         throw new Error('Payment date is required');
       }
-      if (!items.some(item => item.product_id !== 0)) {
+      if (!items.some(item => item.category_id !== 0)) {
         throw new Error('At least one valid item is required');
       }
 
@@ -281,15 +279,14 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
-        category_id: parseInt(formData.category_id) || null,
         payment_account_id: parseInt(formData.payment_account_id) || null,
         total_amount: Number(total),
         items: items.map(item => ({
           ...item,
-          product_id: parseInt(item.product_id as any) || null,
-          quantity: Number(item.quantity),
-          unit_price: Number(item.unit_price),
-          total_price: Number(item.total_price),
+          category_id: parseInt(item.category_id as any) || null,
+          category_name: item.category_name,
+          description: item.description,
+          amount: Number(item.amount), 
         })),
       };
 
@@ -385,14 +382,10 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const CreateCategoryModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onCreate: (name: string, type?: string, description?: string) => Promise<void>;
+    onCreate: (name: string) => Promise<void>;
     existingMethods: string[];
   }> = ({ isOpen, onClose, onCreate, existingMethods }) => {
     const [newName, setNewName] = useState('');
-    const [categoryType, setCategoryType] = useState('');
-    const [description, setDescription] = useState('');
-  
-    const categoryTypes = ['Operational', 'Administrative', 'Marketing', 'Miscellaneous'];
   
     const handleCreate = async () => {
       const trimmedName = newName.trim();
@@ -404,10 +397,8 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
         alert('Category already exists.');
         return;
       }
-      await onCreate(trimmedName, categoryType, description);
+      await onCreate(trimmedName);
       setNewName('');
-      setCategoryType('');
-      setDescription('');
     };
   
     if (!isOpen) return null;
@@ -434,31 +425,6 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
               required
             />
           </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category Type</label>
-            <select
-              value={categoryType}
-              onChange={(e) => setCategoryType(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">Select Category Type</option>
-              {categoryTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input w-full min-h-[80px]"
-              placeholder="Enter category description"
-              maxLength={200}
-            />
-          </div>
           <div className="flex justify-end space-x-2">
             <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
               Cancel
@@ -473,19 +439,26 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   };
 
   // payment account modal
-  const CreatePaymentAccountModal: React.FC<CreateModalProps> = ({
-    isOpen,
-    onClose,
-    onCreate,
-    existingMethods,
-    title,
-    label,
-  }) => {
+  const CreatePaymentAccountModal: React.FC<CreateModalProps> = ({isOpen, onClose, onCreate, existingMethods, title, label}) => {
     const [newName, setNewName] = useState('');
     const [accountType, setAccountType] = useState('');
+    const [detailType, setDetailType] = useState('');
     const [description, setDescription] = useState('');
-  
-    const accountTypes = ['Operational', 'Administrative', 'Marketing', 'Miscellaneous'];
+    const [accountTypes, setAccountTypes] = useState<string[]>([]);
+    const [detailTypes, setDetailTypes] = useState<string[]>([]);
+
+    useEffect(() => {
+      const fetchAccountTypes = async () => {
+        try {
+          const response = await axiosInstance.get(`/api/getPaymentAccountTypes/${selectedCompany?.company_id}`);
+          setAccountTypes(response.data);
+        } catch (error) {
+          console.error('Error fetching account types:', error);
+        }
+      };
+      fetchAccountTypes();
+    }, [selectedCompany]);
+
   
     const handleCreate = async () => {
       const trimmedName = newName.trim();
@@ -497,10 +470,20 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
         alert(`${label} already exists.`);
         return;
       }
-      await onCreate(trimmedName, accountType, description);
+      await onCreate(trimmedName, accountType || undefined, detailType || undefined, description || undefined);
       setNewName('');
       setAccountType('');
+      setDetailType('');
       setDescription('');
+    };
+
+    const fetchDetailTypes = async(id: string) => {
+      try {
+        const detailTypes = await axiosInstance.get(`/api/getPaymentAccountTypeDetails/${id}`);
+        setDetailTypes(detailTypes.data || []);
+      } catch (error) {
+        console.error('Error fetching detail types:', error);
+      }
     };
   
     if (!isOpen) return null;
@@ -527,21 +510,50 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
               required
             />
           </div>
+
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Account Type *</label>
             <select
               value={accountType}
-              onChange={(e) => setAccountType(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === 'create_new') {
+                  setIsCreatePaymentAccountTypeModalOpen(true);
+                  setIsCreatePaymentAccountModalOpen(false);
+                } else {
+                  setAccountType(e.target.value);
+                  fetchDetailTypes(e.target.value);
+                }
+              }}
               className="input w-full"
+              required
             >
-              <option value="">Select Account Type</option>
-              {accountTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+              <option value="" disabled>Select Account Type</option>
+              <option value="create_new">+ Create New Payment Account Type</option>
+              {accountTypes.map((type: any, index: number) => (
+                <option key={index} value={type.id}>
+                  {type.account_type_name}
                 </option>
               ))}
             </select>
           </div>
+
+            <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Detail Type *</label>
+            <select
+              value={detailType}
+              onChange={(e) => setDetailType(e.target.value)}
+              className="input w-full"
+              required
+              disabled={!accountType}
+            >
+              <option value="" disabled>Select Detail Type</option>
+              {detailTypes.map((type: any, index: number) => (
+                <option key={index} value={type.id}>
+                  {type.detail_type_name}
+                </option>
+              ))}
+            </select>
+            </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
@@ -565,7 +577,143 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     );
   };
 
-  return (
+  const PaymentAccountTypeModal: React.FC<{isOpen: boolean; onClose: () => void; onSave: (accountType: string, details: string[]) => Promise<void>;}> = ({ isOpen, onClose, onSave }) => {
+
+    const [accountType, setAccountType] = useState('');
+    const [items, setItems] = useState<string[]>([]);
+    const [newItem, setNewItem] = useState('');
+
+    const addItem = () => {
+      if (!newItem.trim()) return;
+      setItems([...items, newItem.trim()]);
+      setNewItem('');
+    };
+
+    const removeItem = (index: number) => {
+      setItems(items.filter((_, i) => i !== index));
+    };
+
+    const handleSave = async () => {
+      if (!accountType.trim()) {
+        alert('Account type name is required.');
+        return;
+      }
+      await onSave(accountType, items);
+      setAccountType('');
+      setItems([]);
+      onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Create Payment Account Type</h2>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Account Type Input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Account Type Name *</label>
+            <input
+              type="text"
+              value={accountType}
+              onChange={(e) => setAccountType(e.target.value)}
+              className="input w-full"
+              placeholder="Enter account type name"
+              maxLength={50}
+              required
+            />
+          </div>
+
+          {/* Items Header + Add Button */}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Detail Types *</label>
+            <div className="flex justify-between items-center mb-2">
+            <input
+              type="text"
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              className="input mr-2 flex-1"
+              placeholder="Enter detail type"
+              maxLength={50}
+            />
+            <button
+              type="button"
+              onClick={addItem}
+              className="btn btn-secondary btn-sm flex items-center"
+              style={{ width: 'auto' }}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </button>
+            </div>
+
+          {/* Items Table */}
+          <div className="overflow-x-auto mb-4">
+            <table className="min-w-full border border-gray-200">
+              <thead className="bg-gray-50">
+              <tr>
+                <th
+                className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+                style={{ width: '90%' }}
+                >
+                Detail Type
+                </th>
+                <th
+                className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+                style={{ width: '10%' }}
+                >
+                Action
+                </th>
+              </tr>
+              </thead>
+              <tbody>
+              {items.map((item, index) => (
+                <tr key={index} className="border-t">
+                <td className="px-4 py-2" style={{ width: '90%' }}>{item}</td>
+                <td className="px-4 py-2" style={{ width: '10%' }}>
+                  <button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  className="text-red-600 hover:text-red-900"
+                  >
+                  <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                <td colSpan={2} className="px-4 py-4 text-center text-gray-400 uppercase text-sm">
+                  No detail types added
+                </td>
+                </tr>
+              )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
+              Cancel
+            </button>
+            <button type="button" onClick={handleSave} className="btn btn-primary btn-md">
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
+  return ( 
     <motion.div
       initial={{ opacity: 0, y: 100 }}
       animate={{ opacity: 1, y: 0 }}
@@ -621,7 +769,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                 />
               </div>
 
-                <div>
+                {/* <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                         Category *
                     </label>
@@ -648,7 +796,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                         </option>
                         ))}
                     </select>
-                </div>
+                </div> */}
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -671,9 +819,9 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                         Select Payment Account
                         </option>
                         <option value="create_new">+ Create New Payment Account</option>
-                        {paymentAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                            {account.name}
+                        {paymentAccounts.map((account, index) => (
+                        <option key={index} value={account.id}>
+                            {account.payment_account_name}
                         </option>
                         ))}
                     </select>
@@ -738,11 +886,11 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                 <table className="min-w-full border border-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      {/* <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th> */}
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
                   </thead>
@@ -752,59 +900,69 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                         <td className="px-4 py-2">
                           <input
                             type="text"
-                            value={item.product_name || ''}
+                            value={item.category_name || ''}
                             onChange={(e) => {
-                              updateItem(index, 'product_name', e.target.value);
+                              updateItem(index, 'category_name', e.target.value);
                               setActiveSuggestionIndex(index);
                             }}
                             onFocus={() => {
                               setActiveSuggestionIndex(index);
-                              const filtered = products.filter(product =>
-                                product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
+                              const filtered = categories.filter(category =>
+                                category.category_name.toLowerCase().includes(item.category_name?.toLowerCase() || '')
                               );
-                              setProductSuggestions(filtered.length > 0 ? filtered : products);
+                              setCategorySuggestions(filtered.length > 0 ? filtered : categories);
                             }}
                             onBlur={() => {
                               setTimeout(() => {
                                 if (activeSuggestionIndex === index) {
-                                  setProductSuggestions([]);
+                                  setCategorySuggestions([]);
                                   setActiveSuggestionIndex(null);
                                 }
                               }, 200);
                             }}
-                            placeholder="Search product"
+                            placeholder="Search Category"
                             className="border rounded px-2 py-1 w-full"
                           />
-                          {activeSuggestionIndex === index && productSuggestions.length > 0 && (
-                            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
-                              {productSuggestions.map(product => (
+                          {activeSuggestionIndex === index && (
+                            <ul
+                              className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
+                              style={{
+                                maxHeight: '240px',
+                                maxWidth: '420px',
+                                minWidth: '220px',
+                                overflowY: 'auto',
+                                overflowX: 'auto',
+                                width: '420px',
+                              }}
+                            >
+                              <li
+                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t"
+                                onMouseDown={() => {
+                                  setIsCreateCategoryModalOpen(true);
+                                  setCategorySuggestions([]);
+                                  setActiveSuggestionIndex(null);
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create New Category
+                              </li>
+                              {categorySuggestions.map(category => (
                                 <li
-                                  key={product.id}
+                                  key={category.id}
                                   className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
                                   onMouseDown={() => {
                                     const updatedItems = [...items];
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 1,
-                                      product_id: product.id,
-                                      product_name: product.name,
-                                      description: product.description || '',
-                                      unit_price: product.unit_price || 0,
-                                      total_price: product.unit_price || 0,
+                                      category_id: category.id,
+                                      category_name: category.category_name,
                                     };
                                     setItems(updatedItems);
-                                    setProductSuggestions([]);
+                                    setCategorySuggestions([]);
                                     setActiveSuggestionIndex(null);
                                   }}
                                 >
-                                  {product.image && (
-                                    <img
-                                      src={`http://localhost:3000${product.image}`}
-                                      alt={product.name}
-                                      className="w-8 h-8 object-cover mr-2 rounded"
-                                    />
-                                  )}
-                                  <span>{product.name}</span>
+                                  <span>{category.category_name}</span>
                                 </li>
                               ))}
                             </ul>
@@ -816,18 +974,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                             className="input"
                             value={item.description}
                             onChange={(e) => updateItem(index, 'description', e.target.value)}
-                            placeholder="Item description"
-                            required
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            className="input w-20"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            placeholder="Description"
                             required
                           />
                         </td>
@@ -837,13 +984,10 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                             step="0.01"
                             min="0"
                             className="input w-24"
-                            value={item.unit_price}
-                            onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            value={item.amount}
+                            onChange={(e) => updateItem(index, 'amount', parseFloat(e.target.value) || 0)}
                             required
                           />
-                        </td>
-                        <td className="px-4 py-2 text-center border border-gray-200">
-                          Rs. {item.total_price.toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
                           <button
@@ -910,16 +1054,19 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
             isOpen={isCreateCategoryModalOpen}
             onClose={() => setIsCreateCategoryModalOpen(false)}
             onCreate={handleCreateCategory}
-            existingMethods={categories.map(c => c.name.toLowerCase())}
-            />
+            existingMethods={categories.map(c => c.category_name.toLowerCase())}
+          />
             <CreatePaymentAccountModal
             isOpen={isCreatePaymentAccountModalOpen}
             onClose={() => setIsCreatePaymentAccountModalOpen(false)}
             onCreate={handleCreatePaymentAccount}
-            existingMethods={paymentAccounts.map(a => a.name.toLowerCase())}
+            existingMethods={paymentAccounts
+              .filter(a => a && a.payment_account_name) // only keep objects with a valid name
+              .map(a => a.payment_account_name.toLowerCase())
+            }
             title="Create New Payment Account"
             label="Payment Account"
-            />
+          />
             <CreatePaymentMethodModal
             isOpen={isCreatePaymentMethodModalOpen}
             onClose={() => setIsCreatePaymentMethodModalOpen(false)}
@@ -927,7 +1074,18 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
             existingMethods={paymentMethods.map(m => m.toLowerCase())}
             title="Create New Payment Method"
             label="Payment Method"
-            />
+          />
+
+          <PaymentAccountTypeModal
+            isOpen={isCreatePaymentAccountTypeModalOpen}
+            onClose={() => {
+              setIsCreatePaymentAccountTypeModalOpen(false);
+              setIsCreatePaymentAccountModalOpen(true);
+            }}
+            onSave={handleCreatePaymentAccountType}
+          />
+
+
         </div>
       </div>
     </motion.div>

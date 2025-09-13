@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import axios from 'axios';
+import axiosInstance from '../../axiosInstance';
 import { Plus, Search, Edit, Trash2, Receipt, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -34,7 +34,7 @@ export default function BillsPage() {
 
   const fetchBills = async () => {
     try {
-      const response = await axios.get(`/api/getBills/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getBills/${selectedCompany?.company_id}`);
       setBills(response.data);
     } catch (error) {
       console.error('Error fetching bills:', error);
@@ -50,7 +50,7 @@ export default function BillsPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this bill?')) {
       try {
-        await axios.delete(`/api/bills/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/bills/${selectedCompany?.company_id}/${id}`);
         fetchBills();
       } catch (error) {
         console.error('Error deleting bill:', error);

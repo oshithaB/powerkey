@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileText } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -70,6 +70,12 @@ export default function OrdersPage() {
             setOrderItems(response.data);
         } catch (error) {
             console.error('Error fetching order items:', error);
+        }
+    };
+
+    const handleConvertToBill = (order: Order) => {
+        if (window.confirm("Convert this purchase to a bill?")) {
+            navigate("/bill/create", { state: { orderId: order.id } });
         }
     };
 
@@ -186,6 +192,15 @@ export default function OrdersPage() {
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </button>
+                                            {order.status === 'closed' && (
+                                                <button
+                                                    onClick={() => handleConvertToBill(order)}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Convert to Bill"
+                                                >
+                                                    <FileText className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleDelete(order.id)}
                                                 className="text-red-600 hover:text-red-900"

@@ -355,19 +355,41 @@ async function createTables(db) {
             CONSTRAINT payments_ibfk_2 FOREIGN KEY (customer_id) REFERENCES customer (id),
             CONSTRAINT payments_ibfk_3 FOREIGN KEY (company_id) REFERENCES company (company_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`,
-        // `CREATE TABLE IF NOT EXISTS categories (
-        //     id INT AUTO_INCREMENT PRIMARY KEY,
-        //     name VARCHAR(100) NOT NULL UNIQUE,
-        //     description TEXT,
-        //     amount DECIMAL(15,2) DEFAULT 0.00,
-        //     tax_rate_id INT DEFAULT NULL,
-        //     employee_id INT DEFAULT NULL,
-        //     company_id INT NOT NULL,
-        //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        //     FOREIGN KEY (tax_rate_id) REFERENCES tax_rates(tax_rate_id) ON DELETE SET NULL,
-        //     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
-        //     FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
-        // )`
+
+        `CREATE TABLE IF NOT EXISTS account_type (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            account_type_name VARCHAR(100) NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS detail_type (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            detail_type_name VARCHAR(100) NOT NULL UNIQUE,
+            account_type_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_type_id) REFERENCES account_type(id) ON DELETE CASCADE
+        )`,
+        `CREATE TABLE IF NOT EXISTS payment_account (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            payment_account_name VARCHAR(100) NOT NULL,
+            account_type_id INT NOT NULL,
+            detail_type_id INT NOT NULL,
+            company_id INT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_type_id) REFERENCES account_type(id),
+            FOREIGN KEY (detail_type_id) REFERENCES detail_type(id),
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+        `CREATE TABLE IF NOT EXISTS expense_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category_name VARCHAR(100) NOT NULL,
+            company_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`
     ];
 
     for (const table of tables) {

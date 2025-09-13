@@ -11,7 +11,10 @@ const {
     addCategory,
     getExpenseCategories,
     addPaymentAccount,
-    getPaymentAccounts
+    getPaymentAccounts,
+    addPaymentAccountType,
+    getPaymentAccountTypes,
+    getDetailTypesByAccountTypeId
 } = require('../controllers/expense_controller');
 
 router.post(
@@ -22,7 +25,7 @@ router.post(
 );
 
 router.get(
-    '/getExpenses/:companyId',
+    '/getExpenses/:company_id',
     verifyToken,
     getExpenses
 );
@@ -48,22 +51,41 @@ router.post(
 );
 
 router.get(
-    '/getExpenseCategories/:companyId',
+    '/getExpenseCategories/:company_id',
     verifyToken,
     getExpenseCategories
 );
 
 router.post(
-    '/addPaymentAccount',
+    '/addPaymentAccount/:company_id',
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     addPaymentAccount
 );
 
 router.get(
-    '/getPaymentAccounts/:companyId',
+    '/getPaymentAccounts/:company_id',
     verifyToken,
     getPaymentAccounts
+);
+
+router.post(
+    '/addPaymentAccountType/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    addPaymentAccountType
+);
+
+router.get(
+    '/getPaymentAccountTypes/:company_id',
+    verifyToken,
+    getPaymentAccountTypes
+);
+
+router.get(
+    '/getPaymentAccountTypeDetails/:account_type_id',
+    verifyToken,
+    getDetailTypesByAccountTypeId
 );
 
 module.exports = router;

@@ -260,75 +260,193 @@ class ReportController {
      */
     static async getMonthlyProfitAndLoss(req, res) {
         try {
-            const { company_id, year } = req.params;
-            
+            const { company_id } = req.params;
+            const { year } = req.query;
+    
             if (!company_id) {
                 return res.status(400).json({
                     success: false,
                     message: 'Company ID is required'
                 });
             }
-
-            const targetYear = year || new Date().getFullYear();
-
-            const [monthlyData] = await db.execute(`
-                SELECT 
-                    MONTH(STR_TO_DATE(i.invoice_date, '%Y-%m-%d')) as month,
-                    MONTHNAME(STR_TO_DATE(i.invoice_date, '%Y-%m-%d')) as month_name,
-                    COALESCE(SUM(ii.quantity * ii.actual_unit_price), 0) as product_income,
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income,
-                    COALESCE(SUM(i.discount_amount), 0) as discounts_given,
-                    COALESCE(SUM(i.tax_amount), 0) as tax_income,
-                    COALESCE(SUM(ii.quantity * COALESCE(p.cost_price, 0)), 0) as cost_of_sales,
-                    COUNT(DISTINCT i.id) as invoice_count
-                FROM invoices i
-                INNER JOIN invoice_items ii ON i.id = ii.invoice_id
-                LEFT JOIN products p ON ii.product_id = p.id
-                WHERE i.company_id = ? 
-                AND YEAR(STR_TO_DATE(i.invoice_date, '%Y-%m-%d')) = ?
-                AND i.status IN ('paid', 'partially_paid', 'sent', 'opened')
-                GROUP BY MONTH(STR_TO_DATE(i.invoice_date, '%Y-%m-%d')), 
-                         MONTHNAME(STR_TO_DATE(i.invoice_date, '%Y-%m-%d'))
-                ORDER BY month
-            `, [company_id, targetYear]);
-
-            const processedData = monthlyData.map(row => {
-                const productIncome = parseFloat(row.product_income);
-                const shippingIncome = parseFloat(row.shipping_income);
-                const taxIncome = parseFloat(row.tax_income);
-                const discountsGiven = parseFloat(row.discounts_given);
-                const costOfSales = parseFloat(row.cost_of_sales);
+    
+            const selectedYear = year ? parseInt(year) : new Date().getFullYear();
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear();
+            const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-based
+    
+            // Define month names
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+    
+            // Determine which months to include
+            let monthsToInclude = 12;
+            if (selectedYear === currentYear) {
+                monthsToInclude = currentMonth; // Only show up to current month for current year
+            }
+    
+            const monthlyBreakdown = [];
+            let totalInventoryShrinkage = 0;
+    
+            // Loop through each month
+            for (let month = 1; month <= monthsToInclude; month++) {
+                // Create date range for the month
+                const startDate = new Date(selectedYear, month - 1, 1);
+                const endDate = new Date(selectedYear, month, 0); // Last day of the month
                 
+                const startDateStr = startDate.toISOString().split('T')[0];
+                const endDateStr = endDate.toISOString().split('T')[0];
+    
+                // 1. INCOME CALCULATIONS FOR THE MONTH
+                // Product Income
+                const [productIncomeResult] = await db.execute(`
+                    SELECT 
+                        COALESCE(SUM(ii.quantity * ii.actual_unit_price), 0) as product_income
+                    FROM invoices i
+                    INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // Shipping Income
+                const [shippingIncomeResult] = await db.execute(`
+                    SELECT 
+                        COALESCE(SUM(i.shipping_cost), 0) as shipping_income
+                    FROM invoices i
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // Tax Income
+                const [taxIncomeResult] = await db.execute(`
+                    SELECT 
+                        COALESCE(SUM(i.tax_amount), 0) as tax_income
+                    FROM invoices i
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // Discounts Given
+                const [discountsResult] = await db.execute(`
+                    SELECT 
+                        COALESCE(SUM(i.discount_amount), 0) as discounts_given
+                    FROM invoices i
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // 2. COST OF SALES CALCULATIONS FOR THE MONTH
+                // Cost of Sales
+                const [costOfSalesResult] = await db.execute(`
+                    SELECT 
+                        COALESCE(SUM(ii.quantity * p.cost_price), 0) as cost_of_sales
+                    FROM invoices i
+                    INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+                    LEFT JOIN products p ON ii.product_id = p.id
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // Inventory Shrinkage (placeholder - you may need to implement actual logic)
+                const [inventoryShrinkageResult] = await db.execute(`
+                    SELECT 0 as inventory_shrinkage
+                `);
+    
+                // Invoice Count for the month
+                const [invoiceCountResult] = await db.execute(`
+                    SELECT 
+                        COUNT(*) as invoice_count
+                    FROM invoices i
+                    WHERE i.company_id = ? 
+                    AND i.status != 'proforma'
+                    AND i.invoice_date BETWEEN ? AND ?
+                `, [company_id, startDateStr, endDateStr]);
+    
+                // Extract values
+                const productIncome = parseFloat(productIncomeResult[0]?.product_income || 0);
+                const shippingIncome = parseFloat(shippingIncomeResult[0]?.shipping_income || 0);
+                const taxIncome = parseFloat(taxIncomeResult[0]?.tax_income || 0);
+                const discountsGiven = parseFloat(discountsResult[0]?.discounts_given || 0);
+                const costOfSales = parseFloat(costOfSalesResult[0]?.cost_of_sales || 0);
+                const inventoryShrinkage = parseFloat(inventoryShrinkageResult[0]?.inventory_shrinkage || 0);
+                const invoiceCount = parseInt(invoiceCountResult[0]?.invoice_count || 0);
+    
+                // Calculate totals for the month
                 const totalIncome = productIncome + shippingIncome + taxIncome;
                 const netIncome = totalIncome - discountsGiven;
-                const grossProfit = netIncome - costOfSales;
-                
-                return {
-                    month: row.month,
-                    month_name: row.month_name,
-                    product_income: productIncome,
-                    shipping_income: shippingIncome,
-                    tax_income: taxIncome,
-                    discounts_given: discountsGiven,
-                    total_income: totalIncome,
-                    net_income: netIncome,
-                    cost_of_sales: costOfSales,
-                    gross_profit: grossProfit,
-                    invoice_count: parseInt(row.invoice_count),
-                    profit_margin: totalIncome > 0 ? parseFloat(((grossProfit / totalIncome) * 100).toFixed(2)) : 0
-                };
-            });
-
+                const totalCostOfSales = costOfSales + inventoryShrinkage;
+                const grossProfit = netIncome - totalCostOfSales;
+                const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+    
+                // Add to total inventory shrinkage
+                totalInventoryShrinkage += inventoryShrinkage;
+    
+                // Add month data to breakdown
+                monthlyBreakdown.push({
+                    month: month,
+                    month_name: monthNames[month - 1],
+                    income: {
+                        product_income: productIncome,
+                        shipping_income: shippingIncome,
+                        tax_income: taxIncome,
+                        discounts_given: discountsGiven,
+                        total_income: totalIncome,
+                        net_income: netIncome
+                    },
+                    cost_of_sales: {
+                        cost_of_sales: costOfSales,
+                        inventory_shrinkage: inventoryShrinkage,
+                        total_cost_of_sales: totalCostOfSales
+                    },
+                    profitability: {
+                        gross_profit: grossProfit,
+                        gross_profit_margin: parseFloat(grossProfitMargin.toFixed(2))
+                    },
+                    invoice_count: invoiceCount
+                });
+            }
+    
+            // Get company information
+            const [companyResult] = await db.execute(`
+                SELECT name, address, email_address, contact_number, company_logo
+                FROM company
+                WHERE company_id = ?
+            `, [company_id]);
+    
+            const companyInfo = companyResult[0] || {};
+    
+            // Prepare response data
+            const profitAndLossData = {
+                year: selectedYear,
+                company_id: company_id,
+                company: {
+                    name: companyInfo.name || 'Company Name',
+                    address: companyInfo.address,
+                    email: companyInfo.email_address,
+                    phone: companyInfo.contact_number,
+                    logo: companyInfo.company_logo
+                },
+                monthly_breakdown: monthlyBreakdown,
+                summary: {
+                    total_inventory_shrinkage: totalInventoryShrinkage,
+                    months_included: monthsToInclude,
+                    generated_at: new Date().toISOString()
+                }
+            };
+    
             return res.status(200).json({
                 success: true,
                 message: 'Monthly Profit and Loss data retrieved successfully',
-                data: {
-                    year: targetYear,
-                    company_id: company_id,
-                    monthly_breakdown: processedData
-                }
+                data: profitAndLossData
             });
-
+    
         } catch (error) {
             console.error('Error in getMonthlyProfitAndLoss:', error);
             return res.status(500).json({

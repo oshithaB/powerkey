@@ -528,7 +528,7 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700">Purchase Order Status</label>
                 <select
                   name="status"
@@ -539,7 +539,7 @@ export default function PurchaseOrdersPage() {
                   <option value="open">Open</option>
                   <option value="closed">Closed</option>
                 </select>
-              </div>
+              </div> */}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Ship Via</label>
                 <input

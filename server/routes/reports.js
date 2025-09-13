@@ -121,7 +121,7 @@ router.get(
 );
 
 router.get(
-    '/monthly-profit-and-loss/:company_id',
+    '/monthly-profit-and-loss/:company_id/:year',
     verifyToken,
     authorizedRoles(['admin', 'manager', 'accountant']),
     getMonthlyProfitAndLoss

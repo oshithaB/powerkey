@@ -116,56 +116,56 @@ const {
 router.get(
     '/profit-and-loss/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossData
 );
 
 router.get(
     '/monthly-profit-and-loss/:company_id/:year',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getMonthlyProfitAndLoss
 );
 
 router.get(
     '/profit-and-loss-by-emp/:company_id/:employee_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossByEmployeeId
 );
 
 router.get(
     '/invoices-by-employee/:company_id/:employee_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getInvoicesByEmployeeId
 );
 
 router.get(
     '/profit-and-loss-by-cust/:company_id/:customer_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossByCustomerId
 );
 
 router.get(
     '/profit-and-loss-all-employees/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossForAllEmployees
 );
 
 router.get(
     '/inventory-shrinkage/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getInventoryShrinkageByCompanyId
 );
 
 router.get(
     '/profit-and-loss-all-customers/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossForAllCustomers
 );
 

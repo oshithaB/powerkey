@@ -260,8 +260,7 @@ class ReportController {
      */
     static async getMonthlyProfitAndLoss(req, res) {
         try {
-            const { company_id } = req.params;
-            const { year } = req.query;
+            const { company_id, year } = req.params;
     
             if (!company_id) {
                 return res.status(400).json({

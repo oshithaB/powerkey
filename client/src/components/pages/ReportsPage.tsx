@@ -118,11 +118,6 @@ export default function ReportsPage() {
       path: '/reports/invoice-list'
     },
     {
-      name: 'Terms List',
-      description: 'List of payment terms',
-      path: '/reports/terms-list'
-    },
-    {
       name: 'Unbilled Charges',
       description: 'List of all unbilled charges',
       path: '/reports/unbilled-charges'
@@ -163,7 +158,7 @@ export default function ReportsPage() {
     {
       name: 'Income by Customer Summary',
       description: 'Income details by customer',
-      path: '/reports/income-by-customer'
+      path: '/reports/income-by-customer-summary'
     },
     {
       name: 'Deposit Detail',

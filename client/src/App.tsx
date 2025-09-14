@@ -48,6 +48,7 @@ import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyPr
 import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
 import EstimatesbyCustomers from './components/reports/Sales&Customers/EstimatesbyCustomers';
 import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
+import IncomeByCustomerSummary from './components/reports/Sales&Customers/IncomeByCustomerSummary';
 
 // Who Owes You Reports
 import ARAgingSummaryReport from './components/reports/WhoOwesYou/ARAgingSummaryReport';
@@ -362,6 +363,7 @@ function AppContent() {
           }
         />
 
+        {/* Sales and Customers */}
         <Route
           path="/reports/sales-by-customer"
           element={
@@ -421,6 +423,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <StockTakeWorksheet />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/income-by-customer-summary"
+          element={
+            <ProtectedRoute>
+              <IncomeByCustomerSummary />
             </ProtectedRoute>
           }
         />

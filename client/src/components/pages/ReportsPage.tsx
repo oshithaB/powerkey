@@ -90,7 +90,7 @@ export default function ReportsPage() {
     {
       name: 'Customer Balance Detail',
       description: 'Detailed customer outstanding and balances',
-      path: '/reports/customer-balance-detail'
+      path: '/reports/customer-balance-detail/'
     },
     {
       name: 'Invoices and Received Payments',

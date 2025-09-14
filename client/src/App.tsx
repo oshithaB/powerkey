@@ -55,6 +55,8 @@ import ARAgingSummaryInDetails from './components/reports/WhoOwesYou/ARAgingSumm
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 import OpenInvoices from './components/reports/WhoOwesYou/OpenInvoices';
 import InvoiceList from './components/reports/WhoOwesYou/InvoiceList';
+import CustomerBalanceSummary from './components/reports/WhoOwesYou/CustomerBalanceSummary';
+import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalanceDetail';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -465,6 +467,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <InvoiceList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/customer-balance-summary"
+          element={
+            <ProtectedRoute>
+              <CustomerBalanceSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/customer-balance-detail/:customer_Id"
+          element={
+            <ProtectedRoute>
+              <CustomerBalanceDetail />
             </ProtectedRoute>
           }
         />

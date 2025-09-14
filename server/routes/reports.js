@@ -250,6 +250,20 @@ router.get(
     getInvoiceList
 );
 
+router.get(
+    '/customer-balance-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerBalanceSummary
+);
+
+router.get(
+    '/customer-balance-detail/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerBalanceDetail
+);
+
 // Expenses and Suppliers routes
 router.get(
     '/vendor-contacts/:company_id',

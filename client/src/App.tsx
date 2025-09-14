@@ -59,6 +59,9 @@ import InvoiceList from './components/reports/WhoOwesYou/InvoiceList';
 import CustomerBalanceSummary from './components/reports/WhoOwesYou/CustomerBalanceSummary';
 import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalanceDetail';
 
+// What you owe Reports
+import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
+
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
 
@@ -534,6 +537,16 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <TransactionDetailsByTaxCode />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* What you owe section */}
+        <Route
+          path="/reports/supplier-balance-summary"
+          element={
+            <ProtectedRoute>
+              <SupplierBalanceSummary />
             </ProtectedRoute>
           }
         />

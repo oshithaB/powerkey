@@ -1,4 +1,4 @@
-const db = require('../DB/db'); // Assuming db is the MySQL connection/pool
+const db = require('../DB/db');
 
 // Fetch all orders for a company
 const getOrders = async (req, res) => {
@@ -108,8 +108,12 @@ const createOrder = async (req, res) => {
         category, class: orderClass, location, ship_via, total_amount, status
     } = req.body;
 
+    const connection = await db.getConnection();
+
     try {
-        const [result] = await db.execute(
+        await connection.beginTransaction();
+
+        const [result] = await connection.execute(
             `INSERT INTO orders (
                 company_id, vendor_id, mailling_address, email, customer_id, shipping_address,
                 order_no, order_date, category_name, class, location, ship_via, total_amount, status
@@ -131,12 +135,27 @@ const createOrder = async (req, res) => {
                 status || 'open'
             ]
         );
+
+        // Update vendor balance if vendor_id exists and status is 'open'
+        if (vendor_id && (status || 'open') === 'open') {
+            await connection.execute(
+                `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,
+                [total_amount || 0, vendor_id, companyId]
+            );
+        }
+
+        await connection.commit();
+
         res.json({ id: result.insertId, message: 'Order created successfully' });
     } catch (error) {
+        await connection.rollback();
         console.error('Error creating order:', error);
         res.status(500).json({ message: 'Failed to create order' });
+    } finally {
+        connection.release();
     }
 };
+
 
 // Update an existing order
 const updateOrder = async (req, res) => {
@@ -146,16 +165,27 @@ const updateOrder = async (req, res) => {
         category, class: orderClass, location, ship_via, total_amount, status
     } = req.body;
 
+    const connection = await db.getConnection();
+
     try {
-        const [order] = await db.execute(
-            'SELECT id FROM orders WHERE id = ? AND company_id = ?',
+        await connection.beginTransaction();
+
+        // Check if order exists and fetch previous status, total_amount, and vendor_id
+        const [order] = await connection.execute(
+            'SELECT id, status, total_amount, vendor_id FROM orders WHERE id = ? AND company_id = ?',
             [orderId, companyId]
         );
         if (order.length === 0) {
+            await connection.rollback();
             return res.status(404).json({ message: 'Order not found' });
         }
 
-        await db.execute(
+        const previousStatus = order[0].status;
+        const previousTotalAmount = order[0].total_amount || 0;
+        const previousVendorId = order[0].vendor_id;
+
+        // Update order details
+        await connection.execute(
             `UPDATE orders SET
                 vendor_id = ?, mailling_address = ?, email = ?, customer_id = ?, shipping_address = ?,
                 order_no = ?, order_date = ?, category_name = ?, class = ?, location = ?, ship_via = ?,
@@ -180,27 +210,47 @@ const updateOrder = async (req, res) => {
             ]
         );
 
-        if(status === 'closed') {
-            // update product quantity in inventory
-            const [orderItems] = await db.execute(
+        // Handle vendor balance updates
+        // Step 1: Reverse the effect of the previous status if there was a previous vendor
+        if (previousVendorId && previousStatus === 'open') {
+            await connection.execute(
+                `UPDATE vendor SET balance = balance - ? WHERE vendor_id = ? AND company_id = ?`,
+                [previousTotalAmount, previousVendorId, companyId]
+            );
+        }
+
+        // Step 2: Apply the new status effect if there is a vendor
+        if (vendor_id && status === 'open') {
+            await connection.execute(
+                `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,
+                [total_amount || 0, vendor_id, companyId]
+            );
+        }
+
+        // Update product quantity in inventory if status is 'closed'
+        if (status === 'closed') {
+            const [orderItems] = await connection.execute(
                 'SELECT product_id, qty FROM order_items WHERE order_id = ?',
                 [orderId]
             );
 
             for (const item of orderItems) {
-                await db.execute(
+                await connection.execute(
                     'UPDATE products SET quantity_on_hand = quantity_on_hand + ? WHERE id = ? AND company_id = ?',
                     [item.qty, item.product_id, companyId]
                 );
             }
-
-
         }
+
+        await connection.commit();
 
         res.json({ message: 'Order updated successfully' });
     } catch (error) {
+        await connection.rollback();
         console.error('Error updating order:', error);
         res.status(500).json({ message: 'Failed to update order' });
+    } finally {
+        connection.release();
     }
 };
 

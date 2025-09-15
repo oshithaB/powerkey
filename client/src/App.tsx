@@ -36,6 +36,7 @@ import ProfitAndLossByClass from './components/reports/ProfitAndLossByClass';
 import ProfitAndLossByClassInDetail from './components/reports/ProfitAndLossByClassInDetail';
 import ProfitAndLossByCustomer from './components/reports/ProfitAndLossByCustomer';
 import ProfitAndLossByCustomerInDetail from './components/reports/ProfitAndLossByCustomerInDetail';
+import ProfitAndLossByMonth from './components/reports/ProfitAndLossByMonth';
 
 // Sales & Customers Reports
 import CustomerContactDetails from './components/reports/Sales&Customers/CustomerContactDetails';
@@ -47,6 +48,7 @@ import SalesbyProductDetail from './components/reports/Sales&Customers/SalesbyPr
 import DepoistDetail from './components/reports/Sales&Customers/DepoistDetail';
 import EstimatesbyCustomers from './components/reports/Sales&Customers/EstimatesbyCustomers';
 import StockTakeWorksheet from './components/reports/Sales&Customers/StockTakeWorksheet';
+import IncomeByCustomerSummary from './components/reports/Sales&Customers/IncomeByCustomerSummary';
 
 // Who Owes You Reports
 import ARAgingSummaryReport from './components/reports/WhoOwesYou/ARAgingSummaryReport';
@@ -54,6 +56,11 @@ import ARAgingSummaryInDetails from './components/reports/WhoOwesYou/ARAgingSumm
 import InvoicesAndRecievePayments from './components/reports/WhoOwesYou/InvoicesAndRecievePayments';
 import OpenInvoices from './components/reports/WhoOwesYou/OpenInvoices';
 import InvoiceList from './components/reports/WhoOwesYou/InvoiceList';
+import CustomerBalanceSummary from './components/reports/WhoOwesYou/CustomerBalanceSummary';
+import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalanceDetail';
+
+// What you owe Reports
+import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -296,6 +303,14 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/reports/profit&loss-by-month"
+          element={
+            <ProtectedRoute>
+              <ProfitAndLossByMonth />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/reports/commission"
@@ -351,6 +366,7 @@ function AppContent() {
           }
         />
 
+        {/* Sales and Customers */}
         <Route
           path="/reports/sales-by-customer"
           element={
@@ -414,6 +430,15 @@ function AppContent() {
           }
         />
 
+        <Route
+          path="/reports/income-by-customer-summary"
+          element={
+            <ProtectedRoute>
+              <IncomeByCustomerSummary />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Who Owes you section */}
         <Route
           path="/reports/ar-aging-summary"
@@ -460,6 +485,24 @@ function AppContent() {
           }
         />
 
+        <Route
+          path="/reports/customer-balance-summary"
+          element={
+            <ProtectedRoute>
+              <CustomerBalanceSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/customer-balance-detail/:customer_Id"
+          element={
+            <ProtectedRoute>
+              <CustomerBalanceDetail />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Expense & Suppliers section */}
         <Route
           path="/reports/supplier-contact-list"
@@ -494,6 +537,16 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <TransactionDetailsByTaxCode />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* What you owe section */}
+        <Route
+          path="/reports/supplier-balance-summary"
+          element={
+            <ProtectedRoute>
+              <SupplierBalanceSummary />
             </ProtectedRoute>
           }
         />

@@ -352,41 +352,179 @@ const getSalesByProductServiceSummary = async (req, res) => {
 
 // Get income by customer summary
 const getIncomeByCustomerSummary = async (req, res) => {
-  const { company_id } = req.params;
-  const { start_date, end_date } = req.query;
-  
   try {
-    let query = `
-      SELECT 
-          c.name AS customer_name,
-          SUM(p.payment_amount) AS total_income,
-          COUNT(p.id) AS total_payments
-       FROM customer c
-       LEFT JOIN payments p ON c.id = p.customer_id
-       WHERE c.company_id = ? AND c.is_active = TRUE
-    `;
-    
-    const queryParams = [company_id];
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
 
-    if (start_date && end_date) {
-      query += ` AND p.payment_date BETWEEN ? AND ?`;
-      queryParams.push(start_date, end_date);
-    }
+      if (!company_id) {
+          return res.status(400).json({
+              success: false,
+              message: 'Company ID is required'
+          });
+      }
 
-    query += ` GROUP BY c.name`;
+      // Build date filter condition
+      const today = new Date().toISOString().split('T')[0];
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+      let dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+      let dateParams = [startOfYear, today];
 
-    const [rows] = await db.query(query, queryParams);
+      if (start_date && end_date) {
+          dateCondition = 'AND i.invoice_date BETWEEN ? AND ?';
+          dateParams = [start_date, end_date];
+      } else if (start_date) {
+          dateCondition = 'AND i.invoice_date >= ?';
+          dateParams = [start_date];
+      } else if (end_date) {
+          dateCondition = 'AND i.invoice_date <= ?';
+          dateParams = [end_date];
+      }
 
-    res.status(200).json({
-      status: 'success',
-      data: rows
-    });
+      // Get product income per customer
+      const [productIncomeResult] = await db.execute(`
+          SELECT 
+              c.id AS customer_id,
+              c.name AS customer_name,
+              COALESCE(SUM(ii.quantity * ii.actual_unit_price), 0) as product_income
+          FROM invoices i
+          INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+          INNER JOIN customer c ON i.customer_id = c.id
+          WHERE i.company_id = ?
+          AND c.is_active = TRUE
+          AND i.status != 'proforma'
+          ${dateCondition}
+          GROUP BY c.id, c.name
+      `, [company_id, ...dateParams]);
+
+      // Get shipping income per customer
+      const [shippingIncomeResult] = await db.execute(`
+          SELECT 
+              c.id AS customer_id,
+              c.name AS customer_name,
+              COALESCE(SUM(i.shipping_cost), 0) as shipping_income
+          FROM invoices i
+          INNER JOIN customer c ON i.customer_id = c.id
+          WHERE i.company_id = ?
+          AND c.is_active = TRUE
+          AND i.status != 'proforma'
+          ${dateCondition}
+          GROUP BY c.id, c.name
+      `, [company_id, ...dateParams]);
+
+      // Get tax income per customer
+      const [taxIncomeResult] = await db.execute(`
+          SELECT 
+              c.id AS customer_id,
+              c.name AS customer_name,
+              COALESCE(SUM(i.tax_amount), 0) as tax_income
+          FROM invoices i
+          INNER JOIN customer c ON i.customer_id = c.id
+          WHERE i.company_id = ?
+          AND c.is_active = TRUE
+          AND i.status != 'proforma'
+          ${dateCondition}
+          GROUP BY c.id, c.name
+      `, [company_id, ...dateParams]);
+
+      // Get cost of sales per customer (expenses)
+      const [costOfSalesResult] = await db.execute(`
+          SELECT 
+              c.id AS customer_id,
+              c.name AS customer_name,
+              COALESCE(SUM(ii.quantity * p.cost_price), 0) as cost_of_sales
+          FROM invoices i
+          INNER JOIN invoice_items ii ON i.id = ii.invoice_id
+          LEFT JOIN products p ON ii.product_id = p.id
+          INNER JOIN customer c ON i.customer_id = c.id
+          WHERE i.company_id = ?
+          AND c.is_active = TRUE
+          AND i.status != 'proforma'
+          ${dateCondition}
+          GROUP BY c.id, c.name
+      `, [company_id, ...dateParams]);
+
+      // Get discount per customer
+      const [discountResult] = await db.execute(`
+          SELECT 
+              c.id AS customer_id,
+              c.name AS customer_name,
+              COALESCE(SUM(i.discount_amount), 0) as discount
+          FROM invoices i
+          INNER JOIN customer c ON i.customer_id = c.id
+          WHERE i.company_id = ?
+          AND c.is_active = TRUE
+          AND i.status != 'proforma'
+          ${dateCondition}
+          GROUP BY c.id, c.name
+      `, [company_id, ...dateParams]);
+
+      // Prepare data for all customers
+      const customerData = {};
+      
+      // Process all results and combine data by customer
+      const resultsMap = {
+          productIncome: productIncomeResult,
+          shippingIncome: shippingIncomeResult,
+          taxIncome: taxIncomeResult,
+          costOfSales: costOfSalesResult,
+          discount: discountResult
+      };
+
+      for (const [key, result] of Object.entries(resultsMap)) {
+          result.forEach(row => {
+              if (!customerData[row.customer_id]) {
+                  customerData[row.customer_id] = {
+                      customer_name: row.customer_name,
+                      product_income: 0,
+                      shipping_income: 0,
+                      tax_income: 0,
+                      cost_of_sales: 0,
+                      discount: 0
+                  };
+              }
+              
+              if (key === 'productIncome') {
+                  customerData[row.customer_id].product_income = parseFloat(row.product_income || 0);
+              }
+              if (key === 'shippingIncome') {
+                  customerData[row.customer_id].shipping_income = parseFloat(row.shipping_income || 0);
+              }
+              if (key === 'taxIncome') {
+                  customerData[row.customer_id].tax_income = parseFloat(row.tax_income || 0);
+              }
+              if (key === 'costOfSales') {
+                  customerData[row.customer_id].cost_of_sales = parseFloat(row.cost_of_sales || 0);
+              }
+              if (key === 'discount') {
+                  customerData[row.customer_id].discount = parseFloat(row.discount || 0);
+              }
+          });
+      }
+
+      // Calculate final income and expense values
+      const summaryData = Object.values(customerData).map(customer => {
+          const total_income = customer.product_income + customer.shipping_income + customer.tax_income - customer.discount;
+          const total_expense = customer.cost_of_sales;
+          
+          return {
+              customer_name: customer.customer_name,
+              income: total_income,
+              expense: total_expense,
+              net_profit: total_income - total_expense
+          };
+      });
+
+      res.status(200).json({
+          status: 'success',
+          data: summaryData
+      });
+
   } catch (error) {
-    console.error('Error fetching income by customer summary:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error'
-    });
+      console.error('Error fetching income by customer summary:', error);
+      res.status(500).json({
+          status: 'error',
+          message: 'Internal server error'
+      });
   }
 };
 

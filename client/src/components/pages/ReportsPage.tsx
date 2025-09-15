@@ -68,6 +68,11 @@ export default function ReportsPage() {
       name: 'Profit & Loss By All Customer',
       description: 'P&L statement segmented by Customers',
       path: '/reports/profit&loss-by-customer'
+    },
+    {
+      name: 'Profit & Loss By Month',
+      description: 'Monthly P&L statement',
+      path: '/reports/profit&loss-by-month'
     }
   ];
 
@@ -85,7 +90,7 @@ export default function ReportsPage() {
     {
       name: 'Customer Balance Detail',
       description: 'Detailed customer outstanding and balances',
-      path: '/reports/customer-balance-detail'
+      path: '/reports/customer-balance-detail/'
     },
     {
       name: 'Invoices and Received Payments',
@@ -111,11 +116,6 @@ export default function ReportsPage() {
       name: 'Invoice List',
       description: 'List of all invoices',
       path: '/reports/invoice-list'
-    },
-    {
-      name: 'Terms List',
-      description: 'List of payment terms',
-      path: '/reports/terms-list'
     },
     {
       name: 'Unbilled Charges',
@@ -158,7 +158,7 @@ export default function ReportsPage() {
     {
       name: 'Income by Customer Summary',
       description: 'Income details by customer',
-      path: '/reports/income-by-customer'
+      path: '/reports/income-by-customer-summary'
     },
     {
       name: 'Deposit Detail',
@@ -350,6 +350,14 @@ export default function ReportsPage() {
     }
   ];
 
+  const forMyAccountant = [
+    {
+      name: 'Recent Automatic Transactions',
+      description: 'List of recent automatic transactions',
+      path: '/reports/recent-automatic-transactions'
+    },
+  ]
+
   const toggleFavorite = (reportName) => {
     setFavoriteReports(prev => {
       if (prev.includes(reportName)) {
@@ -405,7 +413,16 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...businessOverviewReports, ...whoOwesYouReports, ...salesAndCustomersReports, ...reports]
+              {[
+                ...reports,
+                ...businessOverviewReports,
+                ...whoOwesYouReports,
+                ...salesAndCustomersReports,
+                ...whatYouOweReports,
+                ...expenseAndSuppliers,
+                ...salesTax,
+                ...employees,
+                ...forMyAccountant]
                 .filter(report => favoriteReports.includes(report.name))
                 .map(report => (
                   <button 
@@ -646,6 +663,40 @@ export default function ReportsPage() {
         <div className="card-content">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {employees.map(report => (
+              <button 
+                key={report.name}
+                className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"
+                onClick={() => navigate(report.path)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-gray-900">{report.name}</h4>
+                  <Star 
+                    className={`h-5 w-5 cursor-pointer ${
+                      favoriteReports.includes(report.name) 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-400'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(report.name);
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600">{report.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* For my Accountant */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="text-lg font-semibold">For My Accountant</h2>
+        </div>
+        <div className="card-content">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {forMyAccountant.map(report => (
               <button 
                 key={report.name}
                 className="p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left"

@@ -120,7 +120,7 @@ const getCustomerBalanceSummary = async (req, res) => {
 
 const getCustomerBalanceDetail = async (req, res) => {
     try {
-        const { company_id } = req.params;
+        const { company_id, customer_id } = req.params;
         const { start_date, end_date } = req.query;
 
         console.log('Received params:', { company_id, start_date, end_date });
@@ -143,11 +143,11 @@ const getCustomerBalanceDetail = async (req, res) => {
                 i.status
             FROM customer c
             LEFT JOIN invoices i ON c.id = i.customer_id
-            WHERE c.company_id = ?
+            WHERE c.company_id = ? AND c.id = ?
             AND i.status IN ('opened', 'sent', 'partially_paid', 'overdue')
         `;
 
-        const queryParams = [company_id];
+        const queryParams = [company_id, customer_id];
 
         if (start_date && end_date) {
             query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;

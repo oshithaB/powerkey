@@ -10,6 +10,7 @@ const employeeController = require('../controllers/reports/Employees/Employee_co
 const salesTaxController = require('../controllers/reports/SalesTax/sales_tax_controller');
 const expensesAndSuppliersController = require('../controllers/reports/Expenses&Suppliers/expenses_and_suppliers');
 const whoOwesYouController = require('../controllers/reports/WhoOwesYou/whoOwesYou_controller');
+const whatYouOweController = require('../controllers/reports/WhatYouOwe/whatYouOwe_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -62,6 +63,11 @@ const {
     getUnbilledCharges,
     getUnbilledTime,
 } = whoOwesYouController
+
+// Import what you owe controller functions
+const {
+    getSupplierBalanceSummary,
+} = whatYouOweController
 
 
 // Importing customer contact controller functions
@@ -116,60 +122,60 @@ const {
 router.get(
     '/profit-and-loss/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossData
 );
 
 router.get(
-    '/monthly-profit-and-loss/:company_id',
+    '/monthly-profit-and-loss/:company_id/:year',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getMonthlyProfitAndLoss
 );
 
 router.get(
     '/profit-and-loss-by-emp/:company_id/:employee_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossByEmployeeId
 );
 
 router.get(
     '/invoices-by-employee/:company_id/:employee_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getInvoicesByEmployeeId
 );
 
 router.get(
     '/profit-and-loss-by-cust/:company_id/:customer_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossByCustomerId
 );
 
 router.get(
     '/profit-and-loss-all-employees/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossForAllEmployees
 );
 
 router.get(
     '/inventory-shrinkage/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getInventoryShrinkageByCompanyId
 );
 
 router.get(
     '/profit-and-loss-all-customers/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sale']),
     getProfitAndLossForAllCustomers
 );
 
-// Commission Report Route
+// Commission Report Route ================================================================================================
 router.get(
     '/commission-report',
     verifyToken,
@@ -184,7 +190,7 @@ router.get(
     getCommissionReportByEmployeeId
 );
 
-// Sales Report Route
+// Sales Report Route ====================================================================================================
 router.get (
     '/sales-report',
     verifyToken,
@@ -199,7 +205,7 @@ router.get (
     getSalesReportByEmployeeId
 );
 
-// Balance Sheet Report Route
+// Balance Sheet Report Route ========================================================================================
 router.get(
     '/balance-sheet/:company_id',
     verifyToken,
@@ -214,7 +220,7 @@ router.get(
     getFormattedBalanceSheet
 );
 
-// Who Owes you routes
+// Who Owes you routes ===============================================================================================
 router.get(
     '/ar-aging-summary/:company_id',
     verifyToken,
@@ -250,7 +256,30 @@ router.get(
     getInvoiceList
 );
 
-// Expenses and Suppliers routes
+router.get(
+    '/customer-balance-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerBalanceSummary
+);
+
+router.get(
+    '/customer-balance-detail/:company_id/:customer_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getCustomerBalanceDetail
+);
+
+// What owe you routes ========================================================================================
+router.get(
+    '/supplier-balance-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSupplierBalanceSummary
+);
+
+
+// Expenses and Suppliers routes ========================================================================================
 router.get(
     '/vendor-contacts/:company_id',
     verifyToken,
@@ -259,7 +288,7 @@ router.get(
 );
 
 
-// Sales and Customer routes
+// Sales and Customer routes =======================================================================================
 router.get(
     '/customer-contacts/:company_id',
     verifyToken,
@@ -393,7 +422,7 @@ router.get(
     getSalesByCustomerIDDetail
 );
 
-// Sales Tax routes
+// Sales Tax routes ===========================================================================================================
 router.get(
     '/sscl-100percent-tax-detail/:company_id',
     verifyToken,
@@ -450,7 +479,7 @@ router.get(
     transactionDetailByTaxCode
 );
 
-// Employee routes
+// Employee routes ==========================================================================================================
 router.get(
     '/employee-contacts',
     verifyToken,

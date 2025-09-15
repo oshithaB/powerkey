@@ -155,6 +155,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       setPaymentAccountFilter(newAccount.name);
       setIsCreatePaymentAccountModalOpen(false);
       alert('Payment account created successfully.');
+      navigate(0);
     } catch (error) {
       console.error('Error creating payment account:', error);
       alert('Failed to create payment account.');
@@ -250,53 +251,60 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   };
 
   const calculateTotal = () => {
-    return Number(items.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
+    return Number(
+      items
+        .filter(item => item.category_id && item.category_id !== 0 && item.amount > 0)
+        .reduce((sum, item) => sum + item.amount, 0)
+        .toFixed(2)
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       if (!formData.expense_number) {
         throw new Error('Expense number is required');
       }
-      if (!formData.category_id) {
-        throw new Error('Category is required');
-      }
       if (!formData.payment_date) {
         throw new Error('Payment date is required');
       }
-      if (!items.some(item => item.category_id !== 0)) {
-        throw new Error('At least one valid item is required');
+      
+      // Filter out items with invalid category_id and validate
+      const validItems = items.filter(item => item.category_id && item.category_id !== 0 && item.amount > 0);
+      
+      if (validItems.length === 0) {
+        throw new Error('At least one item with a valid category and amount is required');
       }
-
+  
       const total = calculateTotal();
-
+  
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
         payment_account_id: parseInt(formData.payment_account_id) || null,
         total_amount: Number(total),
-        items: items.map(item => ({
-          ...item,
-          category_id: parseInt(item.category_id as any) || null,
+        items: validItems.map(item => ({
+          category_id: item.category_id,
           category_name: item.category_name,
           description: item.description,
           amount: Number(item.amount), 
         })),
       };
+      
       console.log('Submitting expense data:', submitData);
+      
       if (expense) {
         await axiosInstance.put(`/api/expenses/${selectedCompany?.company_id}/${expense.id}`, submitData);
       } else {
-        await axiosInstance.post(`/api/createExpenses/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/createExpense/${selectedCompany?.company_id}`, submitData);
       }
-
+  
       setFormData(initialFormData);
       setItems(initialItems);
-
+  
       if (onSave && typeof onSave === 'function') {
         onSave();
       } else {

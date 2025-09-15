@@ -1,26 +1,25 @@
 const db = require('../DB/db');
 
 const createExpense = async (req, res) => { 
-  const { company_id, expense_number, category_id, payment_account_id, payment_date, payment_method, payee, notes, total_amount, items } = req.body;
+  const { company_id, expense_number, payment_account_id, payment_date, payment_method, payee, notes, total_amount, items } = req.body;
 
   // Validate required fields
-  if (!company_id || !expense_number || !category_id || !payment_date || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Company ID, expense number, category ID, payment date, total amount, and at least one item are required.' });
+  if (!company_id || !expense_number || !payment_date || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Company ID, expense number, payment date, total amount, and at least one item are required.' });
   }
 
   try {
-    // Start a transaction
-    await db.execute('START TRANSACTION');
+    // Start a transaction - use query instead of execute
+    await db.query('START TRANSACTION');
 
     // Insert expense
     const expenseQuery = `
-      INSERT INTO expenses (company_id, expense_number, category_id, payment_account_id, payment_date, payment_method, payee, notes, total_amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO expenses (company_id, expense_number, payment_account_id, payment_date, payment_method, payee, notes, amount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [expenseResult] = await db.execute(expenseQuery, [
       company_id,
       expense_number.trim(),
-      category_id,
       payment_account_id || null,
       payment_date,
       payment_method || null,
@@ -34,11 +33,11 @@ const createExpense = async (req, res) => {
     // Insert expense items
     const itemQuery = `
       INSERT INTO expense_items (expense_id, category_id, description, amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?)
     `;
     for (const item of items) {
-      if (!item.category_id || !item.amount) {
-        throw new Error('Each item must have a category ID and amount.');
+      if (!item.category_id || item.category_id === 0 || !item.amount || item.amount <= 0) {
+        throw new Error('Each item must have a valid category and amount greater than 0.');
       }
       await db.execute(itemQuery, [
         expenseId,
@@ -48,8 +47,8 @@ const createExpense = async (req, res) => {
       ]);
     }
 
-    // Commit transaction
-    await db.execute('COMMIT');
+    // Commit transaction - use query instead of execute
+    await db.query('COMMIT');
 
     res.status(201).json({
       message: 'Expense created successfully.',
@@ -58,9 +57,10 @@ const createExpense = async (req, res) => {
       total_amount
     });
   } catch (error) {
-    await db.execute('ROLLBACK');
+    // Rollback transaction - use query instead of execute
+    await db.query('ROLLBACK');
     console.error('Error creating expense:', error);
-    res.status(500).json({ error: 'Failed to create expense.' });
+    res.status(500).json({ error: error.message || 'Failed to create expense.' });
   }
 };
 

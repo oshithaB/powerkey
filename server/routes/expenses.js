@@ -18,7 +18,7 @@ const {
 } = require('../controllers/expense_controller');
 
 router.post(
-    '/createExpense',
+    '/createExpense/:company_id',
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     createExpense

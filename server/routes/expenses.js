@@ -44,7 +44,7 @@ router.get(
 );
 
 router.post(
-    '/addCategory',
+    '/addCategory/:company_id',
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     addCategory

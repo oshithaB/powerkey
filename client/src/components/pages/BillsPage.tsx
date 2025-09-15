@@ -7,17 +7,19 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Bill {
   id: number;
-  expense_number: string;
-  category_id: number;
-  category_name?: string;
+  bill_number: string; // Changed from expense_number
+  company_id: number;
+  order_id?: number;
+  vendor_id: number;
+  vendor_name?: string; // Add this
+  payment_method_id: number;
+  payment_method?: string; // Add this
   bill_date: string;
-  due_date?: string;
-  total_amount: number;
-  payee: string;
   notes: string;
-  terms: string;
-  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  total_amount: number;
+  order_number?: string; // Add this
   created_at: string;
+  // Remove fields not returned by backend: category_id, category_name, due_date, terms, status
 }
 
 export default function BillsPage() {
@@ -34,8 +36,9 @@ export default function BillsPage() {
 
   const fetchBills = async () => {
     try {
-      const response = await axiosInstance.get(`/api/getBills/${selectedCompany?.company_id}`);
+      const response = await axiosInstance.get(`/api/getAllBills/${selectedCompany?.company_id}`);
       setBills(response.data);
+      console.log('Fetched bills:', response.data);
     } catch (error) {
       console.error('Error fetching bills:', error);
     } finally {
@@ -74,8 +77,8 @@ export default function BillsPage() {
   };
 
   const filteredBills = bills.filter(bill =>
-    bill.expense_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.payee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.bill_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bill.notes?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -157,34 +160,34 @@ export default function BillsPage() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {bill.expense_number}
+                            {bill.bill_number}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {bill.notes}
+                            {bill.notes || 'No notes'}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.payee || 'No payee'}
+                      {bill.vendor_name || 'No vendor'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.category_name || 'No category'}
+                      {bill.payment_method || 'No payment method'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {format(new Date(bill.bill_date), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.due_date ? format(new Date(bill.due_date), 'MMM dd, yyyy') : 'N/A'}
+                      N/A {/* Since due_date doesn't exist */}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        ${bill.total_amount?.toLocaleString() || '0.00'}
+                        Rs. {bill.total_amount.toLocaleString()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bill.status)}`}>
-                        {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        Pending {/* Default status since status field doesn't exist */}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

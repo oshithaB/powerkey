@@ -273,9 +273,9 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
       };
 
       if (expense) {
-        await axiosInstance.put(`/api/expenses/${selectedCompany?.company_id}/${expense.id}`, submitData);
+        await axiosInstance.put(`/api/createBill/${selectedCompany?.company_id}/${expense.id}`, submitData);
       } else {
-        await axiosInstance.post(`/api/createExpenses/${selectedCompany?.company_id}`, submitData);
+        await axiosInstance.post(`/api/createBill/${selectedCompany?.company_id}`, submitData);
       }
 
       setFormData(initialFormData);

@@ -13,6 +13,7 @@ router.post('/orders/:companyId', orderController.createOrder);
 router.put('/orders/:companyId/:orderId', orderController.updateOrder);
 router.delete('/orders/:companyId/:orderId', orderController.deleteOrder);
 router.get('/order-items/:companyId', orderController.getOrderItems);
+router.get('/order-items/:companyId/:orderId', orderController.getOrderItemsByOrder);
 router.post('/order-items/:companyId', orderController.createOrderItem);
 router.delete('/order-items/:companyId/:orderId', orderController.deleteOrderItems);
 router.get('/stats/:companyId', orderController.getPurchaseStats);

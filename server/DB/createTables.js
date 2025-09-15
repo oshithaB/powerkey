@@ -389,7 +389,69 @@ async function createTables(db) {
             company_id INT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
-        )`
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS expenses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            expense_number VARCHAR(100) NOT NULL UNIQUE,
+            payee VARCHAR(255) NOT NULL,
+            payment_account_id INT NOT NULL,
+            payment_date DATE NOT NULL,
+            payment_method_id INT NOT NULL,
+            amount DECIMAL(15,2) NOT NULL,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (payment_account_id) REFERENCES payment_account(id),
+            FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS expense_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            expense_id INT NOT NULL,
+            category_id INT NOT NULL,
+            description TEXT,
+            amount DECIMAL(15,2) NOT NULL,
+            FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE SET NULL
+        )`,
+        `CREATE TABLE IF NOT EXISTS payment_methods (
+            id INT NOT NULL AUTO_INCREMENT,
+            name VARCHAR(100) NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY name (name)
+        ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;`,
+         
+        `CREATE TABLE IF NOT EXISTS bills (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            bill_number VARCHAR(100) NOT NULL UNIQUE,
+            order_id INT DEFAULT NULL,
+            vendor_id INT NOT NULL,
+            bill_date DATE NOT NULL,
+            payment_method_id INT NOT NULL,
+            notes TEXT,
+            total_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
+            FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id)
+        );`,
+        `CREATE TABLE IF NOT EXISTS bill_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            bill_id INT NOT NULL,
+            product_id INT NOT NULL,
+            product_name VARCHAR(255) NOT NULL,
+            description TEXT,
+            quantity INT NOT NULL DEFAULT 1,
+            unit_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            total_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
+        );`
+
+
+
     ];
 
     for (const table of tables) {

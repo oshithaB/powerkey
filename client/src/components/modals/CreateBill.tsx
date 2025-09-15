@@ -2,26 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { set } from 'date-fns';
 
-interface ExpenseModalProps {
+interface BillModalProps {
   expense?: any;
   onSave?: () => void;
 }
 
-interface ExpenseItem {
+interface BillItem {
   product_id: number;
   product_name: string;
   description: string;
   quantity: number;
   unit_price: number;
   total_price: number;
-}
-
-interface Category {
-  id: number;
-  name: string;
 }
 
 
@@ -34,27 +30,29 @@ interface CreateModalProps {
   label: string;
 }
 
-export default function BillModal({ expense, onSave }: ExpenseModalProps) {
+export default function BillModal({ expense, onSave }: BillModalProps) {
   const { selectedCompany } = useCompany();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [categorySuggestions, setCategorySuggestions] = useState<Category[]>([]);
+  const [vendorSuggestions, setVendorSuggestions] = useState<any[]>([]);
+  const [activeVendorSuggestion, setActiveVendorSuggestion] = useState<boolean>(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
-  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
+  const [isCreatePaymentMethodModalOpen, setIsCreatePaymentMethodModalOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const initialFormData = {
-    expense_number: `BILL-${Date.now()}`,
-    category_id: '',
+    bill_number: `BILL-${Date.now()}`,
+    vendor_name: '',
+    vendor_id: '',
     payment_account_id: '',
     bill_date: new Date().toISOString().split('T')[0],
     payment_method: '',
     notes: '',
-    payee: '',
   };
 
   const [formData, setFormData] = useState(expense ? {
@@ -72,15 +70,57 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     total_price: 0,
   }];
 
-  const [items, setItems] = useState<ExpenseItem[]>(expense?.items || initialItems);
+  const [items, setItems] = useState<BillItem[]>(expense?.items || initialItems);
 
-  const fetchCategories = async () => {
+  useEffect(() => {
+    if (selectedCompany && location.state?.orderId) {
+      loadOrderData(location.state.orderId.toString());
+    }
+  }, [selectedCompany, location.state]);
+
+  const loadOrderData = async (orderId: string) => {
+    if (!orderId) return;
     try {
-      const response = await axiosInstance.get(`/api/getExpenseCategories/${selectedCompany?.company_id}`);
-      setCategories(Array.isArray(response.data) ? response.data : []);
+      const [orderRes, itemsRes] = await Promise.all([
+        axiosInstance.get(`/api/getOrders/${selectedCompany?.company_id}`),
+        axiosInstance.get(`/api/order-items/${selectedCompany?.company_id}/${orderId}`)
+      ]);
+
+      const order = orderRes.data.find((e: any) => e.id === parseInt(orderId));
+      if (!order) {
+        throw new Error('Selected order not found');
+      }
+
+      setFormData({
+        ...formData,
+        bill_number: `BILL-${order.order_no}-${Date.now()}`,
+        order_id: orderId, 
+        vendor_name: order.supplier,
+        vendor_id: order.vendor_id ? order.vendor_id.toString() : '',
+      });
+
+      setItems(itemsRes.data.map((item: any) => ({
+        product_id: item.product_id || 0,
+        product_name: item.name || '',
+        description: item.description || '',
+        quantity: Number(item.qty) || 1,
+        unit_price: Number(item.rate) || 0,
+        total_price: Number(item.amount) || 0
+      })));
+
     } catch (error) {
-      console.error('Error fetching categories:', error);
-      setError('Failed to fetch categories');
+      console.error('Error loading order data:', error);
+      setError('Failed to load order data');
+    }
+  };  
+
+  const fetchVendors = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/getVendors/${selectedCompany?.company_id}`);
+      setVendors(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      setError('Failed to fetch vendors');
     }
   };
 
@@ -94,28 +134,34 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
-  const handleCreateCategory = async (name: string, type?: string, description?: string) => {
+  const fetchPaymentMethods = async () => {
     try {
-      const response = await axiosInstance.post(`/api/categories/${selectedCompany?.company_id}`, {
-        name,
-        category_type: type || null,
-        description: description || null,
-      });
-      const newCategory = response.data;
-      setCategories((prev) => [...prev, newCategory]);
-      setFormData({ ...formData, category_id: newCategory.id.toString() });
-      setIsCreateCategoryModalOpen(false);
-      alert('Category created successfully.');
+      const response = await axiosInstance.get(`/api/getPaymentMethods`);
+      const methods = Array.isArray(response.data) 
+        ? response.data.map(method => {
+            if (typeof method === 'string') {
+              return method;
+            }
+            if (typeof method === 'object' && method !== null) {
+              return method.name || method.method || method.title || method.value || String(method);
+            }
+            return String(method);
+          })
+        : [];
+      setPaymentMethods(methods);
     } catch (error) {
-      console.error('Error creating category:', error);
-      alert('Failed to create category.');
+      console.error('Error fetching payment methods:', error);
+      setError('Failed to fetch payment methods');
+      setPaymentMethods([]);
     }
   };
 
+
   useEffect(() => {
     if (selectedCompany) {
-      fetchCategories();
+      fetchVendors();
       fetchProducts();
+      fetchPaymentMethods();
     }
   }, [selectedCompany]);
 
@@ -135,7 +181,23 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     }
   }, [items, products, activeSuggestionIndex]);
 
-  const updateItem = (index: number, field: keyof ExpenseItem, value: any) => {
+  useEffect(() => {
+    if (activeVendorSuggestion !== false) {
+      const activeVendor = formData.vendor_name || '';
+      if (activeVendor) {
+        const filteredVendors = vendors.filter(vendor =>
+          vendor.name.toLowerCase().includes(activeVendor.toLowerCase())
+        );
+        setVendorSuggestions(filteredVendors);
+      } else {
+        setVendorSuggestions(vendors);
+      }
+    } else {
+      setVendorSuggestions([]);
+    } 
+  }, [formData.vendor_name, vendors, activeVendorSuggestion]); 
+
+  const updateItem = (index: number, field: keyof BillItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
@@ -183,14 +245,12 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     setError(null);
 
     try {
-      if (!formData.expense_number) {
-        throw new Error('Expense number is required');
+      if (!formData.bill_number) {
+        throw new Error('Bill number is required');
       }
-      if (!formData.category_id) {
-        throw new Error('Category is required');
-      }
+
       if (!formData.bill_date) {
-        throw new Error('Payment date is required');
+        throw new Error('Bill date is required');
       }
       if (!items.some(item => item.product_id !== 0)) {
         throw new Error('At least one valid item is required');
@@ -201,7 +261,6 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
-        category_id: parseInt(formData.category_id) || null,
         payment_account_id: parseInt(formData.payment_account_id) || null,
         total_amount: Number(total),
         items: items.map(item => ({
@@ -237,35 +296,47 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
+  const handleCreatePaymentMethod = async (name: string) => {
+  try {
+    const response = await axiosInstance.post('/api/createPaymentMethod', {
+      name,
+    });
+    const newMethod = response.data.name;
+    setPaymentMethods((prev) => [...prev, newMethod]);
+    setFormData({ ...formData, payment_method: newMethod });
+    setIsCreatePaymentMethodModalOpen(false);
+    alert('Payment method created successfully.');
+  } catch (error) {
+    console.error('Error creating payment method:', error);
+    alert('Failed to create payment method.');
+  }
+};
+
   const total = calculateTotal();
 
-  // Category modal
-  const CreateCategoryModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onCreate: (name: string, type?: string, description?: string) => Promise<void>;
-    existingMethods: string[];
-  }> = ({ isOpen, onClose, onCreate, existingMethods }) => {
+  //   payment method
+  const CreatePaymentMethodModal: React.FC<CreateModalProps> = ({
+    isOpen,
+    onClose,
+    onCreate,
+    existingMethods,
+    title,
+    label,
+  }) => {
     const [newName, setNewName] = useState('');
-    const [categoryType, setCategoryType] = useState('');
-    const [description, setDescription] = useState('');
-  
-    const categoryTypes = ['Operational', 'Administrative', 'Marketing', 'Miscellaneous'];
   
     const handleCreate = async () => {
       const trimmedName = newName.trim();
       if (!trimmedName) {
-        alert('Category name is required.');
+        alert(`${label} name is required.`);
         return;
       }
       if (existingMethods.includes(trimmedName.toLowerCase())) {
-        alert('Category already exists.');
+        alert(`${label} already exists.`);
         return;
       }
-      await onCreate(trimmedName, categoryType, description);
+      await onCreate(trimmedName);
       setNewName('');
-      setCategoryType('');
-      setDescription('');
     };
   
     if (!isOpen) return null;
@@ -274,50 +345,22 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Create New Category</h2>
-            <button
-                onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
-                className="text-gray-400 hover:text-gray-600"
-            >
-                <X className="h-6 w-6" />
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+              <X className="h-6 w-6" />
             </button>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label} Name *</label>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               className="input w-full"
-              placeholder="Enter category name"
+              placeholder={`Enter ${label.toLowerCase()} name`}
               maxLength={50}
               autoFocus
               required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category Type</label>
-            <select
-              value={categoryType}
-              onChange={(e) => setCategoryType(e.target.value)}
-              className="input w-full"
-            >
-              <option value="">Select Category Type</option>
-              {categoryTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input w-full min-h-[80px]"
-              placeholder="Enter category description"
-              maxLength={200}
             />
           </div>
           <div className="flex justify-end space-x-2">
@@ -332,6 +375,8 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
       </div>
     );
   };
+
+
 
   return (
     <motion.div
@@ -369,8 +414,8 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                 <input
                   type="text"
                   className="input"
-                  value={formData.expense_number}
-                  onChange={(e) => setFormData({ ...formData, expense_number: e.target.value })}
+                  value={formData.bill_number}
+                  onChange={(e) => setFormData({ ...formData, bill_number: e.target.value })}
                   placeholder="Enter Bill number"
                   required
                 />
@@ -378,45 +423,56 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payee
+                  Vendor *
                 </label>
                 <input
                   type="text"
                   className="input"
-                  value={formData.payee || ''}
-                  onChange={(e) => setFormData({ ...formData, payee: e.target.value })}
-                  placeholder="Enter payee name"
+                  value={formData.vendor_name || ''}
+                  disabled={!!formData.order_id}
+                  onChange={(e) => {
+                    setFormData({ ...formData, vendor_name: e.target.value })
+                    setActiveVendorSuggestion(true);
+                  }}
+                  onFocus={() => {
+                    setActiveVendorSuggestion(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setActiveVendorSuggestion(false);
+                      setVendorSuggestions([]);
+                    }, 200);
+                  }}
+                  placeholder="Enter vendor name"
                 />
-              </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Category *
-                    </label>
-                    <select
-                        name="category_id"
-                        value={formData.category_id}
-                        onChange={(e) => {
-                        if (e.target.value === 'create_new') {
-                            setIsCreateCategoryModalOpen(true);
-                        } else {
-                            setFormData({ ...formData, category_id: e.target.value });
-                        }
+                {activeVendorSuggestion && vendorSuggestions.length > 0 && (
+                  <ul
+                    className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
+                    style={{
+                      maxHeight: '240px',
+                      maxWidth: '420px',
+                      minWidth: '220px',
+                      overflowY: 'auto',
+                      overflowX: 'auto',
+                      width: '420px',
+                    }}
+                  >
+                    {vendorSuggestions.map((vendor, index) => (
+                      <li
+                        key={index}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                        onMouseDown={() => {
+                          setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString() });
+                          setVendorSuggestions([]);
+                          setActiveVendorSuggestion(false);
                         }}
-                        className="input w-full"
-                        required
-                    >
-                        <option value="" disabled>
-                        Select Category
-                        </option>
-                        <option value="create_new">+ Create New Category</option>
-                        {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                            {category.name}
-                        </option>
-                        ))}
-                    </select>
-                </div>
+                      >
+                        <span>{vendor.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -432,25 +488,43 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                 </div>
 
                 <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Due Date
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Payment Method *
                     </label>
-                    <input
-                        type="date"
-                        className="input"
-                        value={formData.due_date || ''}
-                        onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    />
+                    <select
+                        name="payment_method"
+                        value={formData.payment_method}
+                        onChange={(e) => {
+                        if (e.target.value === 'create_new') {
+                            setIsCreatePaymentMethodModalOpen(true);
+                        } else {
+                            setFormData({ ...formData, payment_method: e.target.value });
+                        }
+                        }}
+                        className="input w-full"
+                        required
+                    >
+                        <option value="" disabled>
+                        Select Payment Method
+                        </option>
+                        <option value="create_new">+ Create New Payment Method</option>
+                        {paymentMethods.map((method, index) => (
+                        <option key={`${method}-${index}`} value={method}>
+                            {method.charAt(0).toUpperCase() + method.slice(1)}
+                        </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Terms
+                        Terms *
                     </label>
                     <select
                         className="input w-full"
                         value={formData.terms || ''}
                         onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+                        required
                     >
                         <option value="" disabled>Select a Term</option>
                         <option value="Due on Receipt">Due on Receipt</option>
@@ -467,6 +541,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                 <button
                   type="button"
                   onClick={addItem}
+                  disabled={!!formData.order_id}
                   className="btn btn-secondary btn-sm"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -488,7 +563,10 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                   </thead>
                   <tbody>
                     {items.map((item, index) => (
-                      <tr key={index} className="border-t">
+                      <tr
+                        key={index}
+                        className={`border-t ${formData.order_id ? 'opacity-60 pointer-events-none' : ''}`}
+                      >
                         <td className="px-4 py-2">
                           <input
                             type="text"
@@ -499,10 +577,6 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             }}
                             onFocus={() => {
                               setActiveSuggestionIndex(index);
-                              const filtered = products.filter(product =>
-                                product.name.toLowerCase().includes(item.product_name?.toLowerCase() || '')
-                              );
-                              setProductSuggestions(filtered.length > 0 ? filtered : products);
                             }}
                             onBlur={() => {
                               setTimeout(() => {
@@ -514,9 +588,20 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             }}
                             placeholder="Search product"
                             className="border rounded px-2 py-1 w-full"
+                            disabled={!!formData.order_id}
                           />
-                          {activeSuggestionIndex === index && productSuggestions.length > 0 && (
-                            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                          {activeSuggestionIndex === index && productSuggestions.length > 0 && !formData.order_id && (
+                            <ul
+                              className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
+                              style={{
+                                maxHeight: '240px',
+                                maxWidth: '420px',
+                                minWidth: '220px',
+                                overflowY: 'auto',
+                                overflowX: 'auto',
+                                width: '420px',
+                              }}
+                            >
                               {productSuggestions.map(product => (
                                 <li
                                   key={product.id}
@@ -558,6 +643,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             onChange={(e) => updateItem(index, 'description', e.target.value)}
                             placeholder="Item description"
                             required
+                            // disabled={!!formData.order_id}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -569,6 +655,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                             required
+                            // disabled={!!formData.order_id}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -580,6 +667,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             value={item.unit_price}
                             onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                             required
+                            // disabled={!!formData.order_id}
                           />
                         </td>
                         <td className="px-4 py-2 text-center border border-gray-200">
@@ -590,6 +678,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                             type="button"
                             onClick={() => removeItem(index)}
                             className="text-red-600 hover:text-red-900"
+                            disabled={!!formData.order_id}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -612,6 +701,7 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Additional notes..."
+                    style={{ resize: 'none' }}
                   />
                 </div>
               </div>
@@ -641,17 +731,20 @@ export default function BillModal({ expense, onSave }: ExpenseModalProps) {
                     disabled={loading}
                     className="btn btn-primary btn-md"
                 >
-                    {loading ? 'Saving...' : expense ? 'Update Expense' : 'Create Expense'}
+                    {loading ? 'Saving...' : expense ? 'Update Bill' : 'Create Bill'}
                 </button>
             </div>
           </form>
 
-          <CreateCategoryModal
-            isOpen={isCreateCategoryModalOpen}
-            onClose={() => setIsCreateCategoryModalOpen(false)}
-            onCreate={handleCreateCategory}
-            existingMethods={categories.map(c => c.name.toLowerCase())}
+           <CreatePaymentMethodModal
+            isOpen={isCreatePaymentMethodModalOpen}
+            onClose={() => setIsCreatePaymentMethodModalOpen(false)}
+            onCreate={handleCreatePaymentMethod}
+            existingMethods={paymentMethods.map(m => m.toLowerCase())}
+            title="Create New Payment Method"
+            label="Payment Method"
           />
+
         </div>
       </div>
     </motion.div>

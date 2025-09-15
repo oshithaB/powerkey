@@ -5,7 +5,7 @@ const getOrders = async (req, res) => {
     const { companyId } = req.params;
     try {
         const [orders] = await db.execute(
-            `SELECT o.id, v.name AS supplier, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via, e.name AS employee_name
+            `SELECT o.id, v.name AS supplier, o.vendor_id, o.order_no, o.order_date, o.category_name AS category, o.class, o.location, o.total_amount, o.status, o.created_at, o.mailling_address, o.email, o.customer_id, o.shipping_address, o.ship_via, e.name AS employee_name
              FROM orders o
              LEFT JOIN employees e ON o.class = e.id
              LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
@@ -56,6 +56,31 @@ const getOrderItems = async (req, res) => {
         res.json(orderItems);
     } catch (error) {
         console.error('Error fetching order items:', error);
+        res.status(500).json({ message: 'Failed to fetch order items' });
+    }
+};
+
+// Fetch all order items for a specific order in a company
+const getOrderItemsByOrder = async (req, res) => {
+    const { companyId, orderId } = req.params;
+    try {
+        const [order] = await db.execute(
+            'SELECT id FROM orders WHERE id = ? AND company_id = ?',
+            [orderId, companyId]
+        );
+        if (order.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        const [orderItems] = await db.execute(
+            `SELECT oi.id, oi.order_id, oi.product_id, oi.name, oi.sku, oi.description, oi.qty, oi.rate, oi.amount, oi.class, oi.received, oi.closed, oi.created_at
+             FROM order_items oi
+             WHERE oi.order_id = ?`,
+            [orderId]
+        );
+        res.json(orderItems);
+    } catch (error) {
+        console.error('Error fetching order items by order:', error);
         res.status(500).json({ message: 'Failed to fetch order items' });
     }
 };
@@ -308,5 +333,6 @@ module.exports = {
     createOrderItem,
     deleteOrder,
     deleteOrderItems,
-    getPurchaseStats
+    getPurchaseStats,
+    getOrderItemsByOrder 
 };

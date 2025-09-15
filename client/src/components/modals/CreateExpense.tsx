@@ -170,7 +170,6 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       const newMethod = response.data.name;
       setPaymentMethods((prev) => [...prev, newMethod]);
       setFormData({ ...formData, payment_method: newMethod });
-      setPaymentMethodFilter(newMethod);
       setIsCreatePaymentMethodModalOpen(false);
       alert('Payment method created successfully.');
     } catch (error) {

@@ -1,6 +1,6 @@
 const db = require('../DB/db');
 
-const createExpense = async (req, res) => {
+const createExpense = async (req, res) => { 
   const { company_id, expense_number, category_id, payment_account_id, payment_date, payment_method, payee, notes, total_amount, items } = req.body;
 
   // Validate required fields
@@ -33,21 +33,18 @@ const createExpense = async (req, res) => {
 
     // Insert expense items
     const itemQuery = `
-      INSERT INTO expense_items (expense_id, product_id, product_name, description, quantity, unit_price, total_price)
+      INSERT INTO expense_items (expense_id, category_id, description, amount)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     for (const item of items) {
-      if (!item.product_id || !item.quantity || !item.unit_price) {
-        throw new Error('Each item must have a product ID, quantity, and unit price.');
+      if (!item.category_id || !item.amount) {
+        throw new Error('Each item must have a category ID and amount.');
       }
       await db.execute(itemQuery, [
         expenseId,
-        item.product_id,
-        item.product_name || null,
+        item.category_id,
         item.description || null,
-        item.quantity,
-        item.unit_price,
-        item.total_price || (item.quantity * item.unit_price)
+        item.amount
       ]);
     }
 
@@ -166,7 +163,7 @@ const addCategory = async (req, res) => {
   }
 };
 
-const getExpenseCategories = async (req, res) => {
+const getExpenseCategories = async (req, res) => { 
   const { company_id } = req.params;
 
   console.log('Fetching categories for company ID:', company_id);

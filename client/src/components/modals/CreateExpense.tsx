@@ -128,12 +128,11 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
   const handleCreateCategory = async (name: string) => {
     try {
-      const response = await axiosInstance.post(`/api/categories/${selectedCompany?.company_id}`, {
+      const response = await axiosInstance.post(`/api/addCategory/${selectedCompany?.company_id}`, {
         name,
       });
       const newCategory = response.data;
       setCategories((prev) => [...prev, newCategory]);
-      setFormData({ ...formData, category_id: newCategory.id.toString() });
       setIsCreateCategoryModalOpen(false);
       alert('Category created successfully.');
     } catch (error) {
@@ -288,7 +287,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
           amount: Number(item.amount), 
         })),
       };
-
+      console.log('Submitting expense data:', submitData);
       if (expense) {
         await axiosInstance.put(`/api/expenses/${selectedCompany?.company_id}/${expense.id}`, submitData);
       } else {
@@ -1053,7 +1052,10 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
             isOpen={isCreateCategoryModalOpen}
             onClose={() => setIsCreateCategoryModalOpen(false)}
             onCreate={handleCreateCategory}
-            existingMethods={categories.map(c => c.category_name.toLowerCase())}
+            existingMethods={categories
+              .filter(c => c && c.category_name) // Add null check
+              .map(c => c.category_name.toLowerCase())
+            }
           />
             <CreatePaymentAccountModal
             isOpen={isCreatePaymentAccountModalOpen}

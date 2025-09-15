@@ -1,13 +1,13 @@
 const db = require('../DB/db');
 
 const createBill = async (req, res) => {
-      const { company_id } = req.params;
+  const { company_id } = req.params;
   const {
     bill_number,
     order_id,
     vendor_id,
     bill_date,
-    payment_method_id,
+    payment_method,
     notes,
     total_amount,
     items,
@@ -17,6 +17,18 @@ const createBill = async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // First, get the payment method ID from the name
+    let payment_method_id = null;
+    if (payment_method) {
+      const [paymentMethodResult] = await conn.execute(
+        'SELECT id FROM payment_methods WHERE name = ?',
+        [payment_method]
+      );
+      if (paymentMethodResult.length > 0) {
+        payment_method_id = paymentMethodResult[0].id;
+      }
+    }
+
     // Insert Bill
     const [result] = await conn.execute(
       `INSERT INTO bills 
@@ -26,10 +38,10 @@ const createBill = async (req, res) => {
         company_id,
         bill_number,
         order_id || null,
-        vendor_id,
+        vendor_id || null,
         bill_date,
         payment_method_id,
-        notes,
+        notes || null,
         total_amount,
       ]
     );
@@ -44,7 +56,7 @@ const createBill = async (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           billId,
-          item.product_id,
+          item.product_id || null,
           item.product_name,
           item.description,
           item.quantity,
@@ -69,9 +81,14 @@ const getAllBills = async (req, res) => {
 
     try {
         const [bills] = await db.query(
-            `SELECT b.*, pm.name AS payment_method
+            `SELECT b.*,
+            pm.name AS payment_method,
+            v.name AS vendor_name,
+            o.order_no AS order_number
             FROM bills b
             JOIN payment_methods pm ON b.payment_method_id = pm.id
+            LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
+            LEFT JOIN orders o ON b.order_id = o.id
             WHERE b.company_id = ?
             ORDER BY b.created_at DESC`,
             [company_id]

@@ -75,10 +75,10 @@ const getExpenses = async (req, res) => {
 
   try {
     const expenseQuery = `
-      SELECT e.*, c.name as category_name, pa.name as payment_account_name
+      SELECT e.*, c.category_name as category_name, pa.payment_account_name as payment_account_name
       FROM expenses e
-      LEFT JOIN categories c ON e.category_id = c.id
-      LEFT JOIN payment_accounts pa ON e.payment_account_id = pa.id
+      LEFT JOIN expense_categories c ON e.category_id = c.id
+      LEFT JOIN payment_account pa ON e.payment_account_id = pa.id
       WHERE e.company_id = ?
     `;
     const [expenses] = await db.execute(expenseQuery, [company_id]);
@@ -142,20 +142,22 @@ const getPayees = async (req, res) => {
 };
 
 const addCategory = async (req, res) => {
-  const { name, company_id } = req.body;
+  const { company_id } = req.params;
+  const { name } = req.body;
+  console.log('Received data:', { name, company_id });
 
   if (!name || name.trim() === '' || !company_id) {
     return res.status(400).json({ error: 'Category name and company ID are required.' });
   }
 
   try {
-    const query = 'INSERT INTO expense_categories (name, company_id) VALUES (?, ?)';
+    const query = 'INSERT INTO expense_categories (category_name, company_id) VALUES (?, ?)';
     const [result] = await db.execute(query, [name.trim(), company_id]);
 
     res.status(201).json({
       message: 'Category created successfully.',
-      categoryId: result.insertId,
-      name: name.trim()
+      id: result.insertId,
+      category_name: name.trim()
     });
   } catch (error) {
     console.error('Error creating category:', error);

@@ -22,6 +22,7 @@ import InvoiceRecievedPayment from './components/modals/InvoiceReceivePaymentMod
 import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 import EditPurchaseOrders from './components/modals/EditPurchaseOrders';
 import CreateExpense from './components/modals/CreateExpense';
+import EditExpense from './components/modals/EditExpense';
 import CreateBill from './components/modals/CreateBill';
 import CreateCheque from './components/modals/CreateCheque';
 import EditCheques from './components/modals/EditCheques';
@@ -234,6 +235,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CreateExpense />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expense/edit/:id"
+          element={
+            <ProtectedRoute>
+              <EditExpense />
             </ProtectedRoute>
           }
         />

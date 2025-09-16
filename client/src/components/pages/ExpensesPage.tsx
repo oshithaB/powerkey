@@ -9,56 +9,43 @@ import BillsPage from './BillsPage';
 interface Expense {
   id: number;
   expense_number: string;
-  vendor_id: number;
-  vendor_name?: string;
-  employee_id: number;
-  first_name?: string;
-  last_name?: string;
-  account_id: number;
-  account_name?: string;
-  expense_date: string;
+  payee_id: number;
+  payment_account_id: number;
+  payment_date: string;
   amount: number;
-  tax_amount: number;
-  total_amount: number;
-  payment_method: 'cash' | 'check' | 'credit_card' | 'bank_transfer' | 'other';
-  reference_number: string;
+  payment_method_id: number;
   description: string;
-  receipt_file: string;
-  status: 'pending' | 'approved' | 'paid' | 'rejected';
+  status: 'paid' | 'unpaid';
   created_at: string;
+}
+
+interface Payee {
+  id: number;
+  name: string;
 }
 
 export default function ExpensesPage() {
   const { selectedCompany } = useCompany();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payees, setPayees] = useState<Payee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [formData, setFormData] = useState({
-    vendor_id: '',
-    employee_id: '',
-    account_id: '',
-    expense_date: new Date().toISOString().split('T')[0],
-    amount: 0,
-    tax_amount: 0,
-    payment_method: 'cash',
-    reference_number: '',
-    description: ''
-  });
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('expenses');
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchExpenses();
+    fetchPayees();
   }, [selectedCompany]);
 
   const fetchExpenses = async () => {
     try {
       console.log('Fetching expenses for company:', selectedCompany?.company_id);
       const response = await axiosInstance.get(`/api/getExpenses/${selectedCompany?.company_id}`);
+      console.log('Fetched expenses:', response.data);
       setExpenses(response.data);
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -67,57 +54,24 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchPayees = async () => {
     try {
-      const submitData = new FormData();
-      
-      Object.entries(formData).forEach(([key, value]) => {
-        submitData.append(key, value.toString());
-      });
-      
-      if (receiptFile) {
-        submitData.append('receipt', receiptFile);
-      }
-
-      if (editingExpense) {
-        await axiosInstance.put(`/api/expenses/${selectedCompany?.company_id}/${editingExpense.id}`, submitData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } else {
-        await axiosInstance.post(`/api/expenses/${selectedCompany?.company_id}`, submitData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      }
-      
-      fetchExpenses();
-      setShowModal(false);
-      resetForm();
+      const response = await axiosInstance.get(`/api/getPayees/${selectedCompany?.company_id}`);
+      setPayees(response.data);
     } catch (error) {
-      console.error('Error saving expense:', error);
+      console.error('Error fetching payees:', error);
     }
   };
 
   const handleEdit = (expense: Expense) => {
-    setEditingExpense(expense);
-    setFormData({
-      vendor_id: expense.vendor_id?.toString() || '',
-      employee_id: expense.employee_id?.toString() || '',
-      account_id: expense.account_id?.toString() || '',
-      expense_date: expense.expense_date,
-      amount: expense.amount || 0,
-      tax_amount: expense.tax_amount || 0,
-      payment_method: expense.payment_method,
-      reference_number: expense.reference_number || '',
-      description: expense.description || ''
-    });
-    setShowModal(true);
+    
+    navigate(`/expense/edit/${expense.id}`, { state: { expense } });
   };
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        await axiosInstance.delete(`/api/expenses/${selectedCompany?.company_id}/${id}`);
+        await axiosInstance.delete(`/api/deleteExpense/${selectedCompany?.company_id}/${id}`);
         fetchExpenses();
       } catch (error) {
         console.error('Error deleting expense:', error);
@@ -125,31 +79,11 @@ export default function ExpensesPage() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      vendor_id: '',
-      employee_id: '',
-      account_id: '',
-      expense_date: new Date().toISOString().split('T')[0],
-      amount: 0,
-      tax_amount: 0,
-      payment_method: 'cash',
-      reference_number: '',
-      description: ''
-    });
-    setReceiptFile(null);
-    setEditingExpense(null);
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'approved':
-        return 'bg-blue-100 text-blue-800';
       case 'paid':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'unpaid':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -158,7 +92,10 @@ export default function ExpensesPage() {
 
   const filteredExpenses = expenses.filter(expense =>
     expense.expense_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    payees
+      .filter(payee => payee.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .map(payee => payee.id)
+      .includes(expense.payee_id) ||
     expense.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -237,13 +174,7 @@ export default function ExpensesPage() {
                       Expense
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vendor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Account
+                      Payee
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
@@ -273,35 +204,21 @@ export default function ExpensesPage() {
                             <div className="text-sm font-medium text-gray-900">
                               {expense.expense_number}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {expense.description}
-                            </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {expense.vendor_name || 'No vendor'}
+                        {
+                          payees.find(payee => payee.id === expense.payee_id)?.name || 'No payee'
+                        }
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {expense.first_name && expense.last_name 
-                          ? `${expense.first_name} ${expense.last_name}`
-                          : 'Not assigned'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {expense.account_name || 'No account'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {format(new Date(expense.expense_date), 'MMM dd, yyyy')}
+                        {format(new Date(expense.payment_date), 'MMM dd, yyyy')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          ${expense.total_amount?.toLocaleString() || '0.00'}
+                          Rs.{expense.amount?.toLocaleString() || '0.00'}
                         </div>
-                        {expense.tax_amount > 0 && (
-                          <div className="text-sm text-gray-500">
-                            Tax: ${expense.tax_amount.toLocaleString()}
-                          </div>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(expense.status)}`}>
@@ -323,7 +240,7 @@ export default function ExpensesPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {expense.receipt_file && (
+                          {/* {expense.receipt_file && (
                             <button
                               onClick={() => window.open(expense.receipt_file, '_blank')}
                               className="text-green-600 hover:text-green-900"
@@ -331,7 +248,7 @@ export default function ExpensesPage() {
                             >
                               <Receipt className="h-4 w-4" />
                             </button>
-                          )}
+                          )} */}
                           <button
                             onClick={() => handleDelete(expense.id)}
                             className="text-red-600 hover:text-red-900"

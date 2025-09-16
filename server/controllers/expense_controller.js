@@ -1,7 +1,9 @@
 const db = require('../DB/db');
 
 const createExpense = async (req, res) => { 
-  const { company_id, expense_number, payment_account_id, payment_date, payment_method, payee, notes, total_amount, items } = req.body;
+  const { company_id, expense_number, payment_account_id, payment_date, payment_method, payee_id, notes, total_amount, items } = req.body;
+
+  console.log('Creating expense:', req.body);
 
   // Validate required fields
   if (!company_id || !expense_number || !payment_date || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
@@ -14,7 +16,7 @@ const createExpense = async (req, res) => {
 
     // Insert expense
     const expenseQuery = `
-      INSERT INTO expenses (company_id, expense_number, payment_account_id, payment_date, payment_method, payee, notes, amount)
+      INSERT INTO expenses (company_id, expense_number, payment_account_id, payment_date, payment_method_id, payee_id, notes, amount)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [expenseResult] = await db.execute(expenseQuery, [
@@ -23,7 +25,7 @@ const createExpense = async (req, res) => {
       payment_account_id || null,
       payment_date,
       payment_method || null,
-      payee || null,
+      payee_id || null,
       notes || null,
       total_amount
     ]);
@@ -75,10 +77,8 @@ const getExpenses = async (req, res) => {
 
   try {
     const expenseQuery = `
-      SELECT e.*, c.category_name as category_name, pa.payment_account_name as payment_account_name
+      SELECT e.*
       FROM expenses e
-      LEFT JOIN expense_categories c ON e.category_id = c.id
-      LEFT JOIN payment_account pa ON e.payment_account_id = pa.id
       WHERE e.company_id = ?
     `;
     const [expenses] = await db.execute(expenseQuery, [company_id]);
@@ -98,6 +98,105 @@ const getExpenses = async (req, res) => {
   } catch (error) {
     console.error('Error fetching expenses:', error);
     res.status(500).json({ error: 'Failed to fetch expenses.' });
+  }
+};
+
+const updateExpense = async (req, res) => {
+  const { expense_id, company_id} = req.params;
+
+  console.log('Updating expense:', { expense_id, company_id, body: req.body });
+
+  try {
+    const {
+      expense_number,
+      payment_account_id,
+      payment_date,
+      payment_method,
+      payee_id,
+      notes,
+      total_amount,
+      status,
+      items
+    } = req.body;
+
+    // Validate required fields
+    if (!company_id || !expense_id || !expense_number || !payment_date || !total_amount || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Company ID, expense ID, expense number, payment date, total amount, and at least one item are required.' });
+    }
+
+    const conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    const updateExpenseQuery = `
+      UPDATE expenses
+      SET expense_number = ?, payment_account_id = ?, payment_date = ?, payment_method_id = ?, payee_id = ?, notes = ?, amount = ?, status = ?
+      WHERE id = ? AND company_id = ?
+    `;
+    await conn.execute(updateExpenseQuery, [
+      expense_number,
+      payment_account_id || null,
+      payment_date,
+      payment_method || null,
+      payee_id || null,
+      notes || null,
+      total_amount,
+      status || null,
+      expense_id,
+      company_id
+    ]);
+
+    // Delete existing expense items
+    const deleteItemsQuery = `
+      DELETE FROM expense_items
+      WHERE expense_id = ?
+    `;
+    await conn.execute(deleteItemsQuery, [expense_id]);
+
+    // Insert updated expense items
+    const insertItemQuery = `
+      INSERT INTO expense_items (expense_id, category_id, description, amount)
+      VALUES (?, ?, ?, ?)
+    `;
+    for (const item of items) {
+      if (!item.category_id || item.category_id === 0 || !item.amount || item.amount <= 0) {
+        throw new Error('Each item must have a valid category and amount greater than 0.');
+      }
+      await conn.execute(insertItemQuery, [
+        expense_id,
+        item.category_id,
+        item.description || null,
+        item.amount
+      ]);
+    }
+
+    await conn.commit();
+    res.status(200).json({ message: 'Expense updated successfully.' });
+  } catch (error) {
+    await conn.rollback();
+    console.error('Error updating expense:', error);
+    res.status(500).json({ error: 'Failed to update expense.' });
+  } finally {
+    conn.release();
+  }
+};
+
+const deleteExpense = async (req, res) => {
+  const { expense_id, company_id } = req.params;
+  if (!company_id || !expense_id) {
+    return res.status(400).json({ error: 'Company ID and Expense ID are required.' });
+  }
+  try {
+    const deleteItemsQuery = 'DELETE FROM expense_items WHERE expense_id = ?';
+    await db.execute(deleteItemsQuery, [expense_id]);
+    const deleteExpenseQuery = 'DELETE FROM expenses WHERE id = ? AND company_id = ?';
+    const [result] = await db.execute(deleteExpenseQuery, [expense_id, company_id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Expense not found or does not belong to the specified company.' });
+    }
+    res.status(200).json({ message: 'Expense deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting expense:', error);
+    res.status(500).json({ error: 'Failed to delete expense.' });
   }
 };
 
@@ -333,6 +432,8 @@ const getDetailTypesByAccountTypeId = async (req, res) => {
 module.exports = {
   createExpense,
   getExpenses,
+  updateExpense,
+  deleteExpense,
   addPayee,
   getPayees,
   addCategory,

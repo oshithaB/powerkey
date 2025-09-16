@@ -30,6 +30,11 @@ interface PaymentAccount {
   description?: string;
 }
 
+interface PaymentMethod {
+  id: number;
+  name: string;
+}
+
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,11 +44,17 @@ interface CreateModalProps {
   label: string;
 }
 
+interface Payee {
+  id: number;
+  name: string;
+}
+
 export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const { selectedCompany } = useCompany();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [payees, setPayees] = useState<Payee[]>([]);
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -53,10 +64,13 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const [paymentAccountSuggestions, setPaymentAccountSuggestions] = useState<PaymentAccount[]>([]);
   const [paymentMethodSuggestions, setPaymentMethodSuggestions] = useState<string[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
+  const [payeeSuggestions, setPayeeSuggestions] = useState<Payee[]>([]);
+  const [activePayeeSuggestion, setActivePayeeSuggestion] = useState<boolean>(false);
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
   const [isCreatePaymentAccountModalOpen, setIsCreatePaymentAccountModalOpen] = useState(false);
   const [isCreatePaymentMethodModalOpen, setIsCreatePaymentMethodModalOpen] = useState(false);
   const [isCreatePaymentAccountTypeModalOpen, setIsCreatePaymentAccountTypeModalOpen] = useState(false);
+  const [isCreatePayeeModalOpen, setIsCreatePayeeModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const initialFormData = {
@@ -65,7 +79,8 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: '',
     notes: '',
-    payee: '',
+    payee_id: '',
+    payee_name: '',
   };
 
   const [formData, setFormData] = useState(expense ? {
@@ -107,22 +122,21 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
   const fetchPaymentMethods = async () => {
     try {
       const response = await axiosInstance.get(`/api/getPaymentMethods`);
-      const methods = Array.isArray(response.data) 
-        ? response.data.map(method => {
-            if (typeof method === 'string') {
-              return method;
-            }
-            if (typeof method === 'object' && method !== null) {
-              return method.name || method.method || method.title || method.value || String(method);
-            }
-            return String(method);
-          })
-        : [];
-      setPaymentMethods(methods);
+      console.log('Fetched payment methods:', response.data);
+      setPaymentMethods(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
       setError('Failed to fetch payment methods');
       setPaymentMethods([]);
+    }
+  };
+
+  const fetchPayees = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/getPayees/${selectedCompany?.company_id}`);
+      setPayees(response.data);
+    } catch (error) {
+      console.error('Error fetching payees:', error);
     }
   };
 
@@ -178,6 +192,23 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     }
   };
 
+    const handleCreatePayeeMethod = async (name: string) => {
+    try {
+      const response = await axiosInstance.post('/api/addPayee', {
+        name,
+        company_id: selectedCompany?.company_id,
+      });
+      const newPayee = response.data.name;
+      setPayees((prev) => [...prev, newPayee]);
+      setFormData({ ...formData, payee_name: newPayee });
+      setIsCreatePayeeModalOpen(false);
+      alert('Payee created successfully.');
+    } catch (error) {
+      console.error('Error creating Payee:', error);
+      alert('Failed to create Payee.');
+    }
+  };
+
   const handleCreatePaymentAccountType = async (accountType: string, details: string[]) => {
     try {
       await axiosInstance.post(`/api/addPaymentAccountType/${selectedCompany?.company_id}`, {
@@ -196,7 +227,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
     if (selectedCompany) {
       fetchCategories();
       fetchPaymentAccounts();
-      // fetchProducts();
+      fetchPayees();
       fetchPaymentMethods();
     }
   }, [selectedCompany]);
@@ -216,6 +247,22 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       setCategorySuggestions([]);
     }
   }, [items, categories, activeSuggestionIndex]);
+
+  useEffect(() => {
+    if (activePayeeSuggestion !== false) {
+      const activePayee = formData.payee_name || '';
+      if (activePayee) {
+        const filteredPayees = payees.filter(payee =>
+          payee.name.toLowerCase().includes(activePayee.toLowerCase())
+        );
+        setPayeeSuggestions(filteredPayees);
+      } else {
+        setPayeeSuggestions(payees);
+      }
+    } else {
+      setPayeeSuggestions([]);
+    }
+  }, [formData.payee_name, payees, activePayeeSuggestion]);
 
   const updateItem = (index: number, field: keyof ExpenseItem, value: any) => {
     const updatedItems = [...items];
@@ -324,6 +371,67 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
 //   payment method
   const CreatePaymentMethodModal: React.FC<CreateModalProps> = ({
+    isOpen,
+    onClose,
+    onCreate,
+    existingMethods,
+    title,
+    label,
+  }) => {
+    const [newName, setNewName] = useState('');
+  
+    const handleCreate = async () => {
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        alert(`${label} name is required.`);
+        return;
+      }
+      if (existingMethods.includes(trimmedName.toLowerCase())) {
+        alert(`${label} already exists.`);
+        return;
+      }
+      await onCreate(trimmedName);
+      setNewName('');
+    };
+  
+    if (!isOpen) return null;
+  
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label} Name *</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="input w-full"
+              placeholder={`Enter ${label.toLowerCase()} name`}
+              maxLength={50}
+              autoFocus
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
+              Cancel
+            </button>
+            <button type="button" onClick={handleCreate} className="btn btn-primary btn-md">
+              Create
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const CreatePayeeModal: React.FC<CreateModalProps> = ({
     isOpen,
     onClose,
     onCreate,
@@ -764,15 +872,66 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payee
+                  Payee *
                 </label>
                 <input
                   type="text"
                   className="input"
-                  value={formData.payee || ''}
-                  onChange={(e) => setFormData({ ...formData, payee: e.target.value })}
+                  value={formData.payee_name || ''}
+                  onChange={(e) => {
+                    setFormData({ ...formData, payee_name: e.target.value })
+                    setActivePayeeSuggestion(true);
+                  }}
+                  onFocus={() => {
+                    setActivePayeeSuggestion(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setActivePayeeSuggestion(false);
+                      setPayeeSuggestions([]);
+                    }, 200);
+                  }}
                   placeholder="Enter payee name"
+                  required
                 />
+                {activePayeeSuggestion && (
+                  <ul
+                    className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
+                    style={{
+                      maxHeight: '240px',
+                      maxWidth: '420px',
+                      minWidth: '220px',
+                      overflowY: 'auto',
+                      overflowX: 'auto',
+                      width: '420px',
+                    }}
+                  >
+                    <li
+                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t"
+                      onMouseDown={() => {
+                        setIsCreatePayeeModalOpen(true);
+                        setCategorySuggestions([]);
+                        setActiveSuggestionIndex(null);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Payee
+                    </li>
+                    {payeeSuggestions.map((payee, index) => (
+                      <li
+                        key={index}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                        onMouseDown={() => {
+                          setFormData({ ...formData, payee_name: payee.name , payee_id: payee.id.toString() });
+                          setPayeeSuggestions([]);
+                          setActivePayeeSuggestion(false);
+                        }}
+                      >
+                        <span>{payee.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
                 {/* <div>
@@ -848,7 +1007,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Method
+                        Payment Method *
                     </label>
                     <select
                         name="payment_method"
@@ -861,14 +1020,15 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                         }
                         }}
                         className="input w-full"
+                        required
                     >
                         <option value="" disabled>
                         Select Payment Method
                         </option>
                         <option value="create_new">+ Create New Payment Method</option>
                         {paymentMethods.map((method, index) => (
-                        <option key={`${method}-${index}`} value={method}>
-                            {method.charAt(0).toUpperCase() + method.slice(1)}
+                        <option key={index} value={method.id}>
+                            {method.name}
                         </option>
                         ))}
                     </select>
@@ -989,7 +1149,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            className="input w-24"
+                            className="input w-34"
                             value={item.amount}
                             onChange={(e) => updateItem(index, 'amount', parseFloat(e.target.value) || 0)}
                             required
@@ -1080,9 +1240,24 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
             isOpen={isCreatePaymentMethodModalOpen}
             onClose={() => setIsCreatePaymentMethodModalOpen(false)}
             onCreate={handleCreatePaymentMethod}
-            existingMethods={paymentMethods.map(m => m.toLowerCase())}
+            existingMethods={paymentMethods
+              .filter(m => m && m.name) // only keep objects with a valid name
+              .map(m => m.name.toLowerCase())
+            }
             title="Create New Payment Method"
             label="Payment Method"
+          />
+
+          <CreatePayeeModal
+            isOpen={isCreatePayeeModalOpen}
+            onClose={() => setIsCreatePayeeModalOpen(false)}
+            onCreate={handleCreatePayeeMethod}
+            existingMethods={payees
+              .filter(p => p && p.name) // only keep objects with a valid name
+              .map(p => p.name.toLowerCase())
+            }
+            title="Create New Payee"
+            label="Payee"
           />
 
           <PaymentAccountTypeModal

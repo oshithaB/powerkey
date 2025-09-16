@@ -6,6 +6,8 @@ const authorizedRoles = require('../middleware/authorized-roles');
 const {
     createExpense,
     getExpenses,
+    updateExpense,
+    deleteExpense,
     addPayee,
     getPayees,
     addCategory,
@@ -30,6 +32,20 @@ router.get(
     getExpenses
 );
 
+router.put(
+    '/updateExpense/:company_id/:expense_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    updateExpense
+);
+
+router.delete(
+    '/deleteExpense/:company_id/:expense_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    deleteExpense
+);
+
 router.post(
     '/addPayee',
     verifyToken,
@@ -38,7 +54,7 @@ router.post(
 );
 
 router.get(
-    '/getPayees/:companyId',
+    '/getPayees/:company_id',
     verifyToken,
     getPayees
 );

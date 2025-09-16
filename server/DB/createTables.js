@@ -395,18 +395,25 @@ async function createTables(db) {
             id INT AUTO_INCREMENT PRIMARY KEY,
             company_id INT NOT NULL,
             expense_number VARCHAR(100) NOT NULL UNIQUE,
-            payee VARCHAR(255) NOT NULL,
+            payee_id INT NOT NULL,
             payment_account_id INT NOT NULL,
             payment_date DATE NOT NULL,
             payment_method_id INT NOT NULL,
-            category_id INT NOT NULL,
             amount DECIMAL(15,2) NOT NULL,
             notes TEXT,
+            status ENUM('paid', 'unpaid') NOT NULL DEFAULT 'unpaid',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (payment_account_id) REFERENCES payment_account(id),
             FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),
-            FOREIGN KEY (category_id) REFERENCES expense_categories(id),
+            FOREIGN KEY (payee_id) REFERENCES payees(id),
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS payees (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            company_id INT NOT NULL,
+            name VARCHAR(255) NOT NULL,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
         )`,
 

@@ -164,7 +164,7 @@ const getPurchasesByClassDetail = async (req, res) => {
       query += `
           ORDER BY oi.class, o.order_date DESC, o.order_no
       `;
-      
+
       console.log('Query params:', queryParams);
 
       const [results] = await db.execute(query, queryParams);
@@ -249,10 +249,78 @@ const getOpenPurchaseOrdersDetail = async (req, res) => {
   }
 };
 
+const getPurchaseList = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              o.id,
+              o.order_no,
+              o.order_date,
+              v.name as vendor_name,
+              v.email as vendor_email,
+              o.mailling_address,
+              o.shipping_address,
+              o.ship_via,
+              o.total_amount,
+              o.status,
+              o.category_name,
+              o.class,
+              e.name as employee_name,
+              o.location,
+              COUNT(oi.id) as total_items,
+              SUM(CASE WHEN oi.received = TRUE THEN 1 ELSE 0 END) as received_items,
+              SUM(CASE WHEN oi.closed = TRUE THEN 1 ELSE 0 END) as closed_items
+          FROM orders o
+          LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
+          LEFT JOIN order_items oi ON o.id = oi.order_id
+          LEFT JOIN employees e ON o.class = e.id
+          WHERE o.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          GROUP BY o.id, o.order_no, o.order_date, v.name, v.email, o.mailling_address, 
+                   o.shipping_address, o.ship_via, o.total_amount, o.status, 
+                   o.category_name, o.class, o.location
+          ORDER BY o.order_date DESC, o.order_no
+      `;
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching purchase list:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
     getPurchasesByProductServiceSummary,
     getPurchasesByClassDetail,
     getOpenPurchaseOrdersDetail,
+    getPurchaseList,
 };

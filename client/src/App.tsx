@@ -73,6 +73,7 @@ import GetPurchaseList from './components/reports/ExpensesAndSuppliers/GetPurcha
 import GetPurchasesBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesBySupplierSummary';
 import GetOpenPurchaseOrdersList from './components/reports/ExpensesAndSuppliers/GetOpenPurchaseOrdersList';
 import GetExpenseBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierSummary';
+import GetExpenseBySupplierDetail from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierDetail';
 
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
@@ -607,6 +608,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <GetExpenseBySupplierSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/expense-by-supplier-detail/:payee_id"
+          element={
+            <ProtectedRoute>
+              <GetExpenseBySupplierDetail />
             </ProtectedRoute>
           }
         />

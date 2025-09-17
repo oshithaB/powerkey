@@ -283,7 +283,7 @@ export default function ReportsPage() {
       path: '/reports/supplier-contact-list'
     },
     {
-      name: 'Expense by Supplier Summary',
+      name: 'Expense by Payee Summary',
       description: 'Expense summary by supplier',
       path: '/reports/expense-by-supplier'
     },

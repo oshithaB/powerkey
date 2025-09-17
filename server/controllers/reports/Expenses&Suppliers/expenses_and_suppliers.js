@@ -1,3 +1,4 @@
+const { get } = require('http');
 const db = require('../../../DB/db');
 
 const getVendorsContactDetails = async (req, res) => {
@@ -445,6 +446,7 @@ const getExpenseBySupplierSummary = async (req, res) => {
 
       let query = `
           SELECT 
+              p.id as payee_id,
               p.name as payee_name,
               COUNT(DISTINCT e.id) as total_expenses,
               SUM(CASE WHEN e.status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_expenses,
@@ -492,6 +494,168 @@ const getExpenseBySupplierSummary = async (req, res) => {
   }
 };
 
+const getTransactionListBySupplier = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              v.vendor_id,
+              v.name as supplier_name,
+              'Purchase Order' as transaction_type,
+              o.order_no as transaction_number,
+              o.order_date as transaction_date,
+              o.total_amount,
+              NULL as notes,
+              NULL as expense_category,
+              o.status
+          FROM orders o
+          JOIN vendor v ON o.vendor_id = v.vendor_id
+          WHERE o.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+      }
+
+      query += `
+          UNION ALL
+          SELECT 
+              NULL as vendor_id,
+              p.name as supplier_name,
+              'Expense' as transaction_type,
+              e.expense_number as transaction_number,
+              e.payment_date as transaction_date,
+              e.amount as total_amount,
+              e.notes,
+              GROUP_CONCAT(DISTINCT ec.category_name) as expense_category,
+              e.status
+          FROM expenses e
+          JOIN payees p ON e.payee_id = p.id
+          LEFT JOIN expense_items ei ON e.id = ei.expense_id
+          LEFT JOIN expense_categories ec ON ei.category_id = ec.id
+          WHERE e.company_id = ?
+      `;
+
+      queryParams.push(company_id);
+
+      if (start_date && end_date) {
+          query += ` AND DATE(e.payment_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          GROUP BY e.id, p.name, e.expense_number, e.payment_date, e.amount, e.notes, e.status
+          ORDER BY supplier_name, transaction_date DESC
+      `;
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching transaction list by supplier:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+const getExpenseBySupplierDetail = async (req, res) => {
+  try {
+      const { company_id, payee_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, payee_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              e.id as expense_id,
+              e.expense_number,
+              e.payment_date,
+              e.amount as total_amount,
+              e.notes as expense_notes,
+              e.status,
+              p.id as payee_id,
+              p.name as payee_name,
+              pa.payment_account_name,
+              pm.name as payment_method,
+              ei.id as expense_item_id,
+              ei.description as item_description,
+              ei.amount as item_amount,
+              ec.category_name,
+              at.account_type_name,
+              dt.detail_type_name
+          FROM expenses e
+          JOIN payees p ON e.payee_id = p.id
+          LEFT JOIN payment_account pa ON e.payment_account_id = pa.id
+          LEFT JOIN payment_methods pm ON e.payment_method_id = pm.id
+          LEFT JOIN expense_items ei ON e.id = ei.expense_id
+          LEFT JOIN expense_categories ec ON ei.category_id = ec.id
+          LEFT JOIN account_type at ON pa.account_type_id = at.id
+          LEFT JOIN detail_type dt ON pa.detail_type_id = dt.id
+          WHERE e.company_id = ? AND e.payee_id = ?
+      `;
+
+      const queryParams = [company_id, payee_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(e.payment_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          ORDER BY e.payment_date DESC, e.expense_number, ei.id
+      `;
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      // Get payee information for the response
+      const [payeeInfo] = await db.execute(
+          'SELECT id, name FROM payees WHERE id = ? AND company_id = ?',
+          [payee_id, company_id]
+      );
+
+      if (payeeInfo.length === 0) {
+          return res.status(404).json({
+              success: false,
+              message: 'Payee not found'
+          });
+      }
+
+      res.json({
+          success: true,
+          data: results,
+          payee_info: payeeInfo[0],
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching expense by supplier detail:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
@@ -502,4 +666,6 @@ module.exports = {
     getPurchasesBySupplierSummary,
     getOpenPurchaseOrdersList,
     getExpenseBySupplierSummary,
+    getTransactionListBySupplier,
+    getExpenseBySupplierDetail
 };

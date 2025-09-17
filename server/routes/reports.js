@@ -103,6 +103,7 @@ const {
     getPurchaseList,
     getPurchasesBySupplierSummary,
     getOpenPurchaseOrdersList,
+    getExpenseBySupplierSummary,
 } = expensesAndSuppliersController;
 
 // Importing sales tax controller functions
@@ -341,6 +342,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'staff', 'sales']),
     getOpenPurchaseOrdersList
+);
+
+router.get(
+    '/expense-by-supplier-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getExpenseBySupplierSummary
 );
 
 

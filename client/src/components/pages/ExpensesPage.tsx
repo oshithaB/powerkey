@@ -41,6 +41,12 @@ export default function ExpensesPage() {
     fetchPayees();
   }, [selectedCompany]);
 
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state, selectedCompany?.company_id]);
+
   const fetchExpenses = async () => {
     try {
       console.log('Fetching expenses for company:', selectedCompany?.company_id);

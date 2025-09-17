@@ -75,6 +75,7 @@ import TransactionDetailsByTaxCode from './components/reports/SalesTax/Transacti
 import EmployeeContactDetails from './components/reports/Employees/EmployeeContactDetails';
 
 import NotFound from './components/NotFound/NotFound';
+import EditBill from './components/modals/EditBill';
 
 interface Cheque {
   id: number;
@@ -251,6 +252,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <CreateBill />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bill/edit/:id"
+          element={
+            <ProtectedRoute>
+              <EditBill />
             </ProtectedRoute>
           }
         />

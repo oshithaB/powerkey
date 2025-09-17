@@ -355,7 +355,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       if (onSave && typeof onSave === 'function') {
         onSave();
       } else {
-        navigate("/dashboard/expenses");
+        navigate("/dashboard/expenses", { state: { activeTab: 'expenses' } });
       }
     } catch (error: any) {
       console.error('Error saving expense:', error);
@@ -841,7 +841,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
               Create New Expense
             </h3>
             <button
-              onClick={() => navigate("/dashboard/expenses")}
+              onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'expenses' } })}
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-6 w-6" />
@@ -1201,7 +1201,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate("/dashboard/expenses")}
+                onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'expenses' } })}
                 className="btn btn-secondary btn-md"
               >
                 Cancel

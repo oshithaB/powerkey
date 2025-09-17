@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Lock, Eye, EyeOff } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { set } from 'date-fns';
@@ -20,6 +20,10 @@ interface BillItem {
   total_price: number;
 }
 
+interface Role {
+  role_id: number;
+  name: string;
+}
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -30,11 +34,17 @@ interface CreateModalProps {
   label: string;
 }
 
+interface paymentMethod {
+  id: number;
+  name: string;
+}
+
 export default function BillModal({ expense, onSave }: BillModalProps) {
   const { selectedCompany } = useCompany();
   const [vendors, setVendors] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<paymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
@@ -42,6 +52,8 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   const [activeVendorSuggestion, setActiveVendorSuggestion] = useState<boolean>(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const [isCreatePaymentMethodModalOpen, setIsCreatePaymentMethodModalOpen] = useState(false);
+  const [isCreateVendorModalOpen, setIsCreateVendorModalOpen] = useState(false);
+  const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,11 +61,15 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     bill_number: `BILL-${Date.now()}`,
     vendor_name: '',
     vendor_id: '',
-    payment_account_id: '',
     bill_date: new Date().toISOString().split('T')[0],
     payment_method: '',
+    employee_id: '',
+    due_date: '',
     notes: '',
   };
+
+
+  console.log('Payment Methods:', paymentMethods);
 
   const [formData, setFormData] = useState(expense ? {
     ...initialFormData,
@@ -95,6 +111,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
         ...formData,
         bill_number: `BILL-${order.order_no}-${Date.now()}`,
         order_id: orderId, 
+        employee_id: order.class ? order.class.toString() : '',
         vendor_name: order.supplier,
         vendor_id: order.vendor_id ? order.vendor_id.toString() : '',
       });
@@ -137,18 +154,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   const fetchPaymentMethods = async () => {
     try {
       const response = await axiosInstance.get(`/api/getPaymentMethods`);
-      const methods = Array.isArray(response.data) 
-        ? response.data.map(method => {
-            if (typeof method === 'string') {
-              return method;
-            }
-            if (typeof method === 'object' && method !== null) {
-              return method.name || method.method || method.title || method.value || String(method);
-            }
-            return String(method);
-          })
-        : [];
-      setPaymentMethods(methods);
+      setPaymentMethods(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
       setError('Failed to fetch payment methods');
@@ -156,12 +162,23 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/employees`);
+      setEmployees(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      setError('Failed to fetch employees');
+      setEmployees([]);
+    }
+  };
 
   useEffect(() => {
     if (selectedCompany) {
       fetchVendors();
       fetchProducts();
       fetchPaymentMethods();
+      fetchEmployees();
     }
   }, [selectedCompany]);
 
@@ -236,7 +253,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   };
 
   const calculateTotal = () => {
-    return Number(items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2));
+    return Number(items.reduce((sum, item) => sum + Number(item.total_price), 0).toFixed(2));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -261,7 +278,6 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
-        payment_account_id: parseInt(formData.payment_account_id) || null,
         total_amount: Number(total),
         items: items.map(item => ({
           ...item,
@@ -284,7 +300,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
       if (onSave && typeof onSave === 'function') {
         onSave();
       } else {
-        navigate("/dashboard/expenses");
+        navigate("/dashboard/expenses", { state: { activeTab: 'bills' } });
       }
     } catch (error: any) {
       console.error('Error saving expense:', error);
@@ -376,6 +392,684 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     );
   };
 
+  const CreateVendorModal: React.FC<{
+      isOpen: boolean;
+      onClose: () => void;
+      title: string;
+    }> = ({isOpen, onClose, title}) => {
+    const [vendorFormData, setVendorFormData] = useState({
+      name: '',
+      company_name: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zip_code: '',
+      country: '',
+      tax_number: '',
+      fax_number: '',
+      vehicle_number: '',
+      website: '',
+      default_expense_category: '',
+      billing_rate: 0,
+      terms: '',
+      account_number: '',
+      balance: 0,
+      as_of_date: ''
+    });
+
+    const resetVendorForm = () => {
+      const today = new Date().toISOString().split('T')[0];
+      setVendorFormData({
+        company_name: '',
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        country: '',
+        tax_number: '',
+        fax_number: '',
+        vehicle_number: '',
+        website: '',
+        default_expense_category: '',
+        billing_rate: 0,
+        terms: '',
+        account_number: '',
+        balance: 0,
+        as_of_date: today
+      });
+  };
+
+    const handleVendorSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (isNaN(vendorFormData.balance) || isNaN(vendorFormData.billing_rate)) {
+        setError('Please enter valid numbers for balance and billing rate.');
+        return;
+      }
+
+      try {
+        const payload = {
+          ...vendorFormData,
+          vendor_company_name: vendorFormData.company_name,
+          taxes: vendorFormData.default_expense_category,
+          expense_rates: vendorFormData.billing_rate,
+          asOfDate: vendorFormData.as_of_date
+        };
+
+        await axiosInstance.post(`/api/createVendors/${selectedCompany?.company_id}`, payload);
+
+        setIsCreateVendorModalOpen(false);
+        fetchVendors();
+        resetVendorForm();
+        setError(null);
+      } catch (error: any) {
+        console.error('Error saving vendor:', error);
+        setError(error.response?.data?.message || 'Failed to save vendor');
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
+          <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {title}
+              </h3>
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleVendorSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="input"
+                      placeholder="Enter Name"
+                      value={vendorFormData.name}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Company Name
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Company Name"
+                      value={vendorFormData.company_name}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, company_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      className="input"
+                      placeholder="Enter Email"
+                      value={vendorFormData.email}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      className="input"
+                      placeholder="Enter Phone Number"
+                      value={vendorFormData.phone}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.tax_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, tax_number: e.target.value })}
+                      placeholder="Enter Tax Number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Address"
+                      value={vendorFormData.address}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, address: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Fax Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.fax_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, fax_number: e.target.value })}
+                      placeholder="Enter Fax Number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      className="input"
+                      value={vendorFormData.website || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, website: e.target.value })}
+                      placeholder="Enter Website URL"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vehicle Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={vendorFormData.vehicle_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, vehicle_number: e.target.value })}
+                      placeholder="Enter Vehicle Number"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter City"
+                      value={vendorFormData.city}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, city: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter State"
+                      value={vendorFormData.state}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, state: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ZIP Code
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter ZIP Code"
+                      value={vendorFormData.zip_code}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, zip_code: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Country"
+                      value={vendorFormData.country}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, country: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <hr />
+
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Additional Information
+                </h3>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default expense category
+                  </label>
+                  <select
+                    className="input"
+                    value={vendorFormData.default_expense_category}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, default_expense_category: e.target.value })}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="amorization expense">Amortization Expense</option>
+                    <option value="bad debts">Bad Debts</option>
+                    <option value="bank charges">Bank Charges</option>
+                    <option value="commissions and fees">Commissions and Fees</option>
+                    <option value="dues and subscriptions">Dues and Subscriptions</option>
+                    <option value="equipment rental">Equipment Rental</option>
+                    <option value="income tax expense">Income Tax Expense</option>
+                    <option value="insurance-disability">Insurance - Disability</option>
+                    <option value="insurance-general">Insurance - General</option>
+                    <option value="insurance-liability">Insurance - Liability</option>
+                    <option value="interest expense">Interest Expense</option>
+                    <option value="legal and professional fees">Legal and Professional Fees</option>
+                    <option value="loss on discontinued operations">Loss on Discontinued Operations</option>
+                    <option value="management compensation">Management Compensation</option>
+                    <option value="meals and entertainment">Meals and Entertainment</option>
+                    <option value="office expenses">Office Expenses</option>
+                    <option value="other expenses">Other Expenses</option>
+                    <option value="payroll expenses">Payroll Expenses</option>
+                    <option value="purchases">Purchases</option>
+                    <option value="rent or lease payments">Rent or Lease Payments</option>
+                    <option value="repairs and maintenance">Repairs and Maintenance</option>
+                    <option value="salary">Salary</option>
+                    <option value="shipping and delivery">Shipping and Delivery</option>
+                    <option value="stationery and printing">Stationery and Printing</option>
+                    <option value="supplies">Supplies</option>
+                    <option value="travel expenses - general and admin">Travel Expenses - General and Admin Expenses</option>
+                    <option value="travel expenses - selling">Travel Expenses - Selling Expenses</option>
+                    <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
+                    <option value="uncategorized expense">Uncategorized Expense</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="wage expense">Wage Expense</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Billing Rate
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Billing Rate (/hr)"
+                      value={vendorFormData.billing_rate}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setVendorFormData({ ...vendorFormData, billing_rate: isNaN(val) ? 0 : val });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Terms
+                    </label>
+                    <select
+                      className="input"
+                      value={vendorFormData.terms || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, terms: e.target.value })}
+                    >
+                      <option value="">Select Terms</option>
+                      <option value="due_on_receipt">Due on Receipt</option>
+                      <option value="net_15">Net 15</option>
+                      <option value="net_30">Net 30</option>
+                      <option value="net_60">Net 60</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Account Number"
+                      value={vendorFormData.account_number || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, account_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Opening Balance
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Balance"
+                      value={vendorFormData.balance}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setVendorFormData({ ...vendorFormData, balance: isNaN(val) ? 0 : val });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      As of Date
+                    </label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={vendorFormData.as_of_date || ''}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, as_of_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn btn-secondary btn-md"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-md"
+                  >
+                    Create Vendor
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+  }
+
+  const CreateEmployeeModal: React.FC<{
+      isOpen: boolean;
+      onClose: () => void;
+      title: string;
+    }> = ({isOpen, onClose, title}) => {
+
+        const [employeeFormData, setEmployeeFormData] = useState({
+          name: '',
+          email: '',
+          phone: '',
+          address: '',
+          hire_date: '',
+          role_id: '',
+          username: '',
+          password: '',
+        });
+
+        const [showPassword, setShowPassword] = useState(false);
+
+        const [roles, setRoles] = useState<Role[]>([]);
+
+        const resetEmployeeForm = () => {
+          setFormData({
+            name: '',
+            email: '',
+            phone: '',
+            address: '',
+            hire_date: '',
+            role_id: '',
+            username: '',
+            password: '',
+          });
+        };
+
+        const handleSubmit = async (e: React.FormEvent) => {
+          e.preventDefault();
+          setError(null);
+
+          if (employeeFormData.hire_date && isNaN(new Date(employeeFormData.hire_date).getTime())) {
+            setError('Invalid hire date');
+            return;
+          }
+        
+          // Validate that role_id is provided if username or password is filled
+          if ((employeeFormData.username || employeeFormData.password) && !employeeFormData.role_id) {
+            setError('Role is required when username or password is provided');
+            return;
+          }
+          // Validate that both username and password are provided if one is filled
+          if ((employeeFormData.username || employeeFormData.password) && (!employeeFormData.username || !employeeFormData.password)) {
+            setError('Both username and password are required if one is provided');
+            return;
+          }
+        
+          // Employee data payload (without user credentials)
+          const employeePayload = {
+            name: employeeFormData.name,
+            email: employeeFormData.email || null,
+            phone: employeeFormData.phone || null,
+            address: employeeFormData.address || null,
+            hire_date: employeeFormData.hire_date || null,
+          };
+        
+          try {
+            // For new employees, include user data in the employee creation payload
+            const newEmployeePayload: any = { ...employeePayload };
+
+            if (employeeFormData.username && employeeFormData.password && employeeFormData.role_id) {
+              newEmployeePayload.username = employeeFormData.username;
+              newEmployeePayload.password = employeeFormData.password;
+              newEmployeePayload.role_id = parseInt(employeeFormData.role_id);
+            }
+            
+            await axiosInstance.post('/api/employees', newEmployeePayload);
+
+            fetchEmployees();
+            setIsCreateEmployeeModalOpen(false);
+            resetEmployeeForm();
+          } catch (error: any) {
+            console.error('Error saving employee:', error);
+            if (error.response?.status === 400) {
+              setError(error.response.data.message || 'Invalid input data');
+            } else {
+              setError('An unexpected error occurred');
+            }
+          }
+        };
+
+        const fetchRoles = async () => {
+          try {
+            const response = await axiosInstance.get('/api/roles');
+            setRoles(response.data);
+          } catch (error) {
+            console.error('Error fetching roles:', error);
+          }
+        };
+
+        useEffect (() => {
+          if (selectedCompany) {
+            fetchRoles();
+          }
+        }, [selectedCompany]);
+
+        if (!isOpen) return null;
+
+        return (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
+            <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  {title}
+                </h3>
+                <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="input"
+                        placeholder="Enter Employee Name"
+                        value={employeeFormData.name}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Hire Date
+                      </label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={employeeFormData.hire_date}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, hire_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        className="input"
+                        placeholder="Enter Employee Email"
+                        value={employeeFormData.email}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        className="input"
+                        placeholder="Enter Employee Phone"
+                        value={employeeFormData.phone}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Enter Employee Address"
+                      value={employeeFormData.address}
+                      onChange={(e) => setEmployeeFormData({ ...employeeFormData, address: e.target.value })}
+                    />
+                  </div>
+
+                  <hr />
+
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    Login Credentials
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Role {(employeeFormData.username || employeeFormData.password) && '*'}
+                      </label>
+                      <select
+                        className="input"
+                        value={employeeFormData.role_id}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, role_id: e.target.value })}
+                        required={!!employeeFormData.username || !!employeeFormData.password}
+                      >
+                        <option value="" disabled>Select Role</option>
+                        {roles.map((role) => (
+                          <option key={role.role_id} value={role.role_id}>
+                            {role.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Username {(employeeFormData.password || employeeFormData.role_id) && '*'}
+                      </label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Enter Username"
+                        value={employeeFormData.username}
+                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, username: e.target.value })}
+                        disabled={!employeeFormData.role_id}
+                        autoComplete="off"
+                        required={!!employeeFormData.password || !!employeeFormData.role_id}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Password {(employeeFormData.username || employeeFormData.role_id) && '*'}
+                      </label>
+
+                      <div className="mt-1 relative">
+                        <input
+                          id="password"
+                          name="password"
+                          type={showPassword ? 'text' : 'password'}
+                          autoComplete="new-password"
+                          required={!!employeeFormData.username || !!employeeFormData.role_id}
+                          className="input"
+                          disabled={!employeeFormData.role_id}
+                          placeholder="Enter your password"
+                          value={employeeFormData.password}
+                          onChange={(e) => setEmployeeFormData({ ...employeeFormData, password: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-5 w-5 text-gray-400" />
+                          ) : (
+                            <Eye className="h-5 w-5 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => onClose()}
+                      className="btn btn-secondary btn-md"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-md"
+                    >
+                      Create Employee
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )
+    }
+
 
 
   return (
@@ -445,7 +1139,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                   }}
                   placeholder="Enter vendor name"
                 />
-                {activeVendorSuggestion && vendorSuggestions.length > 0 && (
+                {activeVendorSuggestion && (
                   <ul
                     className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
                     style={{
@@ -457,6 +1151,17 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                       width: '420px',
                     }}
                   >
+                    <li
+                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t"
+                      onMouseDown={() => {
+                        setIsCreateVendorModalOpen(true);
+                        setVendorSuggestions([]);
+                        setActiveVendorSuggestion(false);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Vendor
+                    </li>
                     {vendorSuggestions.map((vendor, index) => (
                       <li
                         key={index}
@@ -507,13 +1212,38 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                         <option value="" disabled>
                         Select Payment Method
                         </option>
-                        <option value="create_new">+ Create New Payment Method</option>
+                        <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Payment Method</option>
                         {paymentMethods.map((method, index) => (
-                        <option key={`${method}-${index}`} value={method}>
-                            {method.charAt(0).toUpperCase() + method.slice(1)}
+                        <option key={index} value={method.id}>
+                            {method.name}
                         </option>
                         ))}
                     </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Employee</label>
+                  <select
+                    name="employee"
+                    value={formData.employee_id || ''}
+                    onChange={(e) => {
+                      if (e.target.value === 'create_new') {
+                        setIsCreateEmployeeModalOpen(true);
+                      } else {
+                        setFormData({ ...formData, employee_id: e.target.value })
+                      }
+                    }}
+                    className="input"
+                    disabled={!!formData.order_id}
+                  >
+                    <option value="" disabled>Select Employee</option>
+                    <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Employee</option>
+                    {employees.map((employee, index) => (
+                      <option key={index} value={employee.id}>
+                        {employee.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -671,7 +1401,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                           />
                         </td>
                         <td className="px-4 py-2 text-center border border-gray-200">
-                          Rs. {item.total_price.toFixed(2)}
+                          Rs. {Number(item.total_price).toFixed(2)}
                         </td>
                         <td className="px-4 py-2">
                           <button
@@ -736,14 +1466,29 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
             </div>
           </form>
 
-           <CreatePaymentMethodModal
+          <CreatePaymentMethodModal
             isOpen={isCreatePaymentMethodModalOpen}
             onClose={() => setIsCreatePaymentMethodModalOpen(false)}
             onCreate={handleCreatePaymentMethod}
-            existingMethods={paymentMethods.map(m => m.toLowerCase())}
+            existingMethods={paymentMethods
+              .filter(m => m && m.name)
+              .map(m => m.name.toLowerCase())
+            }
             title="Create New Payment Method"
             label="Payment Method"
           />
+
+          <CreateVendorModal
+            isOpen={isCreateVendorModalOpen}
+            onClose={() => setIsCreateVendorModalOpen(false)}
+            title="Add New Vendor"
+          />
+
+          <CreateEmployeeModal
+            isOpen={isCreateEmployeeModalOpen}
+            onClose={() => setIsCreateEmployeeModalOpen(false)}
+            title="Add New Employee"
+          />  
 
         </div>
       </div>

@@ -14,7 +14,10 @@ interface Bill {
   vendor_name?: string; // Add this
   payment_method_id: number;
   payment_method?: string; // Add this
+  employee_id: number;
+  employee_name?: string; // Add this
   bill_date: string;
+  due_date: string; // Keep as optional
   notes: string;
   total_amount: number;
   order_number?: string; // Add this
@@ -47,7 +50,7 @@ export default function BillsPage() {
   };
 
   const handleEdit = (bill: Bill) => {
-    navigate(`/bill/edit/${bill.id}`);
+    navigate(`/bill/edit/${bill.id}`, { state: { bill } });
   };
 
   const handleDelete = async (id: number) => {
@@ -126,10 +129,10 @@ export default function BillsPage() {
                     Bill
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Payee
+                    Vendor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
+                    Employee
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Bill Date
@@ -139,9 +142,6 @@ export default function BillsPage() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -172,23 +172,18 @@ export default function BillsPage() {
                       {bill.vendor_name || 'No vendor'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {bill.payment_method || 'No payment method'}
+                      {bill.employee_name || 'No employee'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {format(new Date(bill.bill_date), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      N/A {/* Since due_date doesn't exist */}
+                      {format(new Date(bill.due_date), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         Rs. {bill.total_amount.toLocaleString()}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        Pending {/* Default status since status field doesn't exist */}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">

@@ -6,7 +6,7 @@ const authorizedRoles = require('../middleware/authorized-roles');
 const {
     createBill,
     getAllBills,
-    getBillById,
+    getBillItemsById,
     updateBill
 } = require('../controllers/bill_controller');
 
@@ -21,6 +21,13 @@ router.get(
     '/getAllBills/:company_id',
     verifyToken,
     getAllBills
+);
+
+router.get(
+    '/getBillItems/:company_id/:bill_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    getBillItemsById
 );
 
 module.exports = router;

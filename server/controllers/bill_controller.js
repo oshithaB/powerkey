@@ -8,39 +8,68 @@ const createBill = async (req, res) => {
     vendor_id,
     bill_date,
     payment_method,
+    employee_id,
+    due_date,
+    terms,
     notes,
     total_amount,
     items,
   } = req.body;
 
+  console.log("Received createBill request for company_id:", company_id);
+  console.log("Creating bill with data:", req.body);
+
   const conn = await db.getConnection();
   await conn.beginTransaction();
 
   try {
-    // First, get the payment method ID from the name
-    let payment_method_id = null;
-    if (payment_method) {
-      const [paymentMethodResult] = await conn.execute(
-        'SELECT id FROM payment_methods WHERE name = ?',
-        [payment_method]
-      );
-      if (paymentMethodResult.length > 0) {
-        payment_method_id = paymentMethodResult[0].id;
-      }
+    let calculated_due_date = bill_date;
+
+    if (terms === 'Due on Receipt') {
+      calculated_due_date = bill_date;
+    } else if (terms === 'Net 15') {
+      calculated_due_date = new Date(bill_date);
+      calculated_due_date.setDate(calculated_due_date.getDate() + 15);
+      calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
+    } else if (terms === 'Net 30') {
+      calculated_due_date = new Date(bill_date);
+      calculated_due_date.setDate(calculated_due_date.getDate() + 30);
+      calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
+    } else if (terms === 'Net 60') {
+      calculated_due_date = new Date(bill_date);
+      calculated_due_date.setDate(calculated_due_date.getDate() + 60);
+      calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
+    } else if (due_date) {
+      calculated_due_date = due_date;
     }
+
+    console.log("Inserting bill: ", {
+      company_id,
+      bill_number,
+      order_id,
+      vendor_id,
+      employee_id,
+      bill_date,
+      calculated_due_date,
+      payment_method,
+      notes,
+      total_amount
+    });
 
     // Insert Bill
     const [result] = await conn.execute(
       `INSERT INTO bills 
-        (company_id, bill_number, order_id, vendor_id, bill_date, payment_method_id, notes, total_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (company_id, bill_number, order_id, vendor_id, employee_id, bill_date, due_date, payment_method_id, notes, total_amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         company_id,
         bill_number,
         order_id || null,
         vendor_id || null,
+        employee_id || null,
         bill_date,
-        payment_method_id,
+        calculated_due_date,
+        payment_method,
         notes || null,
         total_amount,
       ]
@@ -84,11 +113,13 @@ const getAllBills = async (req, res) => {
             `SELECT b.*,
             pm.name AS payment_method,
             v.name AS vendor_name,
-            o.order_no AS order_number
+            o.order_no AS order_number,
+            emp.name AS employee_name
             FROM bills b
             JOIN payment_methods pm ON b.payment_method_id = pm.id
             LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
             LEFT JOIN orders o ON b.order_id = o.id
+            LEFT JOIN employees emp ON b.employee_id = emp.id
             WHERE b.company_id = ?
             ORDER BY b.created_at DESC`,
             [company_id]
@@ -100,7 +131,7 @@ const getAllBills = async (req, res) => {
   }
 };  
 
-const getBillById = async (req, res) => {
+const getBillItemsById = async (req, res) => {
     const { company_id, bill_id } = req.params;
 
     try {
@@ -118,7 +149,7 @@ const getBillById = async (req, res) => {
             [bill_id]
         );
 
-        res.json({ ...bill[0], items });
+        res.json({ items });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to fetch bill" });
@@ -192,6 +223,6 @@ const updateBill = async (req, res) => {
 module.exports = {
   createBill,
   getAllBills,
-  getBillById,
+  getBillItemsById,
   updateBill,
 };

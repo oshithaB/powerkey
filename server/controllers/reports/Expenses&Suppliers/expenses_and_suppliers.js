@@ -316,6 +316,66 @@ const getPurchaseList = async (req, res) => {
   }
 };
 
+const getPurchasesBySupplierSummary = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              v.vendor_id,
+              v.name as supplier_name,
+              v.email,
+              v.phone,
+              v.address,
+              COUNT(DISTINCT o.id) as total_purchases,
+              SUM(o.total_amount) as total_purchase_amount,
+              MIN(o.order_date) as first_purchase_date,
+              MAX(o.order_date) as last_purchase_date,
+              SUM(CASE WHEN o.status = 'open' THEN 1 ELSE 0 END) as open_orders,
+              SUM(CASE WHEN o.status = 'closed' THEN 1 ELSE 0 END) as closed_orders
+          FROM vendor v
+          LEFT JOIN orders o ON v.vendor_id = o.vendor_id AND o.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          WHERE v.company_id = ? AND v.is_active = TRUE
+          GROUP BY v.vendor_id, v.name, v.email, v.phone, v.address
+          HAVING total_purchases > 0
+          ORDER BY total_purchase_amount DESC, v.name
+      `;
+
+      queryParams.push(company_id);
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching purchases by supplier summary:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
@@ -323,4 +383,5 @@ module.exports = {
     getPurchasesByClassDetail,
     getOpenPurchaseOrdersDetail,
     getPurchaseList,
+    getPurchasesBySupplierSummary,
 };

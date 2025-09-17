@@ -376,6 +376,60 @@ const getPurchasesBySupplierSummary = async (req, res) => {
   }
 };
 
+const getOpenPurchaseOrdersList = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              o.id,
+              o.order_no,
+              o.order_date,
+              v.name as vendor_name,
+              o.total_amount,
+              o.status,
+              COUNT(oi.id) as total_items
+          FROM orders o
+          LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
+          LEFT JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.company_id = ? AND o.status = 'open'
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          GROUP BY o.id, o.order_no, o.order_date, v.name, o.total_amount, o.status
+          ORDER BY o.order_date DESC, o.order_no
+      `;
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching open purchase orders list:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
@@ -384,4 +438,5 @@ module.exports = {
     getOpenPurchaseOrdersDetail,
     getPurchaseList,
     getPurchasesBySupplierSummary,
+    getOpenPurchaseOrdersList,
 };

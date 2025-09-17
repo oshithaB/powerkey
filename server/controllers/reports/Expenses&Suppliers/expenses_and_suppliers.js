@@ -38,30 +38,37 @@ const getVendorsContactDetails = async (req, res) => {
 
 const getChequeDetails = async (req, res) => {
   const { company_id } = req.params;
-  try {
-    const [rows] = await db.query(
-      `SELECT b.*, pm.name AS payment_method_name, v.name AS vendor_name
-        FROM bills b
-        LEFT JOIN payment_methods pm ON b.payment_method_id = pm.id
-        LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
-        WHERE b.company_id = ? AND pm.name = 'cheque'`,
-      [company_id]
-    );
+  const { start_date, end_date } = req.query;
 
-    if (rows.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'No cheque payments found',
-      });
+  try {
+    let query = `
+      SELECT b.*, pm.name AS payment_method_name, v.name AS vendor_name, e.name AS employee_name
+      FROM bills b
+      LEFT JOIN payment_methods pm ON b.payment_method_id = pm.id
+      LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
+      LEFT JOIN employees e ON b.employee_id = e.id
+      WHERE b.company_id = ? AND pm.name = 'cheque'
+    `;
+
+    const queryParams = [company_id];
+
+    if (start_date && end_date) {
+      query += ` AND DATE(b.bill_date) BETWEEN DATE(?) AND DATE(?)`;
+      queryParams.push(start_date, end_date);
+      console.log('Date filter applied:', { start_date, end_date });
     }
+
+    console.log('Query params:', queryParams);
+
+    const [rows] = await db.query(query, queryParams);
 
     res.status(200).json({
       status: 'success',
       data: rows,
+      total_records: rows.length,
+      filter_applied: { start_date, end_date }
     });
-  }
-
-  catch (error) {
+  } catch (error) {
     console.error('Error fetching cheque details:', error);
     res.status(500).json({
       status: 'error',
@@ -411,7 +418,6 @@ const getOpenPurchaseOrdersList = async (req, res) => {
           ORDER BY o.order_date DESC, o.order_no
       `;
 
-      console.log('Final query:', query);
       console.log('Query params:', queryParams);
 
       const [results] = await db.execute(query, queryParams);

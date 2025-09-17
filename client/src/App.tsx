@@ -69,6 +69,7 @@ import ChequeDetails from './components/reports/ExpensesAndSuppliers/ChequeDetai
 import GetPurchasesByProductServiceSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesByProductServiceSummary';
 import GetPurchasesByClassDetail from './components/reports/ExpensesAndSuppliers/GetPurchasesByClassDetail';
 import GetOpenPurchaseOrdersDetail from './components/reports/ExpensesAndSuppliers/GetOpenPurchaseOrdersDetail';
+import GetPurchaseList from './components/reports/ExpensesAndSuppliers/GetPurchaseList';
 
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
@@ -567,6 +568,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <GetOpenPurchaseOrdersDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchase-list"
+          element={
+            <ProtectedRoute>
+              <GetPurchaseList />
             </ProtectedRoute>
           }
         />

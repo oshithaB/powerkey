@@ -7,25 +7,28 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface PurchasesByProductSummaryData {
-  product_id: string;
+interface PurchasesByClassDetailData {
+  class: string;
+  employee_name: string;
+  order_no: string;
+  order_date: string;
+  vendor_name: string;
   product_name: string;
   sku: string;
-  category_name: string;
-  total_quantity_purchased: number;
-  total_purchase_amount: number;
-  average_unit_price: number;
-  number_of_purchases: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
 }
 
-const GetPurchasesByProductServiceSummary: React.FC = () => {
+const GetPurchasesByClassDetail: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<PurchasesByProductSummaryData[]>([]);
+  const [data, setData] = useState<PurchasesByClassDetailData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [productFilter, setProductFilter] = useState<string>('');
-  const [productSuggestions, setProductSuggestions] = useState<PurchasesByProductSummaryData[]>([]);
+  const [classFilter, setClassFilter] = useState<string>('');
+  const [classSuggestions, setClassSuggestions] = useState<PurchasesByClassDetailData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
@@ -41,7 +44,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchPurchasesByProductSummary = async (startDate?: string, endDate?: string) => {
+  const fetchPurchasesByClassDetail = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -50,20 +53,20 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/purchases-by-product-service-summary/${selectedCompany.company_id}`, {
+      const response = await axiosInstance.get(`/api/purchases-by-class-detail/${selectedCompany.company_id}`, {
         params: { start_date: startDate, end_date: endDate },
       });
       
       if (response.data?.data && Array.isArray(response.data.data)) {
         setData(response.data.data);
-        setProductSuggestions(response.data.data);
+        setClassSuggestions(response.data.data);
       } else {
         setData([]);
-        setProductSuggestions([]);
+        setClassSuggestions([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch Purchases by Product Summary data. Please try again.');
+      setError('Failed to fetch Purchases by Class Detail data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -90,7 +93,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchPurchasesByProductSummary(startDate, endDate);
+      fetchPurchasesByClassDetail(startDate, endDate);
     }
   }, [selectedCompany?.company_id, filter, isCustomRange]);
 
@@ -103,28 +106,28 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
     }).format(value);
   };
 
-  const getTotal = (field: keyof PurchasesByProductSummaryData) => {
-    return productSuggestions.reduce((total, product) => {
-      const value = Number(product[field]) || 0;
+  const getTotal = (field: keyof PurchasesByClassDetailData) => {
+    return classSuggestions.reduce((total, item) => {
+      const value = Number(item[field]) || 0;
       return total + value;
     }, 0);
   };
 
   const handlePrint = () => {
-    if (productSuggestions.length === 0) {
+    if (classSuggestions.length === 0) {
       alert('No data available to print');
       return;
     }
     setShowPrintPreview(true);
   };
 
-  const handleProductSearch = (value: string) => {
-    setProductFilter(value);
-    const filtered = data.filter(product =>
-      product.product_name.toLowerCase().includes(value.toLowerCase()) ||
-      product.sku.toLowerCase().includes(value.toLowerCase())
+  const handleClassSearch = (value: string) => {
+    setClassFilter(value);
+    const filtered = data.filter(item =>
+      item.class.toLowerCase().includes(value.toLowerCase()) ||
+      item.employee_name.toLowerCase().includes(value.toLowerCase())
     );
-    setProductSuggestions(filtered.length > 0 ? filtered : data);
+    setClassSuggestions(filtered.length > 0 ? filtered : data);
   };
 
   const handleDownloadPDF = async () => {
@@ -180,7 +183,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
         }
       }
 
-      const filename = `purchases-by-product-summary-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `purchases-by-class-detail-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -206,11 +209,15 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
     }
   `;
 
+  const uniqueSuggestions = Array.from(
+    new Map(classSuggestions.map(item => [item.employee_name, item])).values()
+  );
+
   if (!selectedCompany) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view Purchases by Product Summary.</p>
+          <p className="text-gray-600">Please select a company to view Purchases by Class Detail.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -242,31 +249,31 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">Purchases by Product Summary</h1>
+                <h1 className="text-2xl font-bold mb-4">Purchases by Class Detail</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
-                  <label className="text-xs text-gray-600 mb-1">Search Product</label>
+                  <label className="text-xs text-gray-600 mb-1">Search Class</label>
                   <div className="relative">
                     <input
                       type="text"
                       className="border rounded-md p-2 w-40"
-                      value={productFilter}
-                      onChange={(e) => handleProductSearch(e.target.value)}
-                      placeholder="Search products..."
+                      value={classFilter}
+                      onChange={(e) => handleClassSearch(e.target.value)}
+                      placeholder="Search class..."
                     />
-                    {productFilter && productSuggestions.length > 0 && (
+                    {classFilter && uniqueSuggestions.length > 0 && (
                       <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-40 mt-1">
-                        {productSuggestions.map((product, index) => (
+                        {uniqueSuggestions.map((item) => (
                           <li
-                            key={index}
+                            key={item.employee_name}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
-                              setProductFilter(product.product_name);
-                              setProductSuggestions([product]);
+                              setClassFilter(item.employee_name);
+                              setClassSuggestions(data.filter(i => i.employee_name === item.employee_name));
                             }}
                           >
-                            {product.product_name} ({product.sku})
+                            {item.employee_name}
                           </li>
                         ))}
                       </ul>
@@ -322,7 +329,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                     <button
                       onClick={() => {
                         if (startDate && endDate) {
-                          fetchPurchasesByProductSummary(startDate, endDate);
+                          fetchPurchasesByClassDetail(startDate, endDate);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -351,7 +358,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Purchases by Product Summary</p>
+                <p className="text-sm font-medium">Purchases by Class Detail</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -373,76 +380,90 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && productSuggestions.length === 0 && (
+              {!loading && !error && classSuggestions.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   No purchase data available.
                 </div>
               )}
               
-              {!loading && !error && productSuggestions.length > 0 && (
+              {!loading && !error && classSuggestions.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
                       <tr>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Employee Name
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Order No
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Order Date
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Vendor Name
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Product Name
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          SKU
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Category
+                          Quantity
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total QTY Purchased
+                          Unit Price
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Cost Price
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Purchase Amount
+                          Total Price
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {productSuggestions.map((product, index) => (
+                      {classSuggestions.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="p-2 border-b font-medium">
-                            {product.product_name || 'N/A'}
+                          <td className="p-2 border-b">
+                            {item.employee_name || 'N/A'}
                           </td>
                           <td className="p-2 border-b">
-                            {product.sku || 'N/A'}
+                            {item.order_no || 'N/A'}
                           </td>
                           <td className="p-2 border-b">
-                            {product.category_name || 'N/A'}
+                            {formatDate(item.order_date) || 'N/A'}
+                          </td>
+                          <td className="p-2 border-b">
+                            {item.vendor_name || 'N/A'}
+                          </td>
+                          <td className="p-2 border-b">
+                            {item.product_name || 'N/A'}
                           </td>
                           <td className="p-2 border-b text-right">
-                            {product.total_quantity_purchased}
+                            {item.quantity}
                           </td>
                           <td className="p-2 border-b text-right">
-                            {formatCurrency(product.average_unit_price)}
+                            {formatCurrency(item.unit_price)}
                           </td>
                           <td className="p-2 border-b text-right font-bold">
-                            {formatCurrency(product.total_purchase_amount)}
+                            {formatCurrency(item.total_price)}
                           </td>
                         </tr>
                       ))}
                       <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={3}>Total</td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_quantity_purchased')}
+                          {getTotal('quantity')}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('average_unit_price') / productSuggestions.length)}
+                          {formatCurrency(getTotal('unit_price') / (classSuggestions.length > 0 ? classSuggestions.length : 1))}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_purchase_amount'))}
+                          {formatCurrency(getTotal('total_price'))}
                         </td>
                       </tr>
                     </tbody>
@@ -458,12 +479,12 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && productSuggestions.length > 0 && (
+      {showPrintPreview && classSuggestions.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Purchases by Product Summary
+                Print Preview - Purchases by Class Detail
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -478,8 +499,8 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Purchases by Product Summary</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Purchase Summary Information</h2>
+                    <h1 className="text-3xl font-bold mb-2">Purchases by Class Detail</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Purchase Detail Information</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
@@ -505,63 +526,77 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                     <tr>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Employee Name
+                        </th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Order No
+                        </th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Order Date
+                        </th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Vendor Name
+                        </th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             Product Name
                         </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            SKU
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Category
+                            Quantity
                         </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total QTY Purchased
+                            Unit Price
                         </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Cost Price
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total Purchase Amount
+                            Total Price
                         </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {productSuggestions.map((product, index) => (
+                    {classSuggestions.map((item, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="p-2 border-b font-medium">
-                          {product.product_name || 'N/A'}
+                        <td className="p-2 border-b">
+                          {item.employee_name || 'N/A'}
                         </td>
                         <td className="p-2 border-b">
-                          {product.sku || 'N/A'}
+                          {item.order_no || 'N/A'}
                         </td>
                         <td className="p-2 border-b">
-                          {product.category_name || 'N/A'}
+                          {formatDate(item.order_date) || 'N/A'}
+                        </td>
+                        <td className="p-2 border-b">
+                          {item.vendor_name || 'N/A'}
+                        </td>
+                        <td className="p-2 border-b">
+                          {item.product_name || 'N/A'}
                         </td>
                         <td className="p-2 border-b text-right">
-                          {product.total_quantity_purchased}
+                          {item.quantity}
                         </td>
                         <td className="p-2 border-b text-right">
-                          {formatCurrency(product.average_unit_price)}
+                          {formatCurrency(item.unit_price)}
                         </td>
                         <td className="p-2 border-b text-right font-bold">
-                          {formatCurrency(product.total_purchase_amount)}
+                          {formatCurrency(item.total_price)}
                         </td>
                       </tr>
                     ))}
                     <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={3}>Total</td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_quantity_purchased')}
+                          {getTotal('quantity')}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('average_unit_price') / productSuggestions.length)}
+                          {formatCurrency(getTotal('unit_price') / (classSuggestions.length > 0 ? classSuggestions.length : 1))}
                         </td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_purchase_amount'))}
+                          {formatCurrency(getTotal('total_price'))}
                         </td>
                     </tr>
                   </tbody>
@@ -576,7 +611,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Purchases by Product Summary
+                        Purchases by Class Detail
                       </p>
                     </div>
                   </div>
@@ -605,4 +640,4 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
   );
 };
 
-export default GetPurchasesByProductServiceSummary;
+export default GetPurchasesByClassDetail;

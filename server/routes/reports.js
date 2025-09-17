@@ -98,6 +98,7 @@ const {
     getVendorsContactDetails,
     getChequeDetails,
     getPurchasesByProductServiceSummary,
+    getPurchasesByClassDetail,
 } = expensesAndSuppliersController;
 
 // Importing sales tax controller functions
@@ -301,6 +302,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'staff', 'sales']),
     getPurchasesByProductServiceSummary
+);
+
+router.get(
+    '/purchases-by-class-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getPurchasesByClassDetail
 );
 
 

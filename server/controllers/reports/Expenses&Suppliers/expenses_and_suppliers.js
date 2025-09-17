@@ -125,8 +125,68 @@ const getPurchasesByProductServiceSummary = async (req, res) => {
   }
 };
 
+const getPurchasesByClassDetail = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              o.class,
+              e.name as employee_name,
+              o.order_no,
+              o.order_date,
+              v.name as vendor_name,
+              COALESCE(p.name, oi.name) as product_name,
+              COALESCE(p.sku, oi.sku) as sku,
+              oi.description,
+              oi.qty as quantity,
+              oi.rate as unit_price,
+              oi.amount as total_price
+          FROM order_items oi
+          JOIN orders o ON oi.order_id = o.id
+          LEFT JOIN employees e ON o.class = e.id
+          LEFT JOIN products p ON oi.product_id = p.id
+          LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
+          WHERE o.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          ORDER BY oi.class, o.order_date DESC, o.order_no
+      `;
+
+      console.log('Final query:', query);
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching purchases by class detail:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
-    getPurchasesByProductServiceSummary
+    getPurchasesByProductServiceSummary,
+    getPurchasesByClassDetail,
 };

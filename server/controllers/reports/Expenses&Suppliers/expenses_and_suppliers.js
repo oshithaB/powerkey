@@ -1,41 +1,132 @@
 const db = require('../../../DB/db');
 
 const getVendorsContactDetails = async (req, res) => {
-    const { company_id } = req.params;
-    try {
-      const [rows] = await db.query(
-        `SELECT 
-            vendor_id,
-            name,
-            email,
-            phone,
-            address,
-            tax_number
-         FROM vendor
-         WHERE is_active = TRUE AND company_id = ?`,
-        [company_id]
-      );
-  
-      if (rows.length === 0) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Vendor not found',
-        });
-      }
-  
-      res.status(200).json({
-        status: 'success',
-        data: rows,
-      });
-    } catch (error) {
-      console.error('Error fetching vendor contacts:', error);
-      res.status(500).json({
+  const { company_id } = req.params;
+  try {
+    const [rows] = await db.query(
+      `SELECT 
+          vendor_id,
+          name,
+          email,
+          phone,
+          address,
+          tax_number
+        FROM vendor
+        WHERE is_active = TRUE AND company_id = ?`,
+      [company_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
         status: 'error',
-        message: 'Internal server error',
+        message: 'Vendor not found',
       });
     }
-}
+
+    res.status(200).json({
+      status: 'success',
+      data: rows,
+    });
+  } catch (error) {
+    console.error('Error fetching vendor contacts:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+    });
+  }
+};
+
+const getChequeDetails = async (req, res) => {
+  const { company_id } = req.params;
+  try {
+    const [rows] = await db.query(
+      `SELECT b.*, pm.name AS payment_method_name, v.name AS vendor_name
+        FROM bills b
+        LEFT JOIN payment_methods pm ON b.payment_method_id = pm.id
+        LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
+        WHERE b.company_id = ? AND pm.name = 'cheque'`,
+      [company_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'No cheque payments found',
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: rows,
+    });
+  }
+
+  catch (error) {
+    console.error('Error fetching cheque details:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+    });
+  }
+};
+
+const getPurchasesByProductServiceSummary = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              p.id as product_id,
+              p.name as product_name,
+              p.sku,
+              pc.name as category_name,
+              SUM(oi.qty) as total_quantity_purchased,
+              SUM(oi.amount) as total_purchase_amount,
+              AVG(oi.rate) as average_unit_price,
+              COUNT(DISTINCT o.id) as number_of_purchases
+          FROM order_items oi
+          JOIN orders o ON oi.order_id = o.id
+          LEFT JOIN products p ON oi.product_id = p.id
+          LEFT JOIN product_categories pc ON p.category_id = pc.id
+          WHERE o.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          GROUP BY p.id, p.name, p.sku, pc.name, oi.name, oi.sku
+          ORDER BY total_purchase_amount DESC, COALESCE(p.name, oi.name)
+      `;
+
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching purchases by product/service summary:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
 
 module.exports = {
     getVendorsContactDetails,
+    getChequeDetails,
+    getPurchasesByProductServiceSummary
 };

@@ -65,6 +65,8 @@ import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBala
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
+import ChequeDetails from './components/reports/ExpensesAndSuppliers/ChequeDetails';
+import GetPurchasesByProductServiceSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesByProductServiceSummary';
 
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
@@ -527,6 +529,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SupplierContactDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/cheque-detail"
+          element={
+            <ProtectedRoute>
+              <ChequeDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchases-by-product-service"
+          element={
+            <ProtectedRoute>
+              <GetPurchasesByProductServiceSummary />
             </ProtectedRoute>
           }
         />

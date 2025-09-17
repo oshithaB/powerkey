@@ -436,6 +436,62 @@ const getOpenPurchaseOrdersList = async (req, res) => {
   }
 };
 
+const getExpenseBySupplierSummary = async (req, res) => {
+  try {
+      const { company_id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      console.log('Received params:', { company_id, start_date, end_date });
+
+      let query = `
+          SELECT 
+              p.name as payee_name,
+              COUNT(DISTINCT e.id) as total_expenses,
+              SUM(CASE WHEN e.status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_expenses,
+              SUM(CASE WHEN e.status = 'paid' THEN 1 ELSE 0 END) as paid_expenses,
+              SUM(e.amount) as total_expense_amount,
+              MIN(e.payment_date) as first_expense_date,
+              MAX(e.payment_date) as last_expense_date,
+              status,
+              GROUP_CONCAT(DISTINCT ec.category_name) as expense_categories
+          FROM expenses e
+          JOIN payees p ON e.payee_id = p.id
+          LEFT JOIN expense_items ei ON e.id = ei.expense_id
+          LEFT JOIN expense_categories ec ON ei.category_id = ec.id
+          WHERE e.company_id = ?
+      `;
+
+      const queryParams = [company_id];
+
+      if (start_date && end_date) {
+          query += ` AND DATE(e.payment_date) BETWEEN DATE(?) AND DATE(?)`;
+          queryParams.push(start_date, end_date);
+          console.log('Date filter applied:', { start_date, end_date });
+      }
+
+      query += `
+          GROUP BY p.id, p.name
+          ORDER BY total_expense_amount DESC, p.name
+      `;
+
+      console.log('Query params:', queryParams);
+
+      const [results] = await db.execute(query, queryParams);
+
+      console.log(`Found ${results.length} records`);
+
+      res.json({
+          success: true,
+          data: results,
+          total_records: results.length,
+          filter_applied: { start_date, end_date }
+      });
+  } catch (error) {
+      console.error('Error fetching expense by supplier summary:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 module.exports = {
     getVendorsContactDetails,
     getChequeDetails,
@@ -445,4 +501,5 @@ module.exports = {
     getPurchaseList,
     getPurchasesBySupplierSummary,
     getOpenPurchaseOrdersList,
+    getExpenseBySupplierSummary,
 };

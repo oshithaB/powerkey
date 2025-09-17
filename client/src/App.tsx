@@ -72,6 +72,7 @@ import GetOpenPurchaseOrdersDetail from './components/reports/ExpensesAndSupplie
 import GetPurchaseList from './components/reports/ExpensesAndSuppliers/GetPurchaseList';
 import GetPurchasesBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesBySupplierSummary';
 import GetOpenPurchaseOrdersList from './components/reports/ExpensesAndSuppliers/GetOpenPurchaseOrdersList';
+import GetExpenseBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierSummary';
 
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
@@ -597,6 +598,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <GetOpenPurchaseOrdersList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/expense-by-supplier"
+          element={
+            <ProtectedRoute>
+              <GetExpenseBySupplierSummary />
             </ProtectedRoute>
           }
         />

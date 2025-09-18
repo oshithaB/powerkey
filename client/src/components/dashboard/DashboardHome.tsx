@@ -31,37 +31,97 @@ interface MoneyFlowData {
 export default function DashboardHome({ data }: DashboardHomeProps) {
   const [moneyFlowData, setMoneyFlowData] = useState<MoneyFlowData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('today');
+  const [periodStart, setPeriodStart] = useState<string>('');
+  const [periodEnd, setPeriodEnd] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
   const { selectedCompany } = useCompany();
   
   // Default values for metrics and recentInvoices
   const metrics = data?.metrics || {};
   const recentInvoices = data?.recentInvoices || [];
 
-  useEffect(() => {
-    const fetchMoneyFlowData = async () => {
-      try {
-        const response = await fetch(`/api/moneyInDrawer/${selectedCompany?.company_id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          setMoneyFlowData(result.data);
-        } else {
-          console.error('Failed to fetch money flow data');
-        }
-      } catch (error) {
-        console.error('Error fetching money flow data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  };
 
-    fetchMoneyFlowData();
-  }, []);
+  const fetchMoneyFlowData = async (startDate?: string, endDate?: string) => {
+    if (!selectedCompany?.company_id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        console.error('No authentication token found');
+        setLoading(false);
+        return;
+      }
+
+      let url = `/api/moneyInDrawer/${selectedCompany.company_id}`;
+      const params = new URLSearchParams();
+      
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setMoneyFlowData(result.data);
+      } else {
+        console.error('Failed to fetch money flow data:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching money flow data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCompany?.company_id) {
+      if (isCustomRange) {
+        return;
+      }
+      
+      const today = new Date();
+      let startDate: string | undefined;
+      let endDate: string = today.toISOString().split('T')[0];
+
+      if (filter === 'today') {
+        startDate = today.toISOString().split('T')[0];
+        endDate = startDate;
+      } else if (filter === 'week') {
+        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+      } else if (filter === 'month') {
+        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
+      } else if (filter === 'year') {
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+      }
+
+      setPeriodStart(startDate || '');
+      setPeriodEnd(endDate);
+      fetchMoneyFlowData(startDate, endDate);
+    }
+  }, [selectedCompany?.company_id, filter, isCustomRange]);
 
   const statCards = [
     {
@@ -125,6 +185,25 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
       );
     }
     return null;
+  };
+
+  const getPeriodText = () => {
+    if (isCustomRange && startDate && endDate) {
+      return `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`;
+    }
+    
+    switch (filter) {
+      case 'today':
+        return `Today: ${formatDate(periodStart)}`;
+      case 'week':
+        return `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`;
+      case 'month':
+        return `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`;
+      case 'year':
+        return `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`;
+      default:
+        return '';
+    }
   };
 
   return (
@@ -274,10 +353,73 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
       <div className="card">
         <div className="card-header">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Today's Money Flow</h2>
-            <div className="text-sm text-gray-500">
-              {format(new Date(), 'MMMM dd, yyyy')}
+            <h2 className="text-lg font-semibold">Money Flow</h2>
+            <div className="flex space-x-2 items-end">
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-600 mb-1">Filter Period</label>
+                <select
+                  value={isCustomRange ? 'custom' : filter}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'custom') {
+                      setIsCustomRange(true);
+                      setFilter('');
+                    } else {
+                      setIsCustomRange(false);
+                      setFilter(value);
+                      setStartDate('');
+                      setEndDate('');
+                    }
+                  }}
+                  className="border rounded-md p-2 w-40"
+                >
+                  <option value="">Select Period</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last Week</option>
+                  <option value="month">Last Month</option>
+                  <option value="year">Last Year</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+              {isCustomRange && (
+                <>
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="border rounded-md p-2"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="border rounded-md p-2"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (startDate && endDate) {
+                        setPeriodStart(startDate);
+                        setPeriodEnd(endDate);
+                        fetchMoneyFlowData(startDate, endDate);
+                      }
+                    }}
+                    disabled={!startDate || !endDate}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    Apply
+                  </button>
+                </>
+              )}
             </div>
+          </div>
+          <div className="text-sm text-gray-500 mt-2">
+            {getPeriodText()}
           </div>
         </div>
         <div className="card-content">
@@ -377,9 +519,9 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Wallet className="h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions today</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions</h3>
                     <p className="text-sm text-gray-500 text-center">
-                      No money received or spent today. Start by creating an invoice or recording an expense.
+                      No money received or spent in the selected period. Start by creating an invoice or recording an expense.
                     </p>
                   </div>
                 )}

@@ -26,6 +26,20 @@ export default function ChequesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
+  const updateNearDueCheques = (fetchedCheques: Cheque[]) => {
+    const hasNearDue = fetchedCheques.some((cheque) => {
+      if (cheque.cheque_date && cheque.status === 'pending') {
+        const today = new Date();
+        const chequeDate = new Date(cheque.cheque_date);
+        const diffInTime = chequeDate.getTime() - today.getTime();
+        const diffInDays = diffInTime / (1000 * 3600 * 24);
+        return diffInDays == 0 || diffInDays <= 3;
+      }
+      return false;
+    });
+    setHasNearDueCheques(hasNearDue);
+  };
+
   useEffect(() => {
     fetchCheques();
   }, [selectedCompany]);
@@ -36,22 +50,14 @@ export default function ChequesPage() {
         const response = await axiosInstance.get(`/api/getChequesByCompanyId/${selectedCompany.company_id}`);
         const fetchedCheques = response.data;
         setCheques(fetchedCheques);
-
-        // Check for near-due pending cheques
-        const hasNearDue = fetchedCheques.some((cheque: Cheque) => {
-          if (cheque.cheque_date && cheque.status === 'pending') {
-            const today = new Date();
-            const chequeDate = new Date(cheque.cheque_date);
-            const diffInTime = chequeDate.getTime() - today.getTime();
-            const diffInDays = diffInTime / (1000 * 3600 * 24);
-            return diffInDays <= 0 && diffInDays <= 3;
-          }
-          return false;
-        });
-        setHasNearDueCheques(hasNearDue);
+        updateNearDueCheques(fetchedCheques);
+      } else {
+        setCheques([]);
+        setHasNearDueCheques(false);
       }
     } catch (error) {
       console.error('Error fetching cheques:', error);
+      setHasNearDueCheques(false);
     } finally {
       setLoading(false);
     }
@@ -65,7 +71,7 @@ export default function ChequesPage() {
     if (window.confirm('Are you sure you want to delete this cheque?')) {
       try {
         await axiosInstance.delete(`/api/deleteCheque/${id}`);
-        fetchCheques();
+        await fetchCheques();
       } catch (error) {
         console.error('Error deleting cheque:', error);
         alert('Failed to delete cheque. Please try again.');
@@ -78,7 +84,7 @@ export default function ChequesPage() {
       await axiosInstance.put(`/api/updateStatus/${chequeId}`, {
         status: newStatus
       });
-      fetchCheques();
+      await fetchCheques();
     } catch (error) {
       console.error('Error updating cheque status:', error);
       alert('Failed to update cheque status. Please try again.');
@@ -125,7 +131,6 @@ export default function ChequesPage() {
         </button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
         <input
@@ -137,7 +142,6 @@ export default function ChequesPage() {
         />
       </div>
 
-      {/* Cheques Table */}
       <div className="card">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -175,21 +179,20 @@ export default function ChequesPage() {
                 </tr>
               ) : (
                 filteredCheques.map((cheque) => {
-                  // Check if cheque date is within 3 days from today and status is pending
                   const isNearDue = cheque.cheque_date && cheque.status === 'pending'
                     ? (() => {
                         const today = new Date();
                         const chequeDate = new Date(cheque.cheque_date);
                         const diffInTime = chequeDate.getTime() - today.getTime();
                         const diffInDays = diffInTime / (1000 * 3600 * 24);
-                        return diffInDays <= 0 && diffInDays <= 3;
+                        return diffInDays == 0 || diffInDays <= 3;
                       })()
                     : false;
 
                   return (
                     <tr
                       key={cheque.id}
-                      className={` ${isNearDue ? 'bg-red-100' : ''}`}
+                      className={`hover:bg-gray-50 ${isNearDue ? 'bg-red-100' : ''}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

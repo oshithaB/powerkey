@@ -132,7 +132,7 @@ function AppContent() {
               const chequeDate = new Date(cheque.cheque_date);
               const diffInTime = chequeDate.getTime() - today.getTime();
               const diffInDays = diffInTime / (1000 * 3600 * 24);
-              return diffInDays >= 0 && diffInDays <= 3;
+              return diffInDays == 0 || diffInDays <= 3;
             }
             return false;
           });

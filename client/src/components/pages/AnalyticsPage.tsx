@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, BarChart3, TrendingUp, Activity } from 'lucide-react';
-import { Bar, Line, Pie } from 'react-chartjs-2'; // Added Pie import
+import { Bar, Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,

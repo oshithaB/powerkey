@@ -56,6 +56,56 @@ const getSupplierBalanceSummary = async (req, res) => {
     }
 };
 
+const getSupplierBalanceDetail = async (req, res) => {
+    try {
+        const { company_id, vendor_id } = req.params;
+        const { start_date, end_date } = req.query;
+
+        let query = `
+            SELECT
+                o.id,
+                v.vendor_id,
+                v.name AS vendor_name,
+                v.email AS vendor_email,
+                v.phone AS vendor_phone,
+                o.order_no,
+                o.order_date,
+                o.status,
+                oi.name AS product_name,
+                oi.sku AS product_sku,
+                oi.qty AS quantity,
+                oi.rate AS unit_cost_price,
+                (oi.qty * oi.rate) AS total_cost_price
+            FROM orders o
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            LEFT JOIN vendor v ON o.vendor_id = v.vendor_id
+            WHERE o.company_id = ?
+            AND o.vendor_id = ?
+        `;
+
+        const queryParams = [company_id, vendor_id];
+
+        if (start_date && end_date) {
+            query += ` AND DATE(o.order_date) BETWEEN DATE(?) AND DATE(?)`;
+            queryParams.push(start_date, end_date);
+        }
+
+        query += ` ORDER BY o.order_date DESC`;
+
+        const [results] = await db.execute(query, queryParams);
+
+        res.json({
+            success: true,
+            data: results,
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
+        });
+    } catch (error) {
+        console.error('Error fetching vendor balance detail report:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
 const getAPAgingSummary = async(req, res) => {
     // try {
     //     const { company_id } = req.params;
@@ -148,5 +198,6 @@ const getAPAgingSummary = async(req, res) => {
 
 module.exports = {
     getSupplierBalanceSummary,
+    getSupplierBalanceDetail,
     getAPAgingSummary,
 }

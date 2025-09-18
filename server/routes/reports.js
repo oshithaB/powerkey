@@ -67,6 +67,7 @@ const {
 // Import what you owe controller functions
 const {
     getSupplierBalanceSummary,
+    getSupplierBalanceDetail,
     getAPAgingSummary,
 } = whatYouOweController
 
@@ -286,6 +287,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getSupplierBalanceSummary
+);
+
+router.get(
+    '/supplier-balance-detail/:company_id/:vendor_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSupplierBalanceDetail
 );
 
 router.get(

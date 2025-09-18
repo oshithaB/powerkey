@@ -417,11 +417,62 @@ const deleteCompany = async (req, res) => {
     }
 };
 
-module.exports = { 
-    createCompany, 
-    selectCompany, 
-    getCompanies, 
+const getMoneyInDrawerByCompany = async (req, res) => {
+    try {
+        console.log('Get money in drawer by company request received');
+
+        const { company_id } = req.params;
+        const today = new Date().toISOString().split('T')[0];
+
+        // Query to get total money received today from payments for specific company
+        const [paymentsResult] = await db.query(`
+            SELECT COALESCE(SUM(payment_amount), 0) as total_received
+            FROM payments
+            WHERE DATE(payment_date) = ? AND company_id = ?
+        `, [today, company_id]);
+
+        // Query to get total money spent today from expenses for specific company
+        const [expensesResult] = await db.query(`
+            SELECT COALESCE(SUM(amount), 0) as total_spent
+            FROM expenses
+            WHERE DATE(updated_at) = ? AND company_id = ? AND status = 'paid'
+        `, [today, company_id]);
+
+        const totalReceived = parseFloat(paymentsResult[0].total_received) || 0;
+        const totalSpent = parseFloat(expensesResult[0].total_spent) || 0;
+        const netAmount = totalReceived - totalSpent;
+
+        const result = {
+            company_id: company_id,
+            date: today,
+            total_received: totalReceived,
+            total_spent: totalSpent,
+            net_amount: netAmount,
+            money_in_drawer: netAmount
+        };
+
+        console.log('Money in drawer calculated for company:', result);
+
+        return res.status(200).json({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        console.error('Error calculating money in drawer by company:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+};
+
+module.exports = {
+    createCompany,
+    selectCompany,
+    getCompanies,
     getDashboardData,
     updateCompany,
-    deleteCompany
+    deleteCompany,
+    getMoneyInDrawerByCompany
 };

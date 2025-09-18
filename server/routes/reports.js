@@ -67,6 +67,7 @@ const {
 // Import what you owe controller functions
 const {
     getSupplierBalanceSummary,
+    getAPAgingSummary,
 } = whatYouOweController
 
 
@@ -104,7 +105,6 @@ const {
     getPurchasesBySupplierSummary,
     getOpenPurchaseOrdersList,
     getExpenseBySupplierSummary,
-    getTransactionListBySupplier,
     getExpenseBySupplierDetail
 } = expensesAndSuppliersController;
 
@@ -288,6 +288,13 @@ router.get(
     getSupplierBalanceSummary
 );
 
+router.get(
+    '/ap-aging-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getAPAgingSummary
+);
+
 
 // Expenses and Suppliers routes ========================================================================================
 router.get(
@@ -358,13 +365,6 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'staff', 'sales']),
     getExpenseBySupplierDetail
-);
-
-router.get(
-    '/transaction-list-by-supplier/:company_id',
-    verifyToken,
-    authorizedRoles(['admin', 'staff', 'sales']),
-    getTransactionListBySupplier
 );
 
 

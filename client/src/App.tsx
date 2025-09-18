@@ -63,6 +63,7 @@ import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalan
 // What you owe Reports
 import APAgingSummaryReport from './components/reports/WhatYouOwe/APAgingSummaryReport';
 import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
+import SupplierBalanceDetails from './components/reports/WhatYouOwe/SupplierBalanceDetails';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -665,6 +666,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SupplierBalanceSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/supplier-balance-detail/:vendor_id"
+          element={
+            <ProtectedRoute>
+              <SupplierBalanceDetails />
             </ProtectedRoute>
           }
         />

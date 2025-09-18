@@ -61,6 +61,7 @@ import CustomerBalanceSummary from './components/reports/WhoOwesYou/CustomerBala
 import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalanceDetail';
 
 // What you owe Reports
+import APAgingSummaryReport from './components/reports/WhatYouOwe/APAgingSummaryReport';
 import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
 
 // Expense and Suppliers Reports
@@ -650,6 +651,15 @@ function AppContent() {
         />
 
         {/* What you owe section */}
+        <Route
+          path="/reports/ap-aging-summary"
+          element={
+            <ProtectedRoute>
+              <APAgingSummaryReport />
+            </ProtectedRoute>
+          }
+        />
+        
         <Route
           path="/reports/supplier-balance-summary"
           element={

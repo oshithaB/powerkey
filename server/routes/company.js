@@ -10,7 +10,8 @@ const {
     getCompanies, 
     getDashboardData,
     updateCompany,
-    deleteCompany
+    deleteCompany,
+    getMoneyInDrawerByCompany,
 } = require('../controllers/company_controller');
 
 // Upload single image with field name 'logo'
@@ -53,6 +54,11 @@ router.delete(
   verifyToken,
   authorizedRoles(['admin']),
   deleteCompany
+);
+
+router.get(
+  '/moneyInDrawer/:company_id',
+  getMoneyInDrawerByCompany
 );
 
 module.exports = router;

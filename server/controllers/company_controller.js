@@ -422,21 +422,26 @@ const getMoneyInDrawerByCompany = async (req, res) => {
         console.log('Get money in drawer by company request received');
 
         const { company_id } = req.params;
+        const { start_date, end_date } = req.query;
+        
+        // Default to today if no dates provided
         const today = new Date().toISOString().split('T')[0];
+        const startDate = start_date || today;
+        const endDate = end_date || today;
 
-        // Query to get total money received today from payments for specific company
+        // Query to get total money received in date range from payments for specific company
         const [paymentsResult] = await db.query(`
             SELECT COALESCE(SUM(payment_amount), 0) as total_received
             FROM payments
-            WHERE DATE(payment_date) = ? AND company_id = ?
-        `, [today, company_id]);
+            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? AND company_id = ?
+        `, [startDate, endDate, company_id]);
 
-        // Query to get total money spent today from expenses for specific company
+        // Query to get total money spent in date range from expenses for specific company
         const [expensesResult] = await db.query(`
             SELECT COALESCE(SUM(amount), 0) as total_spent
             FROM expenses
-            WHERE DATE(updated_at) = ? AND company_id = ? AND status = 'paid'
-        `, [today, company_id]);
+            WHERE DATE(updated_at) >= ? AND DATE(updated_at) <= ? AND company_id = ? AND status = 'paid'
+        `, [startDate, endDate, company_id]);
 
         const totalReceived = parseFloat(paymentsResult[0].total_received) || 0;
         const totalSpent = parseFloat(expensesResult[0].total_spent) || 0;
@@ -444,7 +449,8 @@ const getMoneyInDrawerByCompany = async (req, res) => {
 
         const result = {
             company_id: company_id,
-            date: today,
+            start_date: startDate,
+            end_date: endDate,
             total_received: totalReceived,
             total_spent: totalSpent,
             net_amount: netAmount,

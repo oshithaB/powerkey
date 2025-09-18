@@ -223,11 +223,6 @@ export default function ReportsPage() {
       name: 'Supplier Balance Summary',
       description: 'Outstanding balances by supplier',
       path: '/reports/supplier-balance-summary'
-    },
-    {
-      name: 'Supplier Balance Detail',
-      description: 'Detailed supplier outstanding and balances',
-      path: '/reports/supplier-balance-detail'
     }
   ];
 

@@ -156,21 +156,23 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
 
   // Prepare pie chart data
   const pieChartData = moneyFlowData ? [
-    {
+    ...(moneyFlowData.total_received > 0 ? [{
       name: 'Money Received',
       value: moneyFlowData.total_received,
       color: '#10B981', // green
       icon: '↗'
-    },
-    {
+    }] : []),
+    ...(moneyFlowData.total_spent > 0 ? [{
       name: 'Money Spent',
       value: moneyFlowData.total_spent,
       color: '#EF4444', // red
       icon: '↘'
-    }
-  ].filter(item => item.value > 0) : [];
+    }] : [])
+  ] : [];
 
-  const COLORS = ['#10B981', '#EF4444'];
+  const getColor = (entry: any, index: number) => {
+    return entry.name === 'Money Received' ? '#10B981' : '#EF4444';
+  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -497,7 +499,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                             dataKey="value"
                           >
                             {pieChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              <Cell key={`cell-${index}`} fill={getColor(entry, index)} />
                             ))}
                           </Pie>
                           <Tooltip content={<CustomTooltip />} />
@@ -509,7 +511,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                         <div key={entry.name} className="flex items-center">
                           <div 
                             className="w-3 h-3 rounded-full mr-2"
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            style={{ backgroundColor: getColor(entry, index) }}
                           ></div>
                           <span className="text-sm text-gray-600">{entry.name}</span>
                         </div>

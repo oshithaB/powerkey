@@ -438,13 +438,22 @@ const getMoneyInDrawerByCompany = async (req, res) => {
 
         // Query to get total money spent in date range from expenses for specific company
         const [expensesResult] = await db.query(`
-            SELECT COALESCE(SUM(amount), 0) as total_spent
+            SELECT COALESCE(SUM(amount), 0) as total_spent_expenses
             FROM expenses
             WHERE DATE(updated_at) >= ? AND DATE(updated_at) <= ? AND company_id = ? AND status = 'paid'
         `, [startDate, endDate, company_id]);
 
+        // Query to get total money spent in date range from bill payments for specific company
+        const [billPaymentsResult] = await db.query(`
+            SELECT COALESCE(SUM(payment_amount), 0) as total_spent_bills
+            FROM bill_payments
+            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? AND company_id = ?
+        `, [startDate, endDate, company_id]);
+
         const totalReceived = parseFloat(paymentsResult[0].total_received) || 0;
-        const totalSpent = parseFloat(expensesResult[0].total_spent) || 0;
+        const totalSpentExpenses = parseFloat(expensesResult[0].total_spent_expenses) || 0;
+        const totalSpentBillPayments = parseFloat(billPaymentsResult[0].total_spent_bills) || 0;
+        const totalSpent = totalSpentExpenses + totalSpentBillPayments;
         const netAmount = totalReceived - totalSpent;
 
         const result = {
@@ -453,6 +462,8 @@ const getMoneyInDrawerByCompany = async (req, res) => {
             end_date: endDate,
             total_received: totalReceived,
             total_spent: totalSpent,
+            total_spent_expenses: totalSpentExpenses,
+            total_spent_bill_payments: totalSpentBillPayments,
             net_amount: netAmount,
             money_in_drawer: netAmount
         };

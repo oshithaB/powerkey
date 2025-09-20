@@ -11,7 +11,9 @@ import {
   ArrowUpRight,
   Users,
   TrendingDown,
-  Wallet
+  Wallet,
+  Receipt,
+  CreditCard
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -23,6 +25,8 @@ interface DashboardHomeProps {
 interface MoneyFlowData {
   total_received: number;
   total_spent: number;
+  total_spent_expenses: number;
+  total_spent_bill_payments: number;
   net_amount: number;
   money_in_drawer: number;
   date: string;
@@ -351,7 +355,7 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
         </div>
       </div>
 
-      {/* Today Money Flow */}
+      {/* Money Flow */}
       <div className="card">
         <div className="card-header">
           <div className="flex items-center justify-between">
@@ -458,6 +462,23 @@ export default function DashboardHome({ data }: DashboardHomeProps) {
                       <p className="text-2xl font-bold text-red-900">
                         Rs. {moneyFlowData.total_spent.toLocaleString()}
                       </p>
+                      {/* Breakdown of expenses and bill payments */}
+                      {(moneyFlowData.total_spent_expenses > 0 || moneyFlowData.total_spent_bill_payments > 0) && (
+                        <div className="mt-2 text-xs text-red-700">
+                          {moneyFlowData.total_spent_expenses > 0 && (
+                            <div className="flex items-center">
+                              <Receipt className="h-3 w-3 mr-1" />
+                              <span>Expenses: Rs. {moneyFlowData.total_spent_expenses.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {moneyFlowData.total_spent_bill_payments > 0 && (
+                            <div className="flex items-center">
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              <span>Bill Payments: Rs. {moneyFlowData.total_spent_bill_payments.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

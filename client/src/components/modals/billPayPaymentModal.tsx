@@ -6,289 +6,270 @@ import { X, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
-interface InvoiceItem {
-  id: number;
-  invoice_id: number;
-  product_id: number;
-  product_name: string;
-  description: string;
-  quantity: string;
-  unit_price: string;
-  actual_unit_price: string;
-  tax_rate: string;
-  tax_amount: string;
-  total_price: string;
-  created_at: string;
-  updated_at: string;
+interface BillItem {
+    product_id: number;
+    product_name: string;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
 }
 
-interface Invoice {
-  id: number;
-  invoice_number: string;
-  customer_id: number;
-  customer_name?: string;
-  customer_credit_limit? : number | String,
-  company_id: number;
-  employee_id: number;
-  employee_name?: string;
-  estimate_id: number | null;
-  invoice_date: string;
-  due_date: string;
-  shipping_date: string;
-  total_amount: number | string | null;
-  paid_amount: number | string | null;
-  balance_due: number | string | null;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled' | 'proforma';
-  computed_status?: string;
-  discount_type: 'fixed' | 'percentage';
-  discount_value: string;
-  discount_amount: string;
-  subtotal: string;
-  tax_amount: string;
-  notes: string;
-  terms: string;
-  shipping_address: string;
-  billing_address: string;
-  ship_via: string;
-  tracking_number: string;
-  created_at: string;
-  updated_at: string;
-  items: InvoiceItem[];
+interface Bill {
+    id: number;
+    bill_number: string; 
+    company_id: number;
+    order_id?: number;
+    vendor_id: number;
+    vendor_name?: string; 
+    payment_method_id: number;
+    payment_method?: string; 
+    employee_id: number;
+    employee_name?: string; 
+    bill_date: string;
+    due_date: string; 
+    notes: string;
+    status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+    total_amount: number;
+    paid_amount: number;
+    balance_due: number;
+    order_number?: string; 
+    created_at: string;
 }
 
 interface Payment {
-  payment_amount: number;
-  payment_date: string;
-  payment_method: string;
-  deposit_to: string;
-  notes?: string | undefined;
-  [key: number]: number | string;
+    payment_amount: number;
+    payment_date: string;
+    payment_method: string;
+    deposit_to: string;
+    notes?: string | undefined;
+    [key: number]: number | string;
 }
 
 interface CreateModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (name: string) => Promise<void>;
-  existingMethods: string[];
-  title: string;
-  label: string;
+    isOpen: boolean;
+    onClose: () => void;
+    onCreate: (name: string) => Promise<void>;
+    existingMethods: string[];
+    title: string;
+    label: string;
 }
 
 const CreateModal: React.FC<CreateModalProps> = ({
-  isOpen,
-  onClose,
-  onCreate,
-  existingMethods,
-  title,
-  label,
-}) => {
-  const [newName, setNewName] = useState('');
+    isOpen,
+    onClose,
+    onCreate,
+    existingMethods,
+    title,
+    label,
+    }) => {
+    const [newName, setNewName] = useState('');
 
-  const handleCreate = async () => {
-    const trimmedName = newName.trim();
-    if (!trimmedName) {
-      // alert(${label} name is required.);
-      return;
-    }
-    if (existingMethods.includes(trimmedName.toLowerCase())) {
-      alert(`${label} already exists.`);
-      return;
-    }
-    await onCreate(trimmedName);
-    setNewName('');
-  };
+    const handleCreate = async () => {
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+        // alert(${label} name is required.);
+        return;
+        }
+        if (existingMethods.includes(trimmedName.toLowerCase())) {
+        alert(`${label} already exists.`);
+        return;
+        }
+        await onCreate(trimmedName);
+        setNewName('');
+    };
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
-            <X className="h-6 w-6" />
-          </button>
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+                <X className="h-6 w-6" />
+            </button>
+            </div>
+            <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label} Name</label>
+            <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="input w-full"
+                placeholder={`Enter ${label.toLowerCase()} name`}
+                maxLength={50}
+                autoFocus
+            />
+            </div>
+            <div className="flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
+                Cancel
+            </button>
+            <button type="button" onClick={handleCreate} className="btn btn-primary btn-md">
+                Create
+            </button>
+            </div>
         </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">{label} Name</label>
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="input w-full"
-            placeholder={`Enter ${label.toLowerCase()} name`}
-            maxLength={50}
-            autoFocus
-          />
         </div>
-        <div className="flex justify-end space-x-2">
-          <button type="button" onClick={onClose} className="btn btn-secondary btn-md">
-            Cancel
-          </button>
-          <button type="button" onClick={handleCreate} className="btn btn-primary btn-md">
-            Create
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
-const InvoiceReceivePaymentModal: React.FC = () => {
-  const navigate = useNavigate();
-  const { state } = useLocation();
-  const { selectedCompany } = useCompany();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
-  const [depositPurposesLoading, setDepositPurposesLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [payment, setPayment] = useState<Payment>({
-    payment_amount: 0,
-    payment_date: new Date().toISOString().split('T')[0],
-    payment_method: '',
-    deposit_to: '',
-    notes: '',
-  });
-  const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
-  const [isCreateDepositModalOpen, setIsCreateDepositModalOpen] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  const [depositPurposes, setDepositPurposes] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+const BillReceivePaymentModal: React.FC = () => {
+    const navigate = useNavigate();
+    const { state } = useLocation();
+    const { selectedCompany } = useCompany();
+    const [bills, setBills] = useState<Bill[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+    const [depositPurposesLoading, setDepositPurposesLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [payment, setPayment] = useState<Payment>({
+        payment_amount: 0,
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: '',
+        deposit_to: '',
+        notes: '',
+    });
+    const [selectedBills, setSelectedBills] = useState<number[]>([]);
+    const [selectAll, setSelectAll] = useState(false);
+    const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
+    const [isCreateDepositModalOpen, setIsCreateDepositModalOpen] = useState(false);
+    const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+    const [depositPurposes, setDepositPurposes] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      if (!selectedCompany?.company_id) {
-        setError('No company selected. Please select a company first.');
-        setLoading(false);
-        return;
-      }
+    useEffect(() => {
+        const fetchBills = async () => {
+            if (!selectedCompany?.company_id) {
+                setError('No company selected. Please select a company first.');
+                setLoading(false);
+                return;
+            }
 
-      const customerId = state?.invoice?.customer_id || null;
+            const vendorId = state?.bill?.vendor_id || null;
 
-      if (!customerId || isNaN(customerId)) {
-        setError('Invalid or missing Customer ID');
-        setLoading(false);
-        return;
-      }
+            if (!vendorId || isNaN(vendorId)) {
+                setError('Invalid or missing Vendor ID');
+                setLoading(false);
+                return;
+            }
 
-      try {
-        const response = await axiosInstance.get(
-          `/api/getInvoicesByCustomer/${selectedCompany.company_id}/${customerId}`
-        );
-        setInvoices(response.data);
-      } catch (error: any) {
-        setError('Failed to fetch invoices. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
+            try {
+                const response = await axiosInstance.get(
+                `/api/getBillsByVendor/${selectedCompany.company_id}/${vendorId}`
+                );
+                setBills(response.data);
+            } catch (error: any) {
+                setError('Failed to fetch bills. Please try again later.');
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    fetchInvoices();
-  }, [selectedCompany, state]);
+        fetchBills();
+    }, [selectedCompany, state]);
 
-  useEffect(() => {
-    const fetchPaymentMethods = async () => {
-      if (!selectedCompany?.company_id) return;
-      setPaymentMethodsLoading(true);
-      try {
-        const response = await axiosInstance.get('/api/getPaymentMethods');
-        const methods = response.data.map((method: { name: string }) => method.name);
-        setPaymentMethods(methods);
-        if (methods.length > 0 && !payment.payment_method) {
-          setPayment((prev) => ({ ...prev, payment_method: methods[0] }));
-        }
-      } catch (error) {
-        console.error('Error fetching payment methods:', error);
-        setPaymentMethods([]);
-        alert('Failed to fetch payment methods.');
-      } finally {
-        setPaymentMethodsLoading(false);
-      }
-    };
+    useEffect(() => {
+        const fetchPaymentMethods = async () => {
+            if (!selectedCompany?.company_id) return;
+            setPaymentMethodsLoading(true);
+            try {
+                const response = await axiosInstance.get('/api/getPaymentMethods');
+                const methods = response.data.map((method: { name: string }) => method.name);
+                setPaymentMethods(methods);
+                if (methods.length > 0 && !payment.payment_method) {
+                    setPayment((prev) => ({ ...prev, payment_method: methods[0] }));
+                }
+            } catch (error) {
+                console.error('Error fetching payment methods:', error);
+                setPaymentMethods([]);
+                alert('Failed to fetch payment methods.');
+            } finally {
+                setPaymentMethodsLoading(false);
+            }
+        };
 
-    const fetchDepositPurposes = async () => {
-      if (!selectedCompany?.company_id) return;
-      setDepositPurposesLoading(true);
-      try {
-        const response = await axiosInstance.get('/api/getDepositPurposes');
-        const purposes = response.data.map((purpose: { name: string }) => purpose.name);
-        setDepositPurposes(purposes);
-        if (purposes.length > 0 && !payment.deposit_to) {
-          setPayment((prev) => ({ ...prev, deposit_to: purposes[0] }));
-        }
-      } catch (error) {
-        console.error('Error fetching deposit purposes:', error);
-        setDepositPurposes([]);
-        alert('Failed to fetch deposit purposes.');
-      } finally {
-        setDepositPurposesLoading(false);
-      }
-    };
+        const fetchDepositPurposes = async () => {
+            if (!selectedCompany?.company_id) return;
+            setDepositPurposesLoading(true);
+            try {
+                const response = await axiosInstance.get('/api/getDepositPurposes');
+                const purposes = response.data.map((purpose: { name: string }) => purpose.name);
+                setDepositPurposes(purposes);
+                if (purposes.length > 0 && !payment.deposit_to) {
+                    setPayment((prev) => ({ ...prev, deposit_to: purposes[0] }));
+                }
+            } catch (error) {
+                console.error('Error fetching deposit purposes:', error);
+                setDepositPurposes([]);
+                alert('Failed to fetch deposit purposes.');
+            } finally {
+                setDepositPurposesLoading(false);
+            }
+        };
 
-    fetchPaymentMethods();
-    fetchDepositPurposes();
-  }, [selectedCompany]);
+        fetchPaymentMethods();
+        fetchDepositPurposes();
+    }, [selectedCompany]);
 
   const handleSelectAll = () => {
     const newSelectAll = !selectAll;
     setSelectAll(newSelectAll);
     if (newSelectAll) {
-      const newSelected = invoices.filter((invoice) => invoice.status !== 'paid').map((invoice) => invoice.id);
-      setSelectedInvoices(newSelected);
-      const updatedPayments = invoices.reduce(
-        (acc, invoice) => ({
+      const newSelected = bills.filter((bill) => bill.status !== 'paid').map((bill) => bill.id);
+      setSelectedBills(newSelected);
+      const updatedPayments = bills.reduce(
+        (acc, bill) => ({
           ...acc,
-          [invoice.id]: invoice.status === 'paid' ? 0 : Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0),
+          [bill.id]: bill.status === 'paid' ? 0 : Number(bill.total_amount) - (Number(bill.paid_amount) || 0),
         }),
         {}
       );
-      const total = invoices.reduce((sum, invoice) => sum + (invoice.status === 'paid' ? 0 : Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0)), 0);
+      const total = bills.reduce((sum, bill) => sum + (bill.status === 'paid' ? 0 : Number(bill.total_amount) - (Number(bill.paid_amount) || 0)), 0);
       setPayment((prev) => ({ ...prev, ...updatedPayments, payment_amount: total }));
     } else {
-      setSelectedInvoices([]);
+      setSelectedBills([]);
       setPayment((prev) => ({ ...prev, payment_amount: 0 }));
     }
   };
   
-  const handleSelectInvoice = (invoiceId: number, totalAmount: number | string | null) => {
-    const invoice = invoices.find((inv) => inv.id === invoiceId);
-    if (invoice?.status === 'paid') return;
+  const handleSelectBill = (bill_id: number, totalAmount: number | string | null) => {
+    const bill = bills.find((inv) => inv.id === bill_id);
+    if (bill?.status === 'paid') return;
   
-    const newSelected = selectedInvoices.includes(invoiceId)
-      ? selectedInvoices.filter((id) => id !== invoiceId)
-      : [...selectedInvoices, invoiceId];
+    const newSelected = selectedBills.includes(bill_id)
+      ? selectedBills.filter((id) => id !== bill_id)
+      : [...selectedBills, bill_id];
   
-    setSelectedInvoices(newSelected);
+    setSelectedBills(newSelected);
   
-    const balanceDue = invoice ? Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0) : 0;
+    const balanceDue = bill ? Number(bill.total_amount) - (Number(bill.paid_amount) || 0) : 0;
   
     const total = newSelected.reduce((sum, id) => {
-      const inv = invoices.find((inv) => inv.id === id);
-      return sum + (inv ? (Number(payment[id]) || (inv.status === 'paid' ? 0 : Number(inv.total_amount) - (Number(inv.paid_amount) || 0))) : 0);
+      const bill = bills.find((bill) => bill.id === id);
+      return sum + (bill ? (Number(payment[id]) || (bill.status === 'paid' ? 0 : Number(bill.total_amount) - (Number(bill.paid_amount) || 0))) : 0);
     }, 0);
   
     setPayment((prev) => ({
       ...prev,
-      [invoiceId]: newSelected.includes(invoiceId) ? balanceDue : '',
+      [bill_id]: newSelected.includes(bill_id) ? balanceDue : '',
       payment_amount: total,
     }));
-    setSelectAll(newSelected.length === invoices.filter((invoice) => invoice.status !== 'paid').length);
+    setSelectAll(newSelected.length === bills.filter((bill) => bill.status !== 'paid').length);
   };
 
   const handlePaymentChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-    invoiceId?: number
+    bill_id?: number
   ) => {
     const { name, value } = e.target;
-    if (invoiceId) {
+    if (bill_id) {
       setPayment((prev) => {
-        const updatedPayments = { ...prev, [invoiceId]: value };
-        const total = selectedInvoices.reduce((sum, id) => {
-          const inv = invoices.find((inv) => inv.id === id);
-          return sum + (inv ? (Number(updatedPayments[id]) || 0) : 0);
+        const updatedPayments = { ...prev, [bill_id]: value };
+        const total = selectedBills.reduce((sum, id) => {
+          const bill = bills.find((bill) => bill.id === id);
+          return sum + (bill ? (Number(updatedPayments[id]) || 0) : 0);
         }, 0);
         return { ...updatedPayments, payment_amount: total };
       });
@@ -339,10 +320,10 @@ const InvoiceReceivePaymentModal: React.FC = () => {
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    const customerId = state?.invoice?.customer_id || null;
+    const vendor_id = state?.bill?.vendor_id || null;
   
-    if (!customerId || !selectedCompany?.company_id) {
-      alert('Missing customer ID or company ID');
+    if (!vendor_id|| !selectedCompany?.company_id) {
+      alert('Missing vendor ID or company ID');
       return;
     }
     if (!payment.payment_method) {
@@ -354,15 +335,15 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       return;
     }
   
-    const invoicePayments = invoices
-      .filter((invoice) => selectedInvoices.includes(invoice.id) && Number(payment[invoice.id]) > 0)
-      .map((invoice) => ({
-        invoice_id: invoice.id,
-        payment_amount: Number(payment[invoice.id]) || 0,
+    const billPayments = bills
+      .filter((bill) => selectedBills.includes(bill.id) && Number(payment[bill.id]) > 0)
+      .map((bill) => ({
+        bill_id: bill.id,
+        payment_amount: Number(payment[bill.id]) || 0,
       }));
   
-    if (invoicePayments.length === 0) {
-      alert('please select the invoices to pay.');
+    if (billPayments.length === 0) {
+      alert('please select the bills to pay.');
       return;
     }
   
@@ -376,19 +357,19 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   
     try {
       await axiosInstance.post(
-        `/api/recordInvoicePayment/${selectedCompany.company_id}/${customerId}`,
+        `/api/recordBillPayment/${selectedCompany.company_id}/${vendor_id}`,
         {
           payment_amount: payment.payment_amount,
           payment_date: payment.payment_date,
           payment_method: payment.payment_method,
           deposit_to: payment.deposit_to,
           notes: payment.notes,
-          customer_id: customerId,
-          invoice_payments: invoicePayments,
+          vendor_id: vendor_id,
+          bill_payments: billPayments,
         }
       );
       alert('Payment recorded successfully');
-      navigate('/dashboard/sales', { state: { activeTab: 'invoices' } });
+      navigate('/dashboard/expenses', { state: { activeTab: 'bills' } });
     } catch (error) {
       console.error('Error recording payment:', error);
       alert('Failed to record payment');
@@ -416,7 +397,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
           <p className="text-red-600">{error}</p>
           <div className="flex justify-end mt-4">
             <button onClick={() => navigate(-1)} className="btn btn-secondary">
-              Back to Invoices
+              Back to Bills
             </button>
           </div>
         </div>
@@ -434,8 +415,8 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Receive Payment</h2>
-            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900">Send Payment</h2>
+            <button onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })} className="text-gray-600 hover:text-gray-900">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -443,17 +424,13 @@ const InvoiceReceivePaymentModal: React.FC = () => {
           <div className="mb-6">
             <div className='flex items-center space-x-2 mb-2 gap-x-40'>
               <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                Customer: {state?.invoice?.customer_name || 'Unknown Customer'}
-              </h3>
-
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                Credit Limit: {state?.invoice?.customer_credit_limit ? `Rs. ${formatAmount(state?.invoice?.customer_credit_limit)}` : 'N/A'}
+                Vendor: {state?.bill?.vendor_name || 'Unknown Vendor'}
               </h3>
             </div>
             
-            <h4 className="text-md font-semibold text-gray-600 mb-2">Invoices</h4>
+            <h4 className="text-md font-semibold text-gray-600 mb-2">Bills</h4>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search by Invoice Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search by Bill Number</label>
               <input
                 type="text"
                 value={searchQuery}
@@ -476,7 +453,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                       />
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoice #
+                      Bill #
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Due Date
@@ -499,84 +476,82 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {invoices
+                    {bills
                     .filter(
-                      (invoice) =>
-                      ['opened', 'overdue', 'partially_paid'].includes(invoice.status) &&
-                      invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase())
+                      (bill) =>
+                      ['opened', 'overdue', 'partially_paid'].includes(bill.status) &&
+                      bill.bill_number.toLowerCase().includes(searchQuery.toLowerCase())
                     )
                     .length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-2 text-center text-sm text-gray-500">
-                      No invoices found.
+                      No bills found.
                       </td>
                     </tr>
                     ) : (
-                    invoices
+                    bills
                       .filter(
-                      (invoice) =>
-                        ['opened', 'overdue', 'partially_paid'].includes(invoice.status) &&
-                        invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase())
+                      (bill) =>
+                        ['opened', 'overdue', 'partially_paid'].includes(bill.status) &&
+                        bill.bill_number.toLowerCase().includes(searchQuery.toLowerCase())
                       )
-                      .map((invoice) => (
-                      <tr key={invoice.id}>
+                      .map((bill) => (
+                      <tr key={bill.id}>
                         <td className="px-4 py-2 whitespace-nowrap">
                         <input
                           type="checkbox"
-                          checked={selectedInvoices.includes(invoice.id)}
-                          onChange={() => handleSelectInvoice(invoice.id, invoice.total_amount)}
+                          checked={selectedBills.includes(bill.id)}
+                          onChange={() => handleSelectBill(bill.id, bill.total_amount)}
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          disabled={invoice.status === 'paid'}
+                          disabled={bill.status === 'paid'}
                         />
                         </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm">{invoice.invoice_number}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">{bill.bill_number}</td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
-                        {format(new Date(invoice.due_date), 'MMM dd, yyyy')}
+                        {format(new Date(bill.due_date), 'MMM dd, yyyy')}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
-                        Rs. {formatAmount(invoice.total_amount)}
+                        Rs. {formatAmount(bill.total_amount)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
-                        Rs. {formatAmount(invoice.paid_amount)}
+                        Rs. {formatAmount(bill.paid_amount)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
                         <input
                           type="number"
                           value={
-                          payment[invoice.id] !== undefined
-                            ? payment[invoice.id]
-                            : selectedInvoices.includes(invoice.id)
-                            ? Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0)
+                          payment[bill.id] !== undefined
+                            ? payment[bill.id]
+                            : selectedBills.includes(bill.id)
+                            ? Number(bill.total_amount) - (Number(bill.paid_amount) || 0)
                             : ''
                           }
-                          onChange={(e) => handlePaymentChange(e, invoice.id)}
+                          onChange={(e) => handlePaymentChange(e, bill.id)}
                           className="input w-full"
                           placeholder="Enter amount"
-                          disabled={invoice.status === 'paid'}
+                          disabled={bill.status === 'paid'}
                         />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600">
-                        Rs. {formatAmount(Number(invoice.total_amount) - (Number(invoice.paid_amount) || 0) - (Number(payment[invoice.id]) || 0))}
+                        Rs. {formatAmount(Number(bill.total_amount) - (Number(bill.paid_amount) || 0) - (Number(payment[bill.id]) || 0))}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          (invoice.computed_status || invoice.status) === 'paid'
+                          (bill.status) === 'paid'
                             ? 'bg-green-100 text-green-800'
-                            : (invoice.computed_status || invoice.status) === 'partially_paid'
+                            : (bill.status) === 'partially_paid'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : (invoice.computed_status || invoice.status) === 'overdue'
+                            : (bill.status) === 'overdue'
                             ? 'bg-red-100 text-red-800'
-                            : (invoice.computed_status || invoice.status) === 'proforma'
-                            ? 'bg-purple-100 text-purple-800'
                             : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {(invoice.computed_status || invoice.status)
+                          {(bill.status)
                           .replace('_', ' ')
                           .charAt(0)
                           .toUpperCase() +
-                          (invoice.computed_status || invoice.status).replace('_', ' ').slice(1)}
+                          bill.status.replace('_', ' ').slice(1)}
                         </span>
                         </td>
                       </tr>
@@ -665,7 +640,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               />
             </div>
             <div className="flex justify-end space-x-2">
-              <button type="button" onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })} className="btn btn-secondary btn-md">
+              <button type="button" onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })} className="btn btn-secondary btn-md">
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading || depositPurposesLoading}>
@@ -682,7 +657,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
             title="Create New Payment Method"
             label="Payment Method"
           />
-          
+
           <CreateModal
             isOpen={isCreateDepositModalOpen}
             onClose={() => setIsCreateDepositModalOpen(false)}
@@ -697,4 +672,4 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   );
 };
 
-export default InvoiceReceivePaymentModal;
+export default BillReceivePaymentModal;

@@ -63,10 +63,11 @@ export default function EditBill() {
         vendor_name: bill ? bill.vendor_name : '',
         vendor_id: bill ? bill.vendor_id : '',
         bill_date: bill ? bill.bill_date.split('T')[0] : new Date().toISOString().split('T')[0],
-        payment_method: bill ? bill.payment_method : '',
+        payment_method_id: bill ? bill.payment_method_id : '',
         employee_id: bill ? bill.employee_id : '',
         due_date: bill ? (bill.due_date ? bill.due_date.split('T')[0] : '') : '',
         notes: bill ? bill.notes : '',
+        terms: bill ? bill.terms : '',
     };
 
     const [formData, setFormData] = useState(initialFormData);
@@ -75,12 +76,14 @@ export default function EditBill() {
         product_id: 0,
         product_name: '',
         description: '',
-        quantity: 0,
+        quantity: 1,
         unit_price: 0,
         total_price: 0,
     }];
 
-    const [items, setItems] = useState<BillItem[]>(bill?.items || initialItems);
+    const [items, setItems] = useState<BillItem[]>(initialItems);
+
+    console.log('Initial items:', initialItems);
 
     const fetchVendors = async () => {
         try {
@@ -127,7 +130,9 @@ export default function EditBill() {
     const fetchBillItems = async (billId: number) => {
         try {
             const response = await axiosInstance.get(`/api/getBillItems/${selectedCompany?.company_id}/${billId}`);
+            console.log('Fetched bill items:', response.data);
             setItems(Array.isArray(response.data) ? response.data : []);
+            console.log('Set items state:', items);
         } catch (error) {
             console.error('Error fetching bill items:', error);
             setError('Failed to fetch bill items');
@@ -176,6 +181,24 @@ export default function EditBill() {
         setVendorSuggestions([]);
         } 
     }, [formData.vendor_name, vendors, activeVendorSuggestion]); 
+
+    useEffect(() => {
+        if (formData.terms === 'due_on_receipt') {
+        setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: formData.bill_date }));
+        } else if (formData.terms === 'net_15') {
+        const due = new Date(formData.bill_date);
+        due.setDate(due.getDate() + 15);
+        setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+        } else if (formData.terms === 'net_30') {
+        const due = new Date(formData.bill_date);
+        due.setDate(due.getDate() + 30);
+        setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+        } else if (formData.terms === 'net_60') {
+        const due = new Date(formData.bill_date);
+        due.setDate(due.getDate() + 60);
+        setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+        }
+    }, [formData.bill_date, formData.terms, formData.vendor_id]);
 
     const updateItem = (index: number, field: keyof BillItem, value: any) => {
         const updatedItems = [...items];
@@ -251,8 +274,8 @@ export default function EditBill() {
             })),
         };
 
-        if (expense) {
-            await axiosInstance.put(`/api/createBill/${selectedCompany?.company_id}/${expense.id}`, submitData);
+        if (bill) {
+            await axiosInstance.put(`/api/updateBill/${selectedCompany?.company_id}/${bill.id}`, submitData);
         } else {
             await axiosInstance.post(`/api/createBill/${selectedCompany?.company_id}`, submitData);
         }
@@ -260,11 +283,8 @@ export default function EditBill() {
         setFormData(initialFormData);
         setItems(initialItems);
 
-        if (onSave && typeof onSave === 'function') {
-            onSave();
-        } else {
-            navigate("/dashboard/expenses", { state: { activeTab: 'bills' } });
-        }
+        navigate("/dashboard/expenses", { state: { activeTab: 'bills' } });
+
         } catch (error: any) {
         console.error('Error saving expense:', error);
         const errorMessage = error.response?.data?.error || error.message || 'Failed to save expense';
@@ -282,7 +302,7 @@ export default function EditBill() {
         });
         const newMethod = response.data.name;
         setPaymentMethods((prev) => [...prev, newMethod]);
-        setFormData({ ...formData, payment_method: newMethod });
+        setFormData({ ...formData, payment_method_id: newMethod.id });
         setIsCreatePaymentMethodModalOpen(false);
         alert('Payment method created successfully.');
     } catch (error) {
@@ -783,7 +803,7 @@ export default function EditBill() {
             const [roles, setRoles] = useState<Role[]>([]);
 
             const resetEmployeeForm = () => {
-            setFormData({
+            setEmployeeFormData({
                 name: '',
                 email: '',
                 phone: '',
@@ -1046,7 +1066,7 @@ export default function EditBill() {
             <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
-                Create New Bill
+                    Edit Bill
                 </h3>
                 <button
                     onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
@@ -1075,6 +1095,7 @@ export default function EditBill() {
                     onChange={(e) => setFormData({ ...formData, bill_number: e.target.value })}
                     placeholder="Enter Bill number"
                     required
+                    disabled
                     />
                 </div>
 
@@ -1086,7 +1107,6 @@ export default function EditBill() {
                     type="text"
                     className="input"
                     value={formData.vendor_name || ''}
-                    disabled={!!formData.order_id}
                     onChange={(e) => {
                         setFormData({ ...formData, vendor_name: e.target.value })
                         setActiveVendorSuggestion(true);
@@ -1130,7 +1150,7 @@ export default function EditBill() {
                             key={index}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
                             onMouseDown={() => {
-                            setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString() });
+                            setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString(), terms: vendor.terms || '' });
                             setVendorSuggestions([]);
                             setActiveVendorSuggestion(false);
                             }}
@@ -1152,6 +1172,20 @@ export default function EditBill() {
                         value={formData.bill_date}
                         onChange={(e) => setFormData({ ...formData, bill_date: e.target.value })}
                         required
+                        disabled
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date
+                    </label>
+                    <input
+                        type="date"
+                        className="input"
+                        value={formData.due_date}
+                        disabled
+                        required
                     />
                 </div>
 
@@ -1161,12 +1195,12 @@ export default function EditBill() {
                     </label>
                     <select
                         name="payment_method"
-                        value={formData.payment_method}
+                        value={formData.payment_method_id || ''}
                         onChange={(e) => {
                         if (e.target.value === 'create_new') {
                             setIsCreatePaymentMethodModalOpen(true);
                         } else {
-                            setFormData({ ...formData, payment_method: e.target.value });
+                            setFormData({ ...formData, payment_method_id: e.target.value });
                         }
                         }}
                         className="input w-full"
@@ -1185,7 +1219,7 @@ export default function EditBill() {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Employee</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
                     <select
                         name="employee"
                         value={formData.employee_id || ''}
@@ -1197,7 +1231,6 @@ export default function EditBill() {
                         }
                         }}
                         className="input"
-                        disabled={!!formData.order_id}
                     >
                         <option value="" disabled>Select Employee</option>
                         <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Employee</option>
@@ -1209,7 +1242,7 @@ export default function EditBill() {
                     </select>
                 </div>
 
-                <div>
+                {/* <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
                         Terms *
                     </label>
@@ -1225,7 +1258,7 @@ export default function EditBill() {
                         <option value="Net 30">Net 30</option>
                         <option value="Net 60">Net 60</option>
                     </select>
-                </div>
+                </div> */}
             </div>
 
             <div>
@@ -1234,7 +1267,6 @@ export default function EditBill() {
                     <button
                     type="button"
                     onClick={addItem}
-                    disabled={!!formData.order_id}
                     className="btn btn-secondary btn-sm"
                     >
                     <Plus className="h-4 w-4 mr-2" />
@@ -1244,141 +1276,140 @@ export default function EditBill() {
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full border border-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map((item, index) => (
-                        <tr
-                            key={index}
-                            className={`border-t ${formData.order_id ? 'opacity-60 pointer-events-none' : ''}`}
-                        >
-                            <td className="px-4 py-2">
-                            <input
-                                type="text"
-                                value={item.product_name || ''}
-                                onChange={(e) => {
-                                updateItem(index, 'product_name', e.target.value);
-                                setActiveSuggestionIndex(index);
-                                }}
-                                onFocus={() => {
-                                setActiveSuggestionIndex(index);
-                                }}
-                                onBlur={() => {
-                                setTimeout(() => {
-                                    if (activeSuggestionIndex === index) {
-                                    setProductSuggestions([]);
-                                    setActiveSuggestionIndex(null);
-                                    }
-                                }, 200);
-                                }}
-                                placeholder="Search product"
-                                className="border rounded px-2 py-1 w-full"
-                                disabled={!!formData.order_id}
-                            />
-                            {activeSuggestionIndex === index && productSuggestions.length > 0 && !formData.order_id && (
-                                <ul
-                                className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
-                                style={{
-                                    maxHeight: '240px',
-                                    maxWidth: '420px',
-                                    minWidth: '220px',
-                                    overflowY: 'auto',
-                                    overflowX: 'auto',
-                                    width: '420px',
-                                }}
-                                >
-                                {productSuggestions.map(product => (
-                                    <li
-                                    key={product.id}
-                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
-                                    onMouseDown={() => {
-                                        const updatedItems = [...items];
-                                        updatedItems[index] = {
-                                        ...updatedItems[index],
-                                        quantity: 1,
-                                        product_id: product.id,
-                                        product_name: product.name,
-                                        description: product.description || '',
-                                        unit_price: product.unit_price || 0,
-                                        total_price: product.unit_price || 0,
-                                        };
-                                        setItems(updatedItems);
-                                        setProductSuggestions([]);
-                                        setActiveSuggestionIndex(null);
-                                    }}
-                                    >
-                                    {product.image && (
-                                        <img
-                                        src={`http://localhost:3000${product.image}`}
-                                        alt={product.name}
-                                        className="w-8 h-8 object-cover mr-2 rounded"
-                                        />
-                                    )}
-                                    <span>{product.name}</span>
-                                    </li>
-                                ))}
-                                </ul>
-                            )}
-                            </td>
-                            <td className="px-4 py-2">
-                            <input
-                                type="text"
-                                className="input"
-                                value={item.description}
-                                onChange={(e) => updateItem(index, 'description', e.target.value)}
-                                placeholder="Item description"
-                                required
-                                // disabled={!!formData.order_id}
-                            />
-                            </td>
-                            <td className="px-4 py-2">
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                className="input w-20"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                                required
-                                // disabled={!!formData.order_id}
-                            />
-                            </td>
-                            <td className="px-4 py-2">
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="input w-24"
-                                value={item.unit_price}
-                                onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                required
-                                // disabled={!!formData.order_id}
-                            />
-                            </td>
-                            <td className="px-4 py-2 text-center border border-gray-200">
-                            Rs. {Number(item.total_price).toFixed(2)}
-                            </td>
-                            <td className="px-4 py-2">
-                            <button
-                                type="button"
-                                onClick={() => removeItem(index)}
-                                className="text-red-600 hover:text-red-900"
-                                disabled={!!formData.order_id}
+                        <thead className="bg-gray-50">
+                            <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.length === 0 && <p>No items found</p>}
+                            {items.map((item, index) => (
+                            <tr
+                                key={index}
+                                className={`border-t`}
                             >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                            </td>
-                        </tr>
-                        ))}
-                    </tbody>
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="text"
+                                        value={item.product_name || ''}
+                                        onChange={(e) => {
+                                        updateItem(index, 'product_name', e.target.value);
+                                        setActiveSuggestionIndex(index);
+                                        }}
+                                        onFocus={() => {
+                                        setActiveSuggestionIndex(index);
+                                        }}
+                                        onBlur={() => {
+                                        setTimeout(() => {
+                                            if (activeSuggestionIndex === index) {
+                                            setProductSuggestions([]);
+                                            setActiveSuggestionIndex(null);
+                                            }
+                                        }, 200);
+                                        }}
+                                        placeholder="Search product"
+                                        className="border rounded px-2 py-1 w-full"
+                                    />
+                                    {activeSuggestionIndex === index && productSuggestions.length > 0 && (
+                                        <ul
+                                        className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
+                                        style={{
+                                            maxHeight: '240px',
+                                            maxWidth: '420px',
+                                            minWidth: '220px',
+                                            overflowY: 'auto',
+                                            overflowX: 'auto',
+                                            width: '420px',
+                                        }}
+                                        >
+                                        {productSuggestions.map(product => (
+                                            <li
+                                            key={product.id}
+                                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                                            onMouseDown={() => {
+                                                const updatedItems = [...items];
+                                                updatedItems[index] = {
+                                                ...updatedItems[index],
+                                                quantity: 1,
+                                                product_id: product.id,
+                                                product_name: product.name,
+                                                description: product.description || '',
+                                                unit_price: product.unit_price || 0,
+                                                total_price: product.unit_price || 0,
+                                                };
+                                                setItems(updatedItems);
+                                                setProductSuggestions([]);
+                                                setActiveSuggestionIndex(null);
+                                            }}
+                                            >
+                                            {product.image && (
+                                                <img
+                                                src={`http://localhost:3000${product.image}`}
+                                                alt={product.name}
+                                                className="w-8 h-8 object-cover mr-2 rounded"
+                                                />
+                                            )}
+                                            <span>{product.name}</span>
+                                            </li>
+                                        ))}
+                                        </ul>
+                                    )}
+                                </td>
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={item.description}
+                                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                                        placeholder="Item description"
+                                        required
+                                        // disabled={!!formData.order_id}
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        className="input w-20"
+                                        value={item.quantity}
+                                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                        required
+                                        // disabled={!!formData.order_id}
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="input w-24"
+                                        value={item.unit_price}
+                                        onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                        required
+                                        // disabled={!!formData.order_id}
+                                    />
+                                </td>
+                                    <td className="px-4 py-2 text-center border border-gray-200">
+                                    Rs. {Number(item.total_price).toFixed(2)}
+                                    </td>
+                                <td className="px-4 py-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => removeItem(index)}
+                                        className="text-red-600 hover:text-red-900"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </td>
+                            </tr>
+                            ))}
+                        </tbody>
                     </table>
                 </div>
                 </div>
@@ -1424,7 +1455,7 @@ export default function EditBill() {
                         disabled={loading}
                         className="btn btn-primary btn-md"
                     >
-                        {loading ? 'Saving...' : expense ? 'Update Bill' : 'Create Bill'}
+                        {loading ? 'Saving...' : bill ? 'Update Bill' : 'Create Bill'}
                     </button>
                 </div>
             </form>

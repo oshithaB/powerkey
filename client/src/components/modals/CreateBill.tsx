@@ -66,6 +66,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     employee_id: '',
     due_date: '',
     notes: '',
+    terms: '',
   };
 
 
@@ -214,6 +215,26 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     } 
   }, [formData.vendor_name, vendors, activeVendorSuggestion]); 
 
+  useEffect(() => {
+    if (formData.terms === 'due_on_receipt') {
+      setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: formData.bill_date }));
+    } else if (formData.terms === 'net_15') {
+      const due = new Date(formData.bill_date);
+      due.setDate(due.getDate() + 15);
+      setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+    } else if (formData.terms === 'net_30') {
+      const due = new Date(formData.bill_date);
+      due.setDate(due.getDate() + 30);
+      setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+    } else if (formData.terms === 'net_60') {
+      const due = new Date(formData.bill_date);
+      due.setDate(due.getDate() + 60);
+      setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: due.toISOString().split('T')[0] }));
+    } else {
+      setFormData((prev: typeof initialFormData) => ({ ...prev, due_date: '' }));
+    }
+  }, [formData.bill_date, formData.terms, formData.vendor_id]);
+
   const updateItem = (index: number, field: keyof BillItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
@@ -235,6 +256,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
 
     setItems(updatedItems);
   };
+
 
   const addItem = () => {
     setItems([...items, {
@@ -1167,7 +1189,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                         key={index}
                         className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
                         onMouseDown={() => {
-                          setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString() });
+                          setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString(), terms: vendor.terms || '' });
                           setVendorSuggestions([]);
                           setActiveVendorSuggestion(false);
                         }}
@@ -1187,7 +1209,20 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                         type="date"
                         className="input"
                         value={formData.bill_date}
-                        onChange={(e) => setFormData({ ...formData, bill_date: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, bill_date: e.target.value }) }}
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date
+                    </label>
+                    <input
+                        type="date"
+                        className="input"
+                        value={formData.due_date}
+                        disabled
                         required
                     />
                 </div>
@@ -1246,7 +1281,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                   </select>
                 </div>
 
-                <div>
+                {/* <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
                         Terms *
                     </label>
@@ -1262,7 +1297,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                         <option value="Net 30">Net 30</option>
                         <option value="Net 60">Net 60</option>
                     </select>
-                </div>
+                </div> */}
             </div>
 
             <div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import axiosInstance from '../../axiosInstance';
-import { Plus, Search, Edit, Trash2, Receipt, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Receipt, Eye, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -19,10 +19,12 @@ interface Bill {
   bill_date: string;
   due_date: string; // Keep as optional
   notes: string;
+  status: 'opened' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
   total_amount: number;
+  paid_amount: number;
+  balance_due: number;
   order_number?: string; // Add this
   created_at: string;
-  // Remove fields not returned by backend: category_id, category_name, due_date, terms, status
 }
 
 export default function BillsPage() {
@@ -53,6 +55,18 @@ export default function BillsPage() {
     navigate(`/bill/edit/${bill.id}`, { state: { bill } });
   };
 
+  const handleAddPayment = (bill: Bill) => {
+    if (!bill.vendor_id || isNaN(bill.vendor_id) || bill.vendor_id <= 0) {
+      console.error('Invalid or missing vendor ID for bill:', {
+        id: bill.id,
+        customer_id: bill.vendor_id,
+      });
+      alert(`Cannot proceed: Invalid or missing vendor ID for bill ${bill.bill_number}`);
+      return;
+    }
+    navigate(`/bills/receive-payment/${bill.vendor_id}`, { state: { bill } });
+  };
+
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this bill?')) {
       try {
@@ -66,13 +80,17 @@ export default function BillsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'approved':
+      case 'opened':
+        return 'bg-gray-100 text-gray-800';
+      case 'sent':
         return 'bg-blue-100 text-blue-800';
       case 'paid':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'partially_paid':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'overdue':
+        return 'bg-red-100 text-red-800';
+      case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -185,6 +203,11 @@ export default function BillsPage() {
                         Rs. {bill.total_amount.toLocaleString()}
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bill.status)}`}>
+                        {bill.status.replace('_', ' ').charAt(0).toUpperCase() + bill.status.replace('_', ' ').slice(1)}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button
@@ -199,6 +222,15 @@ export default function BillsPage() {
                           title="View"
                         >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleAddPayment(bill)}
+                          className="text-green-600 hover:text-green-900"
+                          style={{ display: bill.status === 'cancelled' || bill.status === 'paid' ? 'none' : undefined }}
+                          title="Add Payment"
+                          disabled={!bill.vendor_id}
+                        >
+                          <DollarSign className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(bill.id)}

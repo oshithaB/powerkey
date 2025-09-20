@@ -356,6 +356,22 @@ async function createTables(db) {
             CONSTRAINT payments_ibfk_3 FOREIGN KEY (company_id) REFERENCES company (company_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`,
 
+        `CREATE TABLE IF NOT EXISTS bill_payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            bill_id INT NOT NULL,
+            vendor_id INT NOT NULL,
+            company_id INT NOT NULL,
+            payment_date DATE NOT NULL,
+            payment_amount DECIMAL(10,2) NOT NULL,
+            payment_method VARCHAR(50) NOT NULL,
+            deposit_to VARCHAR(100) NOT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE,
+            FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id),
+            FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
+        )`,
+
         `CREATE TABLE IF NOT EXISTS account_type (
             id INT AUTO_INCREMENT PRIMARY KEY,
             company_id INT NOT NULL,
@@ -444,7 +460,10 @@ async function createTables(db) {
             due_date DATE NOT NULL,
             payment_method_id INT NOT NULL,
             notes TEXT,
+            status ENUM('opened', 'cancelled', 'paid', 'partially_paid', 'overdue') DEFAULT 'opened',
             total_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            paid_amount DECIMAL(15,2) DEFAULT 0.00,
+            balance_due DECIMAL(15,2) DEFAULT 0.00,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
             FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),

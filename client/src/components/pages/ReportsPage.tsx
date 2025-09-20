@@ -88,11 +88,6 @@ export default function ReportsPage() {
       path: '/reports/customer-balance-summary'
     },
     {
-      name: 'Customer Balance Detail',
-      description: 'Detailed customer outstanding and balances',
-      path: '/reports/customer-balance-detail/'
-    },
-    {
       name: 'Invoices and Received Payments',
       description: 'List of invoices and their payment status',
       path: '/reports/invoices-and-payments'
@@ -228,11 +223,6 @@ export default function ReportsPage() {
       name: 'Supplier Balance Summary',
       description: 'Outstanding balances by supplier',
       path: '/reports/supplier-balance-summary'
-    },
-    {
-      name: 'Supplier Balance Detail',
-      description: 'Detailed supplier outstanding and balances',
-      path: '/reports/supplier-balance-detail'
     }
   ];
 
@@ -268,11 +258,6 @@ export default function ReportsPage() {
       path: '/reports/purchase-list'
     },
     {
-      name: 'Transaction List by Supplier',
-      description: 'List of transactions by supplier',
-      path: '/reports/transaction-list-by-supplier'
-    },
-    {
       name: 'Purchases by Supplier Summary',
       description: 'Purchases summary by supplier',
       path: '/reports/purchases-by-supplier'
@@ -283,7 +268,7 @@ export default function ReportsPage() {
       path: '/reports/supplier-contact-list'
     },
     {
-      name: 'Expense by Supplier Summary',
+      name: 'Expense by Payee Summary',
       description: 'Expense summary by supplier',
       path: '/reports/expense-by-supplier'
     },

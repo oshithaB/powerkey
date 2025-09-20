@@ -148,7 +148,7 @@ export default function CompanySelection() {
         if (key === 'tax_rates') {
           submitData.append(key, JSON.stringify(value));
         } else {
-          submitData.append(key, value);
+          submitData.append(key, typeof value === 'object' ? JSON.stringify(value) : value);
         }
       });
 

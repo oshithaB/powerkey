@@ -80,6 +80,7 @@ const getExpenses = async (req, res) => {
       SELECT e.*
       FROM expenses e
       WHERE e.company_id = ?
+      ORDER BY e.payment_date DESC, e.id DESC
     `;
     const [expenses] = await db.execute(expenseQuery, [company_id]);
 

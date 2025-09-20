@@ -62,10 +62,21 @@ import CustomerBalanceSummary from './components/reports/WhoOwesYou/CustomerBala
 import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalanceDetail';
 
 // What you owe Reports
+import APAgingSummaryReport from './components/reports/WhatYouOwe/APAgingSummaryReport';
 import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
+import SupplierBalanceDetails from './components/reports/WhatYouOwe/SupplierBalanceDetails';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
+import ChequeDetails from './components/reports/ExpensesAndSuppliers/ChequeDetails';
+import GetPurchasesByProductServiceSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesByProductServiceSummary';
+import GetPurchasesByClassDetail from './components/reports/ExpensesAndSuppliers/GetPurchasesByClassDetail';
+import GetOpenPurchaseOrdersDetail from './components/reports/ExpensesAndSuppliers/GetOpenPurchaseOrdersDetail';
+import GetPurchaseList from './components/reports/ExpensesAndSuppliers/GetPurchaseList';
+import GetPurchasesBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetPurchasesBySupplierSummary';
+import GetOpenPurchaseOrdersList from './components/reports/ExpensesAndSuppliers/GetOpenPurchaseOrdersList';
+import GetExpenseBySupplierSummary from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierSummary';
+import GetExpenseBySupplierDetail from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierDetail';
 
 // Sales Tax
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
@@ -123,7 +134,7 @@ function AppContent() {
               const chequeDate = new Date(cheque.cheque_date);
               const diffInTime = chequeDate.getTime() - today.getTime();
               const diffInDays = diffInTime / (1000 * 3600 * 24);
-              return diffInDays >= 0 && diffInDays <= 3;
+              return diffInDays == 0 || diffInDays <= 3;
             }
             return false;
           });
@@ -540,6 +551,87 @@ function AppContent() {
           }
         />
 
+        <Route
+          path="/reports/cheque-detail"
+          element={
+            <ProtectedRoute>
+              <ChequeDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchases-by-product-service"
+          element={
+            <ProtectedRoute>
+              <GetPurchasesByProductServiceSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchases-by-class-detail"
+          element={
+            <ProtectedRoute>
+              <GetPurchasesByClassDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/open-purchase-orders-detail"
+          element={
+            <ProtectedRoute>
+              <GetOpenPurchaseOrdersDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchase-list"
+          element={
+            <ProtectedRoute>
+              <GetPurchaseList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/purchases-by-supplier"
+          element={
+            <ProtectedRoute>
+              <GetPurchasesBySupplierSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/open-purchase-orders-list"
+          element={
+            <ProtectedRoute>
+              <GetOpenPurchaseOrdersList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/expense-by-supplier"
+          element={
+            <ProtectedRoute>
+              <GetExpenseBySupplierSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/expense-by-supplier-detail/:payee_id"
+          element={
+            <ProtectedRoute>
+              <GetExpenseBySupplierDetail />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Sales Tax section */}
         <Route
           path="/reports/sscl-tax-detail"
@@ -570,10 +662,28 @@ function AppContent() {
 
         {/* What you owe section */}
         <Route
+          path="/reports/ap-aging-summary"
+          element={
+            <ProtectedRoute>
+              <APAgingSummaryReport />
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
           path="/reports/supplier-balance-summary"
           element={
             <ProtectedRoute>
               <SupplierBalanceSummary />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/supplier-balance-detail/:vendor_id"
+          element={
+            <ProtectedRoute>
+              <SupplierBalanceDetails />
             </ProtectedRoute>
           }
         />

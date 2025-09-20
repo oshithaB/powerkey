@@ -203,6 +203,7 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
       setFormData({ ...formData, payee_name: newPayee });
       setIsCreatePayeeModalOpen(false);
       alert('Payee created successfully.');
+      navigate(0);
     } catch (error) {
       console.error('Error creating Payee:', error);
       alert('Failed to create Payee.');

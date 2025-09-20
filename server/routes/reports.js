@@ -67,6 +67,8 @@ const {
 // Import what you owe controller functions
 const {
     getSupplierBalanceSummary,
+    getSupplierBalanceDetail,
+    getAPAgingSummary,
 } = whatYouOweController
 
 
@@ -96,6 +98,15 @@ const {
 // Importing expenses and suppliers controller functions
 const {
     getVendorsContactDetails,
+    getChequeDetails,
+    getPurchasesByProductServiceSummary,
+    getPurchasesByClassDetail,
+    getOpenPurchaseOrdersDetail,
+    getPurchaseList,
+    getPurchasesBySupplierSummary,
+    getOpenPurchaseOrdersList,
+    getExpenseBySupplierSummary,
+    getExpenseBySupplierDetail
 } = expensesAndSuppliersController;
 
 // Importing sales tax controller functions
@@ -278,13 +289,90 @@ router.get(
     getSupplierBalanceSummary
 );
 
+router.get(
+    '/supplier-balance-detail/:company_id/:vendor_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getSupplierBalanceDetail
+);
+
+router.get(
+    '/ap-aging-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getAPAgingSummary
+);
+
 
 // Expenses and Suppliers routes ========================================================================================
 router.get(
     '/vendor-contacts/:company_id',
     verifyToken,
-    authorizedRoles(['admin', 'manager', 'accountant']),
+    authorizedRoles(['admin', 'staff', 'sales']),
     getVendorsContactDetails
+);
+
+router.get(
+    '/cheque-details/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getChequeDetails
+);
+
+router.get(
+    '/purchases-by-product-service-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getPurchasesByProductServiceSummary
+);
+
+router.get(
+    '/purchases-by-class-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getPurchasesByClassDetail
+);
+
+router.get(
+    '/open-purchase-orders-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getOpenPurchaseOrdersDetail
+);
+
+router.get(
+    '/purchase-list/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getPurchaseList
+);
+
+router.get(
+    '/purchases-by-supplier-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getPurchasesBySupplierSummary
+);
+
+router.get(
+    '/open-purchase-orders-list/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getOpenPurchaseOrdersList
+);
+
+router.get(
+    '/expense-by-supplier-summary/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getExpenseBySupplierSummary
+);
+
+router.get(
+    '/expense-by-supplier-detail/:company_id/:payee_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'sales']),
+    getExpenseBySupplierDetail
 );
 
 

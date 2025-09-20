@@ -904,7 +904,7 @@ const getInvoiceItems = async(req, res) => {
 };
 
 // Get Invoices By Customer
-const getInvoicesByCustomer = asyncHandler(async (req, res) => {
+const getInvoicesByCustomer = async (req, res) => {
   const { customerId, company_id } = req.params;
 
   if (!customerId || !company_id) {
@@ -971,10 +971,10 @@ const getInvoicesByCustomer = asyncHandler(async (req, res) => {
     console.error('Error fetching invoices by customer:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+};
 
 // Record Payment
-const recordPayment = asyncHandler(async (req, res) => {
+const recordPayment = async (req, res) => {
   const { customerId, company_id } = req.params;
   const { payment_amount, payment_date, payment_method, deposit_to, notes, invoice_payments } = req.body;
 
@@ -1089,10 +1089,9 @@ const recordPayment = asyncHandler(async (req, res) => {
       // Update customer credit limit
       await connection.query(
         `UPDATE customer 
-         SET credit_limit = credit_limit - ?,
-         current_balance = current_balance - ?
+         SET current_balance = current_balance - ?
          WHERE id = ? AND company_id = ?`,
-        [invoicePaymentAmount, invoicePaymentAmount, customerId, company_id]
+        [invoicePaymentAmount, customerId, company_id]
       );
       
       // Update invoice - paid_amount and balance_due are updated, but status is preserved for proforma
@@ -1116,9 +1115,9 @@ const recordPayment = asyncHandler(async (req, res) => {
   } finally {
     connection.release();
   }
-});
+};
 
-const checkCustomerEligibility = asyncHandler(async (req, res) => {
+const checkCustomerEligibility = async (req, res) => {
   const { customer_id, company_id, invoice_total, operation_type} = req.body;
 
   console.log('Checking customer eligibility:', { customer_id, company_id });
@@ -1170,7 +1169,7 @@ const checkCustomerEligibility = asyncHandler(async (req, res) => {
     console.error('Error checking customer eligibility:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+};
 
 // get sales page data
 const getSalesPageDate = async(req, res) => {

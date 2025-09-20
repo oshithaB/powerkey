@@ -7,7 +7,9 @@ const {
     createBill,
     getAllBills,
     getBillItemsById,
-    updateBill
+    updateBill,
+    getBillsByVendor,
+    recordPayment
 } = require('../controllers/bill_controller');
 
 router.post(
@@ -28,6 +30,26 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     getBillItemsById
+);
+
+router.put(
+    '/updateBill/:company_id/:bill_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    updateBill
+);
+
+router.get('/getBillsByVendor/:company_id/:vendor_id', 
+    verifyToken, 
+    authorizedRoles(['admin', 'sale', 'staff']), 
+    getBillsByVendor
+);
+
+router.post(
+    '/recordBillPayment/:company_id/:vendor_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sale', 'staff']),
+    recordPayment
 );
 
 module.exports = router;

@@ -19,6 +19,7 @@ import EditEstimate from './components/modals/EditEstimate';
 import CreateInvoice from './components/modals/CreateInvoice';
 import EditInvoice from './components/modals/EditInvoice';
 import InvoiceRecievedPayment from './components/modals/InvoiceReceivePaymentModal';
+import BillReceivePaymentModal from './components/modals/billPayPaymentModal';
 import PurchaseOrdersPage from './components/modals/PurchaseOrdersPage';
 import EditPurchaseOrders from './components/modals/EditPurchaseOrders';
 import CreateExpense from './components/modals/CreateExpense';
@@ -227,10 +228,18 @@ function AppContent() {
           }
         />
         <Route
-          path="/invoices/receive-payment/:invoiceId"
+          path="/invoices/receive-payment/:customerId"
           element={
             <ProtectedRoute>
               <InvoiceRecievedPayment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bills/receive-payment/:vendorId"
+          element={
+            <ProtectedRoute>
+              <BillReceivePaymentModal />
             </ProtectedRoute>
           }
         />

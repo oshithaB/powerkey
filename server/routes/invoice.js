@@ -95,7 +95,7 @@ router.get(
 );
 
 router.post(
-    '/recordPayment/:company_id/:customerId',
+    '/recordInvoicePayment/:company_id/:customerId',
     verifyToken,
     authorizedRoles(['admin', 'sale', 'staff']),
     recordPayment

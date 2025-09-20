@@ -67,6 +67,7 @@ import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBala
 import SupplierBalanceDetails from './components/reports/WhatYouOwe/SupplierBalanceDetails';
 import APAgingDetailReport from './components/reports/WhatYouOwe/APAgingDetailReport';
 import BillsAndAppliedPayments from './components/reports/WhatYouOwe/BillsAndAppliedPayments';
+import UnpaidBills from './components/reports/WhatYouOwe/UnpaidBills';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -704,6 +705,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <BillsAndAppliedPayments />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/unpaid-bills"
+          element={
+            <ProtectedRoute>
+              <UnpaidBills />
             </ProtectedRoute>
           }
         />

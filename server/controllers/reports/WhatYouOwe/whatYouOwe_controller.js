@@ -403,10 +403,47 @@ const billAndAppliedPayments = async (req, res) => {
     }
 };
 
+const unpaidBills = async(req, res) => {
+    const { company_id } = req.params;
+    const { start_date, end_date } = req.query;
+    
+    try {
+      let query = `
+         SELECT b.*, v.name AS vendor_name
+         FROM bills b
+         JOIN vendor v ON b.vendor_id = v.vendor_id
+         WHERE b.company_id = ? AND b.status != 'paid'
+      `;
+      
+      const queryParams = [company_id];
+  
+      if (start_date && end_date) {
+        query += ` AND b.bill_date BETWEEN ? AND ?`;
+        queryParams.push(start_date, end_date);
+      }
+  
+      query += ` ORDER BY b.bill_number DESC`;
+  
+      const [rows] = await db.query(query, queryParams);
+  
+      res.status(200).json({
+        status: 'success',
+        data: rows
+      });
+    } catch (error) {
+      console.error('Error fetching deposit detail:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error'
+      });
+    }
+};
+
 module.exports = {
     getSupplierBalanceSummary,
     getSupplierBalanceDetail,
     getAPAgingSummary,
     getAPAgingSummaryInDetails,
     billAndAppliedPayments,
+    unpaidBills,
 }

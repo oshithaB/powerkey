@@ -71,6 +71,7 @@ const {
     getAPAgingSummary,
     getAPAgingSummaryInDetails,
     billAndAppliedPayments,
+    unpaidBills,
 } = whatYouOweController
 
 
@@ -317,6 +318,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getAPAgingSummaryInDetails
+);
+
+router.get(
+    '/unpaid-bills/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    unpaidBills
 );
 
 

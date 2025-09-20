@@ -205,11 +205,6 @@ export default function ReportsPage() {
       path: '/reports/bills-and-payments'
     },
     {
-      name: 'Bill Payment List',
-      description: 'List of all bill payments made',
-      path: '/reports/bill-payment-list'
-    },
-    {
       name: 'Unpaid Bills',
       description: 'List of all unpaid bills',
       path: '/reports/unpaid-bills'

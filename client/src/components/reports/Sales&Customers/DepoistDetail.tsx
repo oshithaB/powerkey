@@ -123,7 +123,7 @@ const DepositDetail: React.FC = () => {
   };
 
   const getTotal = () => {
-    return data.reduce((total, deposit) => total + Number(deposit.payment_amount), 0);
+    return customerSuggestions.reduce((total, deposit) => total + Number(deposit.payment_amount), 0);
   };
 
   const handlePrint = () => {

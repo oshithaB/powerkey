@@ -355,9 +355,58 @@ const getAPAgingSummaryInDetails = async (req, res) => {
     }
 };
 
+const billAndAppliedPayments = async (req, res) => {
+    const { company_id } = req.params;
+    const { start_date, end_date } = req.query;
+    
+    try {
+      let query = `
+        SELECT 
+            bp.id,
+            bp.payment_date,
+            bp.payment_amount,
+            bp.payment_method,
+            bp.deposit_to,
+            v.vendor_id AS vendor_id,
+            v.name AS vendor_name,
+            b.bill_number,
+            b.balance_due,
+            b.total_amount,
+            b.status AS invoice_status
+         FROM bill_payments bp
+         JOIN vendor v ON bp.vendor_id = v.vendor_id
+         JOIN bills b ON bp.bill_id = b.id
+         WHERE bp.company_id = ?
+      `;
+      
+      const queryParams = [company_id];
+  
+      if (start_date && end_date) {
+        query += ` AND bp.payment_date BETWEEN ? AND ?`;
+        queryParams.push(start_date, end_date);
+      }
+  
+      query += ` ORDER BY b.bill_number DESC, bp.payment_date DESC, bp.id DESC`;
+  
+      const [rows] = await db.query(query, queryParams);
+  
+      res.status(200).json({
+        status: 'success',
+        data: rows
+      });
+    } catch (error) {
+      console.error('Error fetching deposit detail:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error'
+      });
+    }
+};
+
 module.exports = {
     getSupplierBalanceSummary,
     getSupplierBalanceDetail,
     getAPAgingSummary,
     getAPAgingSummaryInDetails,
+    billAndAppliedPayments,
 }

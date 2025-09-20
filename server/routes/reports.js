@@ -70,6 +70,7 @@ const {
     getSupplierBalanceDetail,
     getAPAgingSummary,
     getAPAgingSummaryInDetails,
+    billAndAppliedPayments,
 } = whatYouOweController
 
 
@@ -302,6 +303,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getAPAgingSummary
+);
+
+router.get(
+    '/bill-and-applied-payments/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    billAndAppliedPayments
 );
 
 router.get(

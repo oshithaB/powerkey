@@ -66,6 +66,7 @@ import APAgingSummaryReport from './components/reports/WhatYouOwe/APAgingSummary
 import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
 import SupplierBalanceDetails from './components/reports/WhatYouOwe/SupplierBalanceDetails';
 import APAgingDetailReport from './components/reports/WhatYouOwe/APAgingDetailReport';
+import BillsAndAppliedPayments from './components/reports/WhatYouOwe/BillsAndAppliedPayments';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -694,6 +695,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SupplierBalanceDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/bills-and-payments"
+          element={
+            <ProtectedRoute>
+              <BillsAndAppliedPayments />
             </ProtectedRoute>
           }
         />

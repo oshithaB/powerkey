@@ -69,6 +69,7 @@ const {
     getSupplierBalanceSummary,
     getSupplierBalanceDetail,
     getAPAgingSummary,
+    getAPAgingSummaryInDetails,
 } = whatYouOweController
 
 
@@ -301,6 +302,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getAPAgingSummary
+);
+
+router.get(
+    '/ap-aging-summary-details/:vendor_id/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getAPAgingSummaryInDetails
 );
 
 

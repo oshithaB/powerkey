@@ -162,6 +162,9 @@ export default function BillsPage() {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -200,9 +203,17 @@ export default function BillsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        Rs. {bill.total_amount.toLocaleString()}
+                        Rs. {bill.total_amount?.toLocaleString() || '0.00'}
                       </div>
-                    </td>
+                      <div className="text-sm text-gray-500">
+                        Paid: Rs. {bill.paid_amount?.toLocaleString() || '0.00'}
+                      </div>
+                      {bill.balance_due > 0 && (
+                        <div className="text-sm text-red-600">
+                          Due: Rs. {bill.balance_due?.toLocaleString() || '0.00'}
+                        </div>
+                      )}
+                      </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bill.status)}`}>
                         {bill.status.replace('_', ' ').charAt(0).toUpperCase() + bill.status.replace('_', ' ').slice(1)}

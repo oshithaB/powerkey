@@ -367,6 +367,7 @@ async function createTables(db) {
             deposit_to VARCHAR(100) NOT NULL,
             notes TEXT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE,
             FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id),
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE
@@ -465,6 +466,7 @@ async function createTables(db) {
             paid_amount DECIMAL(15,2) DEFAULT 0.00,
             balance_due DECIMAL(15,2) DEFAULT 0.00,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id) ON DELETE CASCADE,
             FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),
             FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id),

@@ -7,27 +7,27 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface DepositDetailData {
+interface UnpaidBillData {
   id: string;
-  payment_date: string;
-  payment_amount: number;
-  payment_method: string;
-  deposit_to: string;
-  customer_name: string;
-  invoice_number: string;
-  invoice_status: string;
-  balance_due: number;
+  bill_number: string;
+  bill_date: string;
+  due_date: string;
+  vendor_id: number;
+  status: string;
   total_amount: number;
+  paid_amount: number;
+  balance_due: number;
+  vendor_name?: string;
 }
 
-const InvoicesAndRecievePayments: React.FC = () => {
+const UnpaidBills: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<DepositDetailData[]>([]);
+  const [data, setData] = useState<UnpaidBillData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [customerFilter, setCustomerFilter] = useState<string>('');
-  const [customerSuggestions, setCustomerSuggestions] = useState<DepositDetailData[]>([]);
+  const [vendorFilter, setVendorFilter] = useState<string>('');
+  const [vendorSuggestions, setVendorSuggestions] = useState<UnpaidBillData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
@@ -43,7 +43,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchDepositDetail = async (startDate?: string, endDate?: string) => {
+  const fetchUnpaidBills = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -52,21 +52,20 @@ const InvoicesAndRecievePayments: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/deposit-detail/${selectedCompany.company_id}`, {
+      const response = await axiosInstance.get(`/api/unpaid-bills/${selectedCompany.company_id}`, {
         params: { start_date: startDate, end_date: endDate },
       });
-      console.log('API Response:', response.data);
       
       if (response.data?.data && Array.isArray(response.data.data)) {
         setData(response.data.data);
-        setCustomerSuggestions(response.data.data);
+        setVendorSuggestions(response.data.data);
       } else {
         setData([]);
-        setCustomerSuggestions([]);
+        setVendorSuggestions([]);
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch Invoice and Payment Details. Please try again.');
+      setError('Failed to fetch Unpaid Bills. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -93,7 +92,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchDepositDetail(startDate, endDate);
+      fetchUnpaidBills(startDate, endDate);
     }
   }, [selectedCompany?.company_id, filter, isCustomRange]);
 
@@ -123,24 +122,24 @@ const InvoicesAndRecievePayments: React.FC = () => {
   };
 
   const getTotal = () => {
-    return customerSuggestions.reduce((total, deposit) => total + Number(deposit.payment_amount), 0);
+    return vendorSuggestions.reduce((total, bill) => total + Number(bill.balance_due), 0);
   };
 
   const handlePrint = () => {
-    if (customerSuggestions.length === 0) {
+    if (vendorSuggestions.length === 0) {
       alert('No data available to print');
       return;
     }
     setShowPrintPreview(true);
   };
 
-  const handleCustomerSearch = (value: string) => {
-    setCustomerFilter(value);
-    const filtered = data.filter(deposit =>
-      deposit.customer_name.toLowerCase().includes(value.toLowerCase()) ||
-      deposit.invoice_number.toLowerCase().includes(value.toLowerCase())
+  const handleVendorSearch = (value: string) => {
+    setVendorFilter(value);
+    const filtered = data.filter(bill =>
+      bill.vendor_name?.toLowerCase().includes(value.toLowerCase()) ||
+      bill.bill_number.toLowerCase().includes(value.toLowerCase())
     );
-    setCustomerSuggestions(filtered.length > 0 ? filtered : data);
+    setVendorSuggestions(filtered.length > 0 ? filtered : data);
   };
 
   const handleDownloadPDF = async () => {
@@ -196,7 +195,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
         }
       }
 
-      const filename = `Invoices-and-Recieve-Payments-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Unpaid-Bills-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -205,13 +204,13 @@ const InvoicesAndRecievePayments: React.FC = () => {
     }
   };
 
-  const groupedData = customerSuggestions.reduce((acc, deposit) => {
-    if (!acc[deposit.invoice_number]) {
-      acc[deposit.invoice_number] = [];
+  const groupedData = vendorSuggestions.reduce((acc, bill) => {
+    if (!acc[bill.bill_number]) {
+      acc[bill.bill_number] = [];
     }
-    acc[deposit.invoice_number].push(deposit);
+    acc[bill.bill_number].push(bill);
     return acc;
-  }, {} as Record<string, DepositDetailData[]>);
+  }, {} as Record<string, UnpaidBillData[]>);
 
   const printStyles = `
     @media print {
@@ -234,7 +233,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view Invoice and Payment Details.</p>
+          <p className="text-gray-600">Please select a company to view Unpaid Bills.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -266,7 +265,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">Invoice and Payment Details</h1>
+                <h1 className="text-2xl font-bold mb-4">Unpaid Bills</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
@@ -275,23 +274,23 @@ const InvoicesAndRecievePayments: React.FC = () => {
                     <input
                       type="text"
                       className="border rounded-md p-2 w-40"
-                      value={customerFilter}
-                      onChange={(e) => handleCustomerSearch(e.target.value)}
+                      value={vendorFilter}
+                      onChange={(e) => handleVendorSearch(e.target.value)}
                       placeholder="Search..."
                     />
-                    {customerFilter && customerSuggestions.length > 0 && (
+                    {vendorFilter && vendorSuggestions.length > 0 && (
                       <ul className="absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto w-40 mt-1">
-                        {Array.from(new Set(customerSuggestions.map(deposit => deposit.customer_name))).map((customerName, index) => (
+                        {Array.from(new Set(vendorSuggestions.map(bill => bill.vendor_name))).map((vendorName, index) => (
                           <li
                             key={index}
                             className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => {
-                              setCustomerFilter(customerName);
-                              const filtered = data.filter(deposit => deposit.customer_name === customerName);
-                              setCustomerSuggestions(filtered);
+                              setVendorFilter(vendorName || '');
+                              const filtered = data.filter(bill => bill.vendor_name === vendorName);
+                              setVendorSuggestions(filtered);
                             }}
                           >
-                            {customerName}
+                            {vendorName}
                           </li>
                         ))}
                       </ul>
@@ -347,7 +346,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                     <button
                       onClick={() => {
                         if (startDate && endDate) {
-                          fetchDepositDetail(startDate, endDate);
+                          fetchUnpaidBills(startDate, endDate);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -376,7 +375,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Invoice and Payment Details</p>
+                <p className="text-sm font-medium">Unpaid Bills</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -398,95 +397,87 @@ const InvoicesAndRecievePayments: React.FC = () => {
                 </div>
               )}
               
-              {!loading && !error && customerSuggestions.length === 0 && (
+              {!loading && !error && vendorSuggestions.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No deposit data available.
+                  No unpaid bills data available.
                 </div>
               )}
               
-              {!loading && !error && customerSuggestions.length > 0 && (
+              {!loading && !error && vendorSuggestions.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse min-w-full">
                     <thead>
                       <tr>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Date
+                          Bill Date
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Customer
+                          Due Date
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Invoice #
+                          Vendor
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Payment Method
+                          Bill #
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Deposit To
+                          Total Amount
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Paid Amount
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Amount
+                          Balance Due
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(groupedData).map(([invoiceNumber, deposits], groupIndex) => (
+                      {Object.entries(groupedData).map(([billNumber, bills], groupIndex) => (
                         <React.Fragment key={groupIndex}>
-                          {deposits.map((deposit, index) => (
+                          {bills.map((bill, index) => (
                             <tr
-                              key={deposit.id}
+                              key={bill.id}
                               className={`${index === 0 ? 'border-t-2 border-gray-400' : ''} hover:bg-gray-50`}
                             >
                               <td className="p-2 border-b">
-                                {new Date(deposit.payment_date).toLocaleDateString()}
+                                {new Date(bill.bill_date).toLocaleDateString()}
                               </td>
                               <td className="p-2 border-b">
-                                {deposit.customer_name}
+                                {new Date(bill.due_date).toLocaleDateString()}
+                              </td>
+                              <td className="p-2 border-b">
+                                {bill.vendor_name || `Vendor ${bill.vendor_id}`}
                               </td>
                               <td className="p-2 border-b font-medium">
-                                {deposit.invoice_number}
-                              </td>
-                              <td className="p-2 border-b">
-                                {deposit.payment_method}
-                              </td>
-                              <td className="p-2 border-b">
-                                {deposit.deposit_to}
+                                {bill.bill_number}
                               </td>
                               <td className="p-2 border-b text-right">
-                                {formatCurrency(deposit.payment_amount)}
+                                {formatCurrency(bill.total_amount)}
+                              </td>
+                              <td className="p-2 border-b text-right">
+                                {formatCurrency(bill.paid_amount)}
+                              </td>
+                              <td className="p-2 border-b text-right">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(bill.status)}`}>
+                                  {bill.status.replace('_', ' ').toUpperCase()}
+                                </span>
+                                <br />
+                                {formatCurrency(bill.balance_due)}
                               </td>
                             </tr>
                           ))}
-                          <tr>
-                            <td className="p-2 border-b-2 border-gray-600 text-center">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deposits[0].invoice_status)}`}>
-                                  {deposits[0].invoice_status.replace('_', ' ').toUpperCase()}
-                                </span>
-                            </td>
-                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                              Balance Due: {formatCurrency(deposits[0].balance_due)}
-                            </td>
-                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                              Total Amount: {formatCurrency(deposits[0].total_amount)}
-                            </td>
-                            <td colSpan={2} className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                              Total Payment: 
-                            </td>
-                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                              {formatCurrency(deposits.reduce((sum, d) => sum + Number(d.payment_amount), 0))}
-                            </td>
-                          </tr>
                         </React.Fragment>
                       ))}
                       <tr>
-                        <td colSpan={5} className="p-3 border-t-4 border-gray-800 font-bold text-right text-lg">
-                          Grand Total:
+                        <td colSpan={6} className="p-3 border-t-4 border-gray-800 font-bold text-right text-lg">
+                          Total Balance Due:
                         </td>
                         <td className="p-3 border-t-4 border-gray-800 font-bold text-right text-lg">
                           {formatCurrency(getTotal())}
@@ -505,12 +496,12 @@ const InvoicesAndRecievePayments: React.FC = () => {
         </div>
       </motion.div>
 
-      {showPrintPreview && customerSuggestions.length > 0 && (
+      {showPrintPreview && vendorSuggestions.length > 0 && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50 flex items-center justify-center p-4">
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - Invoice and Payment Details
+                Print Preview - Unpaid Bills
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -525,8 +516,8 @@ const InvoicesAndRecievePayments: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">Invoice and Payment Details</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Payment Transaction Details</h2>
+                    <h1 className="text-3xl font-bold mb-2">Unpaid Bills</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Bill Details</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
                     </h2>
@@ -552,76 +543,74 @@ const InvoicesAndRecievePayments: React.FC = () => {
                     <tr>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Date
+                        Bill Date
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Customer
+                        Due Date
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Invoice #
+                        Vendor
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Payment Method
-                      </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Deposit To
+                        Bill #
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Amount
+                        Total Amount
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Paid Amount
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Balance Due
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(groupedData).map(([invoiceNumber, deposits], groupIndex) => (
+                    {Object.entries(groupedData).map(([billNumber, bills], groupIndex) => (
                       <React.Fragment key={groupIndex}>
-                        {deposits.map((deposit, index) => (
+                        {bills.map((bill, index) => (
                           <tr
-                            key={deposit.id}
+                            key={bill.id}
                             className={index === 0 ? 'border-t-2 border-gray-400' : ''}
                           >
                             <td className="p-2 border-b">
-                              {new Date(deposit.payment_date).toLocaleDateString()}
+                              {new Date(bill.bill_date).toLocaleDateString()}
                             </td>
                             <td className="p-2 border-b">
-                              {deposit.customer_name}
+                              {new Date(bill.due_date).toLocaleDateString()}
+                            </td>
+                            <td className="p-2 border-b">
+                              {bill.vendor_name || `Vendor ${bill.vendor_id}`}
                             </td>
                             <td className="p-2 border-b font-medium">
-                              {deposit.invoice_number}
-                            </td>
-                            <td className="p-2 border-b">
-                              {deposit.payment_method}
-                            </td>
-                            <td className="p-2 border-b">
-                              {deposit.deposit_to}
+                              {bill.bill_number}
                             </td>
                             <td className="p-2 border-b text-right">
-                              {formatCurrency(deposit.payment_amount)}
+                              {formatCurrency(bill.total_amount)}
+                            </td>
+                            <td className="p-2 border-b text-right">
+                              {formatCurrency(bill.paid_amount)}
+                            </td>
+                            <td className="p-2 border-b text-right">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(bill.status)}`}>
+                                {bill.status.replace('_', ' ').toUpperCase()}
+                              </span>
+                              <br />
+                              {formatCurrency(bill.balance_due)}
                             </td>
                           </tr>
                         ))}
-                        <tr>
-                            <td className="p-2 border-b-2 border-gray-600 text-center">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deposits[0].invoice_status)}`}>
-                                    {deposits[0].invoice_status.replace('_', ' ').toUpperCase()}
-                                </span>
-                            </td>
-                            <td colSpan={4} className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                                Total Payment:
-                            </td>
-                            <td className="p-2 border-b-2 border-gray-600 font-bold text-right">
-                                {formatCurrency(deposits.reduce((sum, d) => sum + Number(d.payment_amount), 0))}
-                            </td>
-                        </tr>
                       </React.Fragment>
                     ))}
                     <tr>
-                      <td colSpan={5} className="p-2 border-t-4 border-gray-800 font-bold text-right text-lg">
-                        Grand Total:
+                      <td colSpan={6} className="p-2 border-t-4 border-gray-800 font-bold text-right text-lg">
+                        Total Balance Due:
                       </td>
                       <td className="p-2 border-t-4 border-gray-800 font-bold text-right text-lg">
                         {formatCurrency(getTotal())}
@@ -639,7 +628,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        Invoice and Payment Details
+                        Unpaid Bills
                       </p>
                     </div>
                   </div>
@@ -668,4 +657,4 @@ const InvoicesAndRecievePayments: React.FC = () => {
   );
 };
 
-export default InvoicesAndRecievePayments;
+export default UnpaidBills;

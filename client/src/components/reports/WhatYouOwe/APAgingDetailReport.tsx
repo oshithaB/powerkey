@@ -1,44 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosInstance from '../../../axiosInstance';
-import { X, Printer, ArrowLeft, Eye } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { X, Printer, ArrowLeft } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface Vendor {
-  company_name: string;
-  vendor_id: number;
-  vendor_name: string;
-  due_today: number;
-  due_15_days: number;
-  due_30_days: number;
-  due_60_days: number;
-  overdue: number;
-  total_outstanding: number;
+interface Bill {
+  billId: string;
+  billNumber: string;
+  billDate: string;
+  dueDate: string;
+  totalAmount: string;
+  paidAmount: string;
+  balanceDue: string;
+  status: string;
+  vendorName: string;
+  companyName: string;
 }
 
-interface APAgingSummaryData {
-  vendors: Vendor[];
-  totals: {
-    due_today: number;
-    due_15_days: number;
-    due_30_days: number;
-    due_60_days: number;
-    overdue: number;
-    total_outstanding: number;
-  };
-  period: {
-    start_date: string;
-    end_date: string;
-    current_date: string;
-  };
+interface APAgingDetailsData {
+  due_today: Bill[];
+  due_15_days: Bill[];
+  due_30_days: Bill[];
+  due_60_days: Bill[];
+  overdue: Bill[];
 }
 
-const APAgingSummaryReport: React.FC = () => {
+const APAgingDetailReport: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<APAgingSummaryData | null>(null);
+  const [data, setData] = useState<APAgingDetailsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -47,6 +39,7 @@ const APAgingSummaryReport: React.FC = () => {
   const [periodEnd, setPeriodEnd] = useState<string>('');
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const { vendorId, companyId } = useParams<{ vendorId: string; companyId: string }>();
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isCustomRange, setIsCustomRange] = useState(false);
@@ -57,24 +50,23 @@ const APAgingSummaryReport: React.FC = () => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   };
 
-  const fetchAPAgingSummaryData = async (startDate?: string, endDate?: string) => {
+  const fetchAPAgingDetailsData = async (vendorId: string, startDate?: string, endDate?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/ap-aging-summary/${selectedCompany?.company_id}`, {
-        params: { start_date: startDate, end_date: endDate, filter },
+      const response = await axiosInstance.get(`/api/ap-aging-summary-details/${vendorId}/${selectedCompany?.company_id}`, {
+        params: { start_date: startDate, end_date: endDate },
       });
       setData(response.data.data);
     } catch (err) {
       setError('No data found for the selected period.');
-      console.error('Fetch Error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id) {
+    if (selectedCompany?.company_id && vendorId) {
       if (isCustomRange) {
         return;
       }
@@ -93,19 +85,19 @@ const APAgingSummaryReport: React.FC = () => {
   
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchAPAgingSummaryData(startDate, endDate);
+      fetchAPAgingDetailsData(vendorId, startDate, endDate);
     } else {
-      setError('Please select a company');
+      setError('Missing company or vendor information');
       setLoading(false);
     }
-  }, [selectedCompany?.company_id, filter, isCustomRange]);
+  }, [selectedCompany?.company_id, vendorId, companyId, filter, isCustomRange]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(value);
+  const formatCurrency = (value: string) => {
+    return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
   };
 
   const handlePrint = () => {
-    if (!data || data.vendors.length === 0) {
+    if (!data || Object.values(data).every(category => category.length === 0)) {
       alert('No data available to print');
       return;
     }
@@ -162,17 +154,14 @@ const APAgingSummaryReport: React.FC = () => {
         }
       }
 
-      const filename = `ap-aging-summary-${selectedCompany?.name || 'company'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      const vendorName = data?.due_today[0]?.vendorName || data?.due_15_days[0]?.vendorName || data?.due_30_days[0]?.vendorName || data?.due_60_days[0]?.vendorName || data?.overdue[0]?.vendorName || 'vendor';
+      const filename = `ap-aging-details-${vendorName}-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     }
-  };
-
-  const handleViewDetails = (vendorId: number) => {
-    navigate(`/reports/ap-aging-detail/${vendorId}`);
   };
 
   const printStyles = `
@@ -191,11 +180,67 @@ const APAgingSummaryReport: React.FC = () => {
     }
   `;
 
+  const renderBillTable = (bills: Bill[], title: string) => (
+    <div className="mb-6">
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      {bills.length > 0 ? (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Bill Number
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Date
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Due Date
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Paid Amount
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Total Amount
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Status
+              </th>
+              <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                Balance Due
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {bills.map((bill) => (
+              <tr key={bill.billId}>
+                <td className="p-2 border-b">{bill.billNumber}</td>
+                <td className="p-2 border-b">{bill.billDate}</td>
+                <td className="p-2 border-b">{bill.dueDate}</td>
+                <td className="p-2 border-b text-right">{formatCurrency(bill.paidAmount)}</td>
+                <td className="p-2 border-b text-right">{formatCurrency(bill.totalAmount)}</td>
+                <td className="p-2 border-b">{bill.status}</td>
+                <td className="p-2 border-b text-right">{formatCurrency(bill.balanceDue)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={6}>Total</td>
+              <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                {formatCurrency(bills.reduce((sum, bill) => sum + parseFloat(bill.balanceDue), 0).toFixed(2))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-sm text-gray-600">No bills found for this period.</p>
+      )}
+    </div>
+  );
+
   if (!selectedCompany) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view A/P aging summary data.</p>
+          <p className="text-gray-600">Please select a company to view A/P aging details data.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -227,7 +272,7 @@ const APAgingSummaryReport: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold">A/P Aging Summary Report</h1>
+                <h1 className="text-2xl font-bold">A/P Aging Details Report</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
@@ -279,10 +324,8 @@ const APAgingSummaryReport: React.FC = () => {
                     </div>
                     <button
                       onClick={() => {
-                        if (startDate && endDate) {
-                          setPeriodStart(startDate);
-                          setPeriodEnd(endDate);
-                          fetchAPAgingSummaryData(startDate, endDate);
+                        if (startDate && endDate && vendorId) {
+                          fetchAPAgingDetailsData(vendorId, startDate, endDate);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -313,7 +356,7 @@ const APAgingSummaryReport: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">Accounts Payable Aging Summary</p>
+                <p className="text-sm font-medium">Accounts Payable Aging Details</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -335,70 +378,26 @@ const APAgingSummaryReport: React.FC = () => {
                 </div>
               )}
 
-              {!loading && !error && data && data.vendors.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Vendor
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Current
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          1-15 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          16-30 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          31-60 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Over 60 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.vendors.map((vendor) => (
-                        <tr key={vendor.vendor_id} className="hover:bg-gray-50" onClick={() => handleViewDetails(vendor.vendor_id)} style={{ cursor: 'pointer' }}>
-                          <td className="p-3 border-b font-medium">{vendor.vendor_name}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_today)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_15_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_30_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_60_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.overdue)}</td>
-                          <td className="p-3 border-b text-right font-semibold">{formatCurrency(vendor.total_outstanding)}</td>
-                        </tr>
-                      ))}
-                      {/* Totals Row */}
-                      <tr className="bg-gray-50 font-bold">
-                        <td className="p-3 border-t-2 border-gray-800 font-bold">Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_today)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_15_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_30_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_60_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.overdue)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.total_outstanding)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              {!loading && !error && data && (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-lg font-semibold">
+                      {data?.due_today[0]?.vendorName || data?.due_15_days[0]?.vendorName || data?.due_30_days[0]?.vendorName || data?.due_60_days[0]?.vendorName || data?.overdue[0]?.vendorName || 'Vendor'}
+                    </h2>
+                    <p className="text-sm text-gray-600">Company: {selectedCompany.name || 'N/A'}</p>
+                  </div>
 
-              {!loading && !error && data && data.vendors.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">No outstanding bills found for the selected period.</p>
-                </div>
-              )}
+                  {data.due_today.length > 0 && renderBillTable(data.due_today, 'Due Today')}
+                  {data.due_15_days.length > 0 && renderBillTable(data.due_15_days, '1-15 Days')}
+                  {data.due_30_days.length > 0 && renderBillTable(data.due_30_days, '16-30 Days')}
+                  {data.due_60_days.length > 0 && renderBillTable(data.due_60_days, '31-60 Days')}
+                  {data.overdue.length > 0 && renderBillTable(data.overdue, 'Overdue')}
 
-              <p className="text-sm mt-5 text-gray-600">
-                Report generated at {new Date().toLocaleString()}
-              </p>
+                  <p className="text-sm mt-5 text-gray-600">
+                    Report generated at {new Date().toLocaleString()}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -409,7 +408,7 @@ const APAgingSummaryReport: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - A/P Aging Summary Report
+                Print Preview - A/P Aging Details Report
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -424,8 +423,8 @@ const APAgingSummaryReport: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">A/P Aging Summary Report</h1>
-                    <h2 className="text-xl text-gray-600 mb-2">Accounts Payable Aging Summary</h2>
+                    <h1 className="text-3xl font-bold mb-2">A/P Aging Details Report</h1>
+                    <h2 className="text-xl text-gray-600 mb-2">Accounts Payable Aging Details</h2>
                     <h2 className="text-xl text-gray-600 mb-2">{selectedCompany?.name || 'Company Name'} (Pvt) Ltd.</h2>
                     <p className="text-sm text-gray-600">
                       {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -433,6 +432,7 @@ const APAgingSummaryReport: React.FC = () => {
                       {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                     </p>
+                    <p className="text-sm text-gray-600 mt-2">Vendor: {data?.due_today[0]?.vendorName || data?.due_15_days[0]?.vendorName || data?.due_30_days[0]?.vendorName || data?.due_60_days[0]?.vendorName || data?.overdue[0]?.vendorName || 'Vendor'}</p>
                   </div>
                   {selectedCompany?.company_logo && (
                     <img
@@ -443,57 +443,11 @@ const APAgingSummaryReport: React.FC = () => {
                   )}
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-left" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Vendor
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Current
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          1-15 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          16-30 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          31-60 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Over 60 Days
-                        </th>
-                        <th className="bg-gray-100 p-3 font-bold text-base border section-header text-right" style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.vendors.map((vendor) => (
-                        <tr key={vendor.vendor_id}>
-                          <td className="p-3 border-b font-medium">{vendor.vendor_name}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_today)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_15_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_30_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.due_60_days)}</td>
-                          <td className="p-3 border-b text-right">{formatCurrency(vendor.overdue)}</td>
-                          <td className="p-3 border-b text-right font-semibold">{formatCurrency(vendor.total_outstanding)}</td>
-                        </tr>
-                      ))}
-                      <tr className="bg-gray-50 font-bold">
-                        <td className="p-3 border-t-2 border-gray-800 font-bold">Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_today)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_15_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_30_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.due_60_days)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.overdue)}</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totals.total_outstanding)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                {data.due_today.length > 0 && renderBillTable(data.due_today, 'Due Today')}
+                {data.due_15_days.length > 0 && renderBillTable(data.due_15_days, '1-15 Days')}
+                {data.due_30_days.length > 0 && renderBillTable(data.due_30_days, '16-30 Days')}
+                {data.due_60_days.length > 0 && renderBillTable(data.due_60_days, '31-60 Days')}
+                {data.overdue.length > 0 && renderBillTable(data.overdue, 'Overdue')}
 
                 <div className="border-t pt-2 mt-6">
                   <div className="flex justify-between items-center">
@@ -501,7 +455,7 @@ const APAgingSummaryReport: React.FC = () => {
                       Report generated at: {new Date().toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-600">
-                      A/P Aging Summary Report
+                      A/P Aging Details Report
                     </p>
                   </div>
                 </div>
@@ -529,4 +483,4 @@ const APAgingSummaryReport: React.FC = () => {
   );
 };
 
-export default APAgingSummaryReport;
+export default APAgingDetailReport;

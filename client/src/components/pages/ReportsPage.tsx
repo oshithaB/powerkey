@@ -200,19 +200,9 @@ export default function ReportsPage() {
       path: '/reports/ap-aging-summary'
     },
     {
-      name: 'Accounts Payable Ageing Detail',
-      description: 'Detailed outstanding payables',
-      path: '/reports/ap-aging-detail'
-    },
-    {
       name: 'Bills and Applied Payments',
       description: 'List of bills and their payment status',
       path: '/reports/bills-and-payments'
-    },
-    {
-      name: 'Bill Payment List',
-      description: 'List of all bill payments made',
-      path: '/reports/bill-payment-list'
     },
     {
       name: 'Unpaid Bills',

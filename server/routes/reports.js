@@ -69,6 +69,9 @@ const {
     getSupplierBalanceSummary,
     getSupplierBalanceDetail,
     getAPAgingSummary,
+    getAPAgingSummaryInDetails,
+    billAndAppliedPayments,
+    unpaidBills,
 } = whatYouOweController
 
 
@@ -301,6 +304,27 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getAPAgingSummary
+);
+
+router.get(
+    '/bill-and-applied-payments/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    billAndAppliedPayments
+);
+
+router.get(
+    '/ap-aging-summary-details/:vendor_id/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    getAPAgingSummaryInDetails
+);
+
+router.get(
+    '/unpaid-bills/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    unpaidBills
 );
 
 

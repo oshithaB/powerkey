@@ -65,6 +65,9 @@ import CustomerBalanceDetail from './components/reports/WhoOwesYou/CustomerBalan
 import APAgingSummaryReport from './components/reports/WhatYouOwe/APAgingSummaryReport';
 import SupplierBalanceSummary from './components/reports/WhatYouOwe/SupplierBalanceSummary';
 import SupplierBalanceDetails from './components/reports/WhatYouOwe/SupplierBalanceDetails';
+import APAgingDetailReport from './components/reports/WhatYouOwe/APAgingDetailReport';
+import BillsAndAppliedPayments from './components/reports/WhatYouOwe/BillsAndAppliedPayments';
+import UnpaidBills from './components/reports/WhatYouOwe/UnpaidBills';
 
 // Expense and Suppliers Reports
 import SupplierContactDetails from './components/reports/ExpensesAndSuppliers/SupplierContactDetails';
@@ -669,6 +672,15 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/reports/ap-aging-detail/:vendorId"
+          element={
+            <ProtectedRoute>
+              <APAgingDetailReport />
+            </ProtectedRoute>
+          }
+        />
         
         <Route
           path="/reports/supplier-balance-summary"
@@ -684,6 +696,24 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SupplierBalanceDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/bills-and-payments"
+          element={
+            <ProtectedRoute>
+              <BillsAndAppliedPayments />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/unpaid-bills"
+          element={
+            <ProtectedRoute>
+              <UnpaidBills />
             </ProtectedRoute>
           }
         />

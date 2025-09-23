@@ -49,7 +49,6 @@ interface ProfitAndLossData {
   };
   income: {
     sales_of_product_income: number;
-    shipping_income: number;
     tax_income: number;
     discounts_given: number;
     other_income: number;
@@ -455,7 +454,6 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                     <tbody>
                       {renderTableRow('Discounts Given', data.income.discounts_given)}
                       {renderTableRow('Sales of Product Income', data.income.sales_of_product_income)}
-                      {renderTableRow('Shipping Income', data.income.shipping_income)}
                       {renderTableRow('Tax Income', data.income.tax_income)}
                       {renderTableRow('Total Income', data.income.total_income, true)}
                       {renderTableRow('Cost of Sales', data.cost_of_sales.cost_of_sales, false, true)}
@@ -589,7 +587,6 @@ const ProfitAndLossByClassInDetail: React.FC = () => {
                   <tbody>
                     {renderTableRow('Discounts Given', data.income.discounts_given)}
                     {renderTableRow('Sales of Product Income', data.income.sales_of_product_income)}
-                    {renderTableRow('Shipping Income', data.income.shipping_income)}
                     {renderTableRow('Tax Income', data.income.tax_income)}
                     {renderTableRow('Total Income', data.income.total_income, true)}
                     {renderTableRow('Cost of Sales', data.cost_of_sales.cost_of_sales, false, true)}

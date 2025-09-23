@@ -966,35 +966,6 @@ export default function ExpenseModal({ expense, onSave }: ExpenseModalProps) {
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Account *
-                    </label>
-                    <select
-                        name="payment_account_id"
-                        value={formData.payment_account_id}
-                        onChange={(e) => {
-                        if (e.target.value === 'create_new') {
-                            setIsCreatePaymentAccountModalOpen(true);
-                        } else {
-                            setFormData({ ...formData, payment_account_id: e.target.value });
-                        }
-                        }}
-                        className="input w-full"
-                        required
-                    >
-                        <option value="" disabled>
-                        Select Payment Account
-                        </option>
-                        <option value="create_new">+ Create New Payment Account</option>
-                        {paymentAccounts.map((account, index) => (
-                        <option key={index} value={account.id}>
-                            {account.payment_account_name}
-                        </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
                         Payment Date *
                     </label>
                     <input

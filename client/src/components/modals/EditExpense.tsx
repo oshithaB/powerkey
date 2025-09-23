@@ -72,7 +72,7 @@ export default function EditExpense() {
 
     const initialFormData = {
         expense_number: expense ? expense.expense_number : `EXP-${Date.now()}`,
-        payment_account_id: expense ? expense.payment_account_id.toString() : '',
+        // payment_account_id: expense ? expense.payment_account_id.toString() : '',
         payment_date: expense ? expense.payment_date.split('T')[0] : new Date().toISOString().split('T')[0],
         payment_method: expense ? expense.payment_method_id.toString() : '',
         notes: expense ? expense.notes : '',
@@ -159,7 +159,6 @@ export default function EditExpense() {
         });
         const newAccount = response.data;
         setPaymentAccounts((prev) => [...prev, newAccount]);
-        setFormData({ ...formData, payment_account_id: newAccount.id.toString() });
         setPaymentAccountFilter(newAccount.name);
         setIsCreatePaymentAccountModalOpen(false);
         alert('Payment account created successfully.');
@@ -351,7 +350,7 @@ export default function EditExpense() {
         const submitData = {
             ...formData,
             company_id: selectedCompany?.company_id,
-            payment_account_id: parseInt(formData.payment_account_id) || null,
+            // payment_account_id: parseInt(formData.payment_account_id) || null,
             total_amount: Number(total),
             items: validItems.map(item => ({
             category_id: item.category_id,
@@ -980,35 +979,6 @@ export default function EditExpense() {
                         ))}
                     </select>
                 </div> */}
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Account *
-                    </label>
-                    <select
-                        name="payment_account_id"
-                        value={formData.payment_account_id}
-                        onChange={(e) => {
-                        if (e.target.value === 'create_new') {
-                            setIsCreatePaymentAccountModalOpen(true);
-                        } else {
-                            setFormData({ ...formData, payment_account_id: e.target.value });
-                        }
-                        }}
-                        className="input w-full"
-                        required
-                    >
-                        <option value="" disabled>
-                        Select Payment Account
-                        </option>
-                        <option value="create_new">+ Create New Payment Account</option>
-                        {paymentAccounts.map((account, index) => (
-                        <option key={index} value={account.id}>
-                            {account.payment_account_name}
-                        </option>
-                        ))}
-                    </select>
-                </div>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

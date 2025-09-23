@@ -16,7 +16,6 @@ interface ProfitAndLossData {
   };
   income: {
     sales_of_product_income: number;
-    shipping_income: number;
     tax_income: number;
     discounts_given: number;
     total_income: number;
@@ -270,7 +269,6 @@ const ProfitAndLossByCustomer: React.FC = () => {
     const rows = [
       { label: 'Discounts given', getValue: (customer: any) => -safeGetValue(customer, 'income.discounts_given') },
       { label: 'Sales of Product Income', getValue: (customer: any) => safeGetValue(customer, 'income.sales_of_product_income') },
-      { label: 'Shipping Income', getValue: (customer: any) => safeGetValue(customer, 'income.shipping_income') },
       { label: 'Tax Income', getValue: (customer: any) => safeGetValue(customer, 'income.tax_income') },
       { label: 'Total for Income', getValue: (customer: any) => safeGetValue(customer, 'income.total_income'), isTotal: true },
       { label: 'Cost of Sales', getValue: (customer: any) => safeGetValue(customer, 'cost_of_sales.cost_of_sales'), isCostSection: true },
@@ -565,7 +563,6 @@ const ProfitAndLossByCustomer: React.FC = () => {
                         <tbody>
                           <tr><td className="p-2 border-b font-medium w-48">Discounts given</td></tr>
                           <tr><td className="p-2 border-b font-medium w-48">Sales of Product Income</td></tr>
-                          <tr><td className="p-2 border-b font-medium w-48">Shipping Income</td></tr>
                           <tr><td className="p-2 border-b font-medium w-48">Tax Income</td></tr>
                           <tr><td className="p-2 border-b font-bold w-48">Total for Income</td></tr>
                           <tr><td className="p-2 border-b font-medium cost-section w-48">Cost of Sales</td></tr>
@@ -624,16 +621,6 @@ const ProfitAndLossByCustomer: React.FC = () => {
                             ))}
                             <td className="p-2 border-b text-right">
                               {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.sales_of_product_income'), 0))}
-                            </td>
-                          </tr>
-                          <tr>
-                            {data.map((customer) => (
-                              <td key={customer.customer.id} className="p-2 border-b text-right">
-                                {formatCurrency(safeGetValue(customer, 'income.shipping_income'))}
-                              </td>
-                            ))}
-                            <td className="p-2 border-b text-right">
-                              {formatCurrency(data.reduce((total, emp) => total + safeGetValue(emp, 'income.shipping_income'), 0))}
                             </td>
                           </tr>
                           <tr>
@@ -823,7 +810,6 @@ const ProfitAndLossByCustomer: React.FC = () => {
                     {/* Income Section */}
                     {renderTableRow('Discounts given', (emp) => -safeGetValue(emp, 'income.discounts_given'))}
                     {renderTableRow('Sales of Product Income', (emp) => safeGetValue(emp, 'income.sales_of_product_income'))}
-                    {renderTableRow('Shipping Income', (emp) => safeGetValue(emp, 'income.shipping_income'))}
                     {renderTableRow('Tax Income', (emp) => safeGetValue(emp, 'income.tax_income'))}
                     {renderTableRow('Total for Income', (emp) => safeGetValue(emp, 'income.total_income'), true)}
                     

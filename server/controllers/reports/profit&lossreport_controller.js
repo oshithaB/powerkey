@@ -44,16 +44,6 @@ class ReportController {
                 ${dateCondition}
             `, [company_id, ...dateParams]);
 
-            // Shipping Income - Total shipping charges
-            const [shippingIncomeResult] = await db.execute(`
-                SELECT 
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                FROM invoices i
-                WHERE i.company_id = ? 
-                AND i.status != 'proforma'
-                ${dateCondition}
-            `, [company_id, ...dateParams]);
-
             // Discounts Given - Total discounts provided (shown as negative)
             const [discountsResult] = await db.execute(`
                 SELECT 
@@ -144,7 +134,6 @@ class ReportController {
 
             // Extract values
             const productIncome = parseFloat(productIncomeResult[0]?.product_income || 0);
-            const shippingIncome = parseFloat(shippingIncomeResult[0]?.shipping_income || 0);
             const discountsGiven = parseFloat(discountsResult[0]?.discounts_given || 0);
             const taxIncome = parseFloat(taxIncomeResult[0]?.tax_income || 0);
             const costOfSales = parseFloat(costOfSalesResult[0]?.cost_of_sales || 0);
@@ -158,7 +147,7 @@ class ReportController {
             // 5. CALCULATE TOTALS AND DERIVED METRICS
 
             // Total Income (before discounts)
-            const totalIncome = productIncome + shippingIncome + taxIncome;
+            const totalIncome = productIncome + taxIncome;
 
             // Net Income (after discounts)
             const netIncome = totalIncome - discountsGiven;
@@ -201,7 +190,6 @@ class ReportController {
                 },
                 income: {
                     sales_of_product_income: productIncome,
-                    shipping_income: shippingIncome,
                     tax_income: taxIncome,
                     discounts_given: -discountsGiven,
                     other_income: otherIncome,
@@ -310,16 +298,6 @@ class ReportController {
                     AND i.invoice_date BETWEEN ? AND ?
                 `, [company_id, startDateStr, endDateStr]);
     
-                // Shipping Income
-                const [shippingIncomeResult] = await db.execute(`
-                    SELECT 
-                        COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                    FROM invoices i
-                    WHERE i.company_id = ? 
-                    AND i.status != 'proforma'
-                    AND i.invoice_date BETWEEN ? AND ?
-                `, [company_id, startDateStr, endDateStr]);
-    
                 // Tax Income
                 const [taxIncomeResult] = await db.execute(`
                     SELECT 
@@ -370,7 +348,6 @@ class ReportController {
     
                 // Extract values
                 const productIncome = parseFloat(productIncomeResult[0]?.product_income || 0);
-                const shippingIncome = parseFloat(shippingIncomeResult[0]?.shipping_income || 0);
                 const taxIncome = parseFloat(taxIncomeResult[0]?.tax_income || 0);
                 const discountsGiven = parseFloat(discountsResult[0]?.discounts_given || 0);
                 const costOfSales = parseFloat(costOfSalesResult[0]?.cost_of_sales || 0);
@@ -378,7 +355,7 @@ class ReportController {
                 const invoiceCount = parseInt(invoiceCountResult[0]?.invoice_count || 0);
     
                 // Calculate totals for the month
-                const totalIncome = productIncome + shippingIncome + taxIncome;
+                const totalIncome = productIncome + taxIncome;
                 const netIncome = totalIncome - discountsGiven;
                 const totalCostOfSales = costOfSales + inventoryShrinkage;
                 const grossProfit = netIncome - totalCostOfSales;
@@ -393,7 +370,6 @@ class ReportController {
                     month_name: monthNames[month - 1],
                     income: {
                         product_income: productIncome,
-                        shipping_income: shippingIncome,
                         tax_income: taxIncome,
                         discounts_given: discountsGiven,
                         total_income: totalIncome,
@@ -499,17 +475,6 @@ class ReportController {
                 ${dateCondition}
             `, [company_id, employee_id, ...dateParams]);
 
-            // Shipping Income - Total shipping charges
-            const [shippingIncomeResult] = await db.execute(`
-                SELECT 
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                FROM invoices i
-                WHERE i.company_id = ? 
-                AND i.employee_id = ?
-                AND i.status != 'proforma'
-                ${dateCondition}
-            `, [company_id, employee_id, ...dateParams]);
-
             // Discounts Given - Total discounts provided
             const [discountsResult] = await db.execute(`
                 SELECT 
@@ -589,7 +554,6 @@ class ReportController {
 
             // Extract values
             const productIncome = parseFloat(productIncomeResult[0]?.product_income || 0);
-            const shippingIncome = parseFloat(shippingIncomeResult[0]?.shipping_income || 0);
             const discountsGiven = parseFloat(discountsResult[0]?.discounts_given || 0);
             const taxIncome = parseFloat(taxIncomeResult[0]?.tax_income || 0);
             const costOfSales = parseFloat(costOfSalesResult[0]?.cost_of_sales || 0);
@@ -602,7 +566,7 @@ class ReportController {
             const employeeInfo = employeeResult[0] || {};
 
             // 6. CALCULATE TOTALS AND DERIVED METRICS
-            const totalIncome = productIncome + shippingIncome + taxIncome;
+            const totalIncome = productIncome + taxIncome;
             const netIncome = totalIncome - discountsGiven;
             const totalCostOfSales = costOfSales;
             const grossProfit = netIncome - totalCostOfSales;
@@ -632,7 +596,6 @@ class ReportController {
                 },
                 income: {
                     sales_of_product_income: productIncome,
-                    shipping_income: shippingIncome,
                     tax_income: taxIncome,
                     discounts_given: -discountsGiven,
                     other_income: otherIncome,
@@ -839,20 +802,6 @@ class ReportController {
                 GROUP BY e.id, e.name
             `, [company_id, ...dateParams]);
     
-            const [shippingIncomeResult] = await db.execute(`
-                SELECT 
-                    e.id AS employee_id,
-                    e.name AS employee_name,
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                FROM invoices i
-                INNER JOIN employees e ON i.employee_id = e.id
-                WHERE i.company_id = ?
-                AND e.is_active = TRUE
-                AND i.status != 'proforma'
-                ${dateCondition}
-                GROUP BY e.id, e.name
-            `, [company_id, ...dateParams]);
-    
             const [discountsResult] = await db.execute(`
                 SELECT 
                     e.id AS employee_id,
@@ -938,7 +887,6 @@ class ReportController {
             const employeeData = {};
             const resultsMap = {
                 productIncome: productIncomeResult,
-                shippingIncome: shippingIncomeResult,
                 discounts: discountsResult,
                 taxIncome: taxIncomeResult,
                 costOfSales: costOfSalesResult,
@@ -957,7 +905,6 @@ class ReportController {
                         };
                     }
                     if (key === 'productIncome') employeeData[row.employee_id].productIncome = parseFloat(row.product_income || 0);
-                    if (key === 'shippingIncome') employeeData[row.employee_id].shippingIncome = parseFloat(row.shipping_income || 0);
                     if (key === 'discounts') employeeData[row.employee_id].discountsGiven = parseFloat(row.discounts_given || 0);
                     if (key === 'taxIncome') employeeData[row.employee_id].taxIncome = parseFloat(row.tax_income || 0);
                     if (key === 'costOfSales') employeeData[row.employee_id].costOfSales = parseFloat(row.cost_of_sales || 0);
@@ -967,7 +914,7 @@ class ReportController {
             }
     
             const employees = Object.values(employeeData).map(emp => {
-                const totalIncome = emp.productIncome + emp.shippingIncome + emp.taxIncome;
+                const totalIncome = emp.productIncome + emp.taxIncome;
                 const netIncome = totalIncome - emp.discountsGiven;
                 const grossProfit = netIncome - emp.costOfSales;
                 const netEarnings = grossProfit;
@@ -983,7 +930,6 @@ class ReportController {
                     },
                     income: {
                         sales_of_product_income: emp.productIncome,
-                        shipping_income: emp.shippingIncome,
                         tax_income: emp.taxIncome,
                         discounts_given: -emp.discountsGiven,
                         total_income: totalIncome,
@@ -1133,22 +1079,6 @@ class ReportController {
                 GROUP BY c.id, c.name, c.email, c.phone
             `, [company_id, ...dateParams]);
     
-            const [shippingIncomeResult] = await db.execute(`
-                SELECT 
-                    c.id AS customer_id,
-                    c.name AS customer_name,
-                    c.email AS customer_email,
-                    c.phone AS customer_phone,
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                FROM invoices i
-                INNER JOIN customer c ON i.customer_id = c.id
-                WHERE i.company_id = ?
-                AND c.is_active = TRUE
-                AND i.status != 'proforma'
-                ${dateCondition}
-                GROUP BY c.id, c.name, c.email, c.phone
-            `, [company_id, ...dateParams]);
-    
             const [discountsResult] = await db.execute(`
                 SELECT 
                     c.id AS customer_id,
@@ -1244,7 +1174,6 @@ class ReportController {
             const customerData = {};
             const resultsMap = {
                 productIncome: productIncomeResult,
-                shippingIncome: shippingIncomeResult,
                 discounts: discountsResult,
                 taxIncome: taxIncomeResult,
                 costOfSales: costOfSalesResult,
@@ -1263,7 +1192,6 @@ class ReportController {
                         };
                     }
                     if (key === 'productIncome') customerData[row.customer_id].productIncome = parseFloat(row.product_income || 0);
-                    if (key === 'shippingIncome') customerData[row.customer_id].shippingIncome = parseFloat(row.shipping_income || 0);
                     if (key === 'discounts') customerData[row.customer_id].discountsGiven = parseFloat(row.discounts_given || 0);
                     if (key === 'taxIncome') customerData[row.customer_id].taxIncome = parseFloat(row.tax_income || 0);
                     if (key === 'costOfSales') customerData[row.customer_id].costOfSales = parseFloat(row.cost_of_sales || 0);
@@ -1273,7 +1201,7 @@ class ReportController {
             }
     
             const customers = Object.values(customerData).map(customer => {
-                const totalIncome = customer.productIncome + customer.shippingIncome + customer.taxIncome;
+                const totalIncome = customer.productIncome + customer.taxIncome;
                 const netIncome = totalIncome - customer.discountsGiven;
                 const grossProfit = netIncome - customer.costOfSales;
                 const netEarnings = grossProfit;
@@ -1289,7 +1217,6 @@ class ReportController {
                     },
                     income: {
                         sales_of_product_income: customer.productIncome,
-                        shipping_income: customer.shippingIncome,
                         tax_income: customer.taxIncome,
                         discounts_given: -customer.discountsGiven,
                         total_income: totalIncome,
@@ -1389,17 +1316,6 @@ class ReportController {
                 ${dateCondition}
             `, [company_id, customer_id, ...dateParams]);
 
-            // Shipping Income - Total shipping charges
-            const [shippingIncomeResult] = await db.execute(`
-                SELECT 
-                    COALESCE(SUM(i.shipping_cost), 0) as shipping_income
-                FROM invoices i
-                WHERE i.company_id = ? 
-                AND i.customer_id = ?
-                AND i.status != 'proforma'
-                ${dateCondition}
-            `, [company_id, customer_id, ...dateParams]);
-
             // Discounts Given - Total discounts provided
             const [discountsResult] = await db.execute(`
                 SELECT 
@@ -1479,7 +1395,6 @@ class ReportController {
 
             // Extract values
             const productIncome = parseFloat(productIncomeResult[0]?.product_income || 0);
-            const shippingIncome = parseFloat(shippingIncomeResult[0]?.shipping_income || 0);
             const discountsGiven = parseFloat(discountsResult[0]?.discounts_given || 0);
             const taxIncome = parseFloat(taxIncomeResult[0]?.tax_income || 0);
             const costOfSales = parseFloat(costOfSalesResult[0]?.cost_of_sales || 0);
@@ -1492,7 +1407,7 @@ class ReportController {
             const customerInfo = customerResult[0] || {};
 
             // 6. CALCULATE TOTALS AND DERIVED METRICS
-            const totalIncome = productIncome + shippingIncome + taxIncome;
+            const totalIncome = productIncome + taxIncome;
             const netIncome = totalIncome - discountsGiven;
             const totalCostOfSales = costOfSales;
             const grossProfit = netIncome - totalCostOfSales;
@@ -1522,7 +1437,6 @@ class ReportController {
                 },
                 income: {
                     sales_of_product_income: productIncome,
-                    shipping_income: shippingIncome,
                     tax_income: taxIncome,
                     discounts_given: -discountsGiven,
                     other_income: otherIncome,

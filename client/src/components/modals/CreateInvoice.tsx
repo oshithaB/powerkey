@@ -345,7 +345,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
   };
 
   const calculateTotals = () => {
-    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
+    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.actual_unit_price), 0).toFixed(2));
     const totalTax = Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2));
     const shippingCost = Number(formData.shipping_cost || 0);
     
@@ -356,7 +356,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
 
-    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
+    const total = Number((subtotal + shippingCost + totalTax - discountAmount).toFixed(2));
 
     return { subtotal, totalTax, discountAmount, shippingCost, total };
   };

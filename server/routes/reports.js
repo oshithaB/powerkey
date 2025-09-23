@@ -11,6 +11,7 @@ const salesTaxController = require('../controllers/reports/SalesTax/sales_tax_co
 const expensesAndSuppliersController = require('../controllers/reports/Expenses&Suppliers/expenses_and_suppliers');
 const whoOwesYouController = require('../controllers/reports/WhoOwesYou/whoOwesYou_controller');
 const whatYouOweController = require('../controllers/reports/WhatYouOwe/whatYouOwe_controller');
+const forMyAccountController = require('../controllers/reports/ForMyAccount/forMyAccount_controller');
 const verifyToken = require('../middleware/verifyToken');
 const authorizedRoles = require('../middleware/authorized-roles');
 
@@ -129,6 +130,13 @@ const {
 const {
     getEmployeeContacts,
 } = employeeController;
+
+// Importing for my account controller functions
+const {
+    getTrialBalance,
+    getTrialBalanceByAccountType,
+    getDetailedTrialBalance,
+} = forMyAccountController;
 
 //====================================================================================================================
 
@@ -600,3 +608,25 @@ router.get(
 );
 
 module.exports = router;
+
+// For My Account routes ==========================================================================================
+router.get(
+    '/trial-balance/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'accountant']),
+    getTrialBalance
+);
+
+router.get(
+    '/trial-balance-by-account-type/:company_id/:account_type',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'accountant']),
+    getTrialBalanceByAccountType
+);
+
+router.get(
+    '/detailed-trial-balance/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'staff', 'accountant']),
+    getDetailedTrialBalance
+);

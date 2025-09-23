@@ -816,7 +816,6 @@ export default function InvoicesPage() {
                         <th className="px-4 py-2 text-left">Description</th>
                         <th className="px-4 py-2 text-right">Qty</th>
                         <th className="px-4 py-2 text-right">Unit Price</th>
-                        <th className="px-4 py-2 text-right">Actual Unit Price</th>
                         <th className="px-4 py-2 text-right">Tax %</th>
                         <th className="px-4 py-2 text-right">Total</th>
                       </tr>
@@ -832,9 +831,6 @@ export default function InvoicesPage() {
                           </td>
                           <td className="px-4 py-2">{item.description || 'N/A'}</td>
                           <td className="px-4 py-2 text-right">{item.quantity}</td>
-                          <td className="px-4 py-2 text-right">
-                            Rs. {Number(item.unit_price || 0).toFixed(2)}
-                          </td>
                           <td className="px-4 py-2 text-right">
                             Rs. {Number(item.actual_unit_price || 0).toFixed(2)}
                           </td>

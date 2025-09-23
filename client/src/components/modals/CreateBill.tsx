@@ -1257,7 +1257,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Employee</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
                   <select
                     name="employee"
                     value={formData.employee_id || ''}

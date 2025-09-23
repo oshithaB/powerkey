@@ -721,9 +721,12 @@ export default function EstimatesPage() {
                 </div>
 
                 <div>
+                {printingEstimate.head_note && (
                   <p className="text-lg mb-5 bg-gray-100 p-4 rounded">
-                    {printingEstimate.head_note || "No head note available"}
+                    {printingEstimate.head_note}
                   </p>
+                )}
+
                 </div>
 
                 <div className="mb-6">

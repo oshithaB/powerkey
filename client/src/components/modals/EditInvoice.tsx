@@ -283,7 +283,7 @@ export default function EditInvoice() {
   };
 
   const calculateTotals = () => {
-    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2));
+    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.actual_unit_price), 0).toFixed(2));
     const totalTax = Number(items.reduce((sum, item) => sum + item.tax_amount, 0).toFixed(2));
     const shippingCost = Number(formData.shipping_cost || 0);
     
@@ -295,7 +295,7 @@ export default function EditInvoice() {
       discountAmount = Number(discountValue.toFixed(2));
     }
   
-    const total = Number((subtotal + shippingCost - discountAmount).toFixed(2));
+    const total = Number((subtotal + shippingCost + totalTax - discountAmount).toFixed(2));
     const balanceDue = Number((total - Number(invoice?.paid_amount || 0)).toFixed(2));
   
     return { subtotal, totalTax, discountAmount, shippingCost, total, balanceDue };
@@ -781,8 +781,8 @@ export default function EditInvoice() {
                         <td className="px-4 py-2">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0.01"
+                            step="0"
+                            min="0"
                             className="input w-20"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}

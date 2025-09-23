@@ -12,7 +12,6 @@ interface MonthlyData {
   month_name: string;
   income: {
     product_income: number;
-    shipping_income: number;
     tax_income: number;
     discounts_given: number;
     total_income: number;
@@ -225,7 +224,6 @@ const ProfitAndLossByMonth: React.FC = () => {
     const rows = [
       { label: 'Discounts given', getValue: (month: MonthlyData) => -safeGetValue(month, 'income.discounts_given') },
       { label: 'Product Income', getValue: (month: MonthlyData) => safeGetValue(month, 'income.product_income') },
-      { label: 'Shipping Income', getValue: (month: MonthlyData) => safeGetValue(month, 'income.shipping_income') },
       { label: 'Tax Income', getValue: (month: MonthlyData) => safeGetValue(month, 'income.tax_income') },
       { label: 'Total for Income', getValue: (month: MonthlyData) => safeGetValue(month, 'income.total_income'), isTotal: true },
       { label: 'Cost of Sales', getValue: (month: MonthlyData) => safeGetValue(month, 'cost_of_sales.cost_of_sales'), isCostSection: true },
@@ -460,7 +458,6 @@ const ProfitAndLossByMonth: React.FC = () => {
                         <tbody>
                           <tr><td className="p-2 border-b font-medium w-48">Discounts given</td></tr>
                           <tr><td className="p-2 border-b font-medium w-48">Product Income</td></tr>
-                          <tr><td className="p-2 border-b font-medium w-48">Shipping Income</td></tr>
                           <tr><td className="p-2 border-b font-medium w-48">Tax Income</td></tr>
                           <tr><td className="p-2 border-b font-bold w-48">Total for Income</td></tr>
                           <tr><td className="p-2 border-b font-medium cost-section w-48">Cost of Sales</td></tr>
@@ -518,16 +515,6 @@ const ProfitAndLossByMonth: React.FC = () => {
                             ))}
                             <td className="p-2 border-b text-right">
                               {formatCurrency(getTotal('income.product_income'))}
-                            </td>
-                          </tr>
-                          <tr>
-                            {data.monthly_breakdown.map((month) => (
-                              <td key={month.month} className="p-2 border-b text-right">
-                                {formatCurrency(safeGetValue(month, 'income.shipping_income'))}
-                              </td>
-                            ))}
-                            <td className="p-2 border-b text-right">
-                              {formatCurrency(getTotal('income.shipping_income'))}
                             </td>
                           </tr>
                           <tr>
@@ -709,17 +696,6 @@ const ProfitAndLossByMonth: React.FC = () => {
                           ))}
                           <td className="p-2 border text-right min-w-[120px] whitespace-nowrap">
                             {formatCurrency(getTotal('income.product_income'))}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="p-2 border font-medium sticky left-0 bg-white z-10 min-w-[200px]">Shipping Income</td>
-                          {data.monthly_breakdown.map((month) => (
-                            <td key={month.month} className="p-2 border text-right min-w-[120px] whitespace-nowrap">
-                              {formatCurrency(safeGetValue(month, 'income.shipping_income'))}
-                            </td>
-                          ))}
-                          <td className="p-2 border text-right min-w-[120px] whitespace-nowrap">
-                            {formatCurrency(getTotal('income.shipping_income'))}
                           </td>
                         </tr>
                         <tr>

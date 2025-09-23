@@ -429,25 +429,33 @@ const getMoneyInDrawerByCompany = async (req, res) => {
         const startDate = start_date || today;
         const endDate = end_date || today;
 
-        // Query to get total money received in date range from payments for specific company
+        // Query to get total money received in date range from payments for specific company (cash only)
         const [paymentsResult] = await db.query(`
             SELECT COALESCE(SUM(payment_amount), 0) as total_received
             FROM payments
-            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? AND company_id = ?
+            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? 
+            AND company_id = ? 
+            AND LOWER(payment_method) = 'cash'
         `, [startDate, endDate, company_id]);
 
-        // Query to get total money spent in date range from expenses for specific company
+        // Query to get total money spent in date range from expenses for specific company (cash only)
         const [expensesResult] = await db.query(`
-            SELECT COALESCE(SUM(amount), 0) as total_spent_expenses
-            FROM expenses
-            WHERE DATE(updated_at) >= ? AND DATE(updated_at) <= ? AND company_id = ? AND status = 'paid'
+            SELECT COALESCE(SUM(e.amount), 0) as total_spent_expenses
+            FROM expenses e
+            JOIN payment_methods pm ON e.payment_method_id = pm.id
+            WHERE DATE(e.updated_at) >= ? AND DATE(e.updated_at) <= ? 
+            AND e.company_id = ? 
+            AND e.status = 'paid'
+            AND LOWER(pm.name) = 'cash'
         `, [startDate, endDate, company_id]);
 
-        // Query to get total money spent in date range from bill payments for specific company
+        // Query to get total money spent in date range from bill payments for specific company (cash only)
         const [billPaymentsResult] = await db.query(`
             SELECT COALESCE(SUM(payment_amount), 0) as total_spent_bills
             FROM bill_payments
-            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? AND company_id = ?
+            WHERE DATE(payment_date) >= ? AND DATE(payment_date) <= ? 
+            AND company_id = ?
+            AND LOWER(payment_method) = 'cash'
         `, [startDate, endDate, company_id]);
 
         const totalReceived = parseFloat(paymentsResult[0].total_received) || 0;
@@ -465,10 +473,11 @@ const getMoneyInDrawerByCompany = async (req, res) => {
             total_spent_expenses: totalSpentExpenses,
             total_spent_bill_payments: totalSpentBillPayments,
             net_amount: netAmount,
-            money_in_drawer: netAmount
+            money_in_drawer: netAmount,
+            payment_method_filter: 'cash'
         };
 
-        console.log('Money in drawer calculated for company:', result);
+        console.log('Money in drawer calculated for company (cash only):', result);
 
         return res.status(200).json({
             success: true,

@@ -313,10 +313,6 @@ const ProfitAndLossReport: React.FC = () => {
                       <td className="p-2 border-b">{formatCurrency(data.income.sales_of_product_income)}</td>
                     </tr>
                     <tr>
-                      <td className="p-2 border-b">Shipping Income</td>
-                      <td className="p-2 border-b">{formatCurrency(data.income.shipping_income)}</td>
-                    </tr>
-                    <tr>
                       <td className="p-2 border-b">Tax Income</td>
                       <td className="p-2 border-b">{formatCurrency(data.income.tax_income)}</td>
                     </tr>
@@ -501,10 +497,6 @@ const ProfitAndLossReport: React.FC = () => {
                     <tr>
                       <td className="p-1 border-b">Product Income</td>
                       <td className="p-1 border-b text-right font-medium">{formatCurrency(data.income.sales_of_product_income)}</td>
-                    </tr>
-                    <tr>
-                      <td className="p-1 border-b">Shipping Income</td>
-                      <td className="p-1 border-b text-right">{formatCurrency(data.income.shipping_income)}</td>
                     </tr>
                     <tr>
                       <td className="p-1 border-b">Tax Income</td>

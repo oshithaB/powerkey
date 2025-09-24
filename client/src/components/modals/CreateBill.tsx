@@ -4,7 +4,6 @@ import axiosInstance from '../../axiosInstance';
 import { X, Plus, Trash2, Lock, Eye, EyeOff } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { set } from 'date-fns';
 
 interface BillModalProps {
   expense?: any;
@@ -17,6 +16,9 @@ interface BillItem {
   description: string;
   quantity: number;
   unit_price: number;
+  actual_unit_price: number;
+  tax_rate: number;
+  tax_amount: number;
   total_price: number;
 }
 
@@ -39,6 +41,15 @@ interface paymentMethod {
   name: string;
 }
 
+interface TaxRate {
+  tax_rate_id: number;
+  company_id: number;
+  name: string;
+  rate: string;
+  is_default: number;
+  created_at: string;
+}
+
 export default function BillModal({ expense, onSave }: BillModalProps) {
   const { selectedCompany } = useCompany();
   const [vendors, setVendors] = useState<any[]>([]);
@@ -47,6 +58,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   const [paymentMethods, setPaymentMethods] = useState<paymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [vendorSuggestions, setVendorSuggestions] = useState<any[]>([]);
   const [activeVendorSuggestion, setActiveVendorSuggestion] = useState<boolean>(false);
@@ -69,9 +81,6 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     terms: '',
   };
 
-
-  console.log('Payment Methods:', paymentMethods);
-
   const [formData, setFormData] = useState(expense ? {
     ...initialFormData,
     ...expense,
@@ -84,10 +93,42 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     description: '',
     quantity: 0,
     unit_price: 0,
+    actual_unit_price: 0,
+    tax_rate: 0,
+    tax_amount: 0,
     total_price: 0,
   }];
 
   const [items, setItems] = useState<BillItem[]>(expense?.items || initialItems);
+
+  useEffect(() => {
+    if (selectedCompany) {
+      const fetchTaxRates = async () => {
+        try {
+          const response = await axiosInstance.get(`/api/tax-rates/${selectedCompany?.company_id}`);
+          const taxRatesData = Array.isArray(response.data) && Array.isArray(response.data[0]) 
+            ? response.data[0] 
+            : Array.isArray(response.data) 
+              ? response.data 
+              : [];
+          setTaxRates(taxRatesData);
+          
+          const defaultTaxRate = taxRatesData.find((tax: TaxRate) => tax.is_default === 1);
+          if (defaultTaxRate) {
+            setItems(prevItems => prevItems.map(item => ({
+              ...item,
+              tax_rate: item.tax_rate === 0 ? parseFloat(defaultTaxRate.rate) : item.tax_rate
+            })));
+          }
+        } catch (error) {
+          console.error('Error fetching tax rates:', error);
+          setTaxRates([]);
+          setError('Failed to fetch tax rates');
+        }
+      };
+      fetchTaxRates();
+    }
+  }, [selectedCompany]);
 
   useEffect(() => {
     if (selectedCompany && location.state?.orderId) {
@@ -123,9 +164,11 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
         description: item.description || '',
         quantity: Number(item.qty) || 1,
         unit_price: Number(item.rate) || 0,
+        actual_unit_price: Number((Number(item.rate) / (1 + (item.tax_rate || 0) / 100)).toFixed(2)) || 0,
+        tax_rate: Number(item.tax_rate) || 0,
+        tax_amount: Number(((Number(item.rate) / (1 + (item.tax_rate || 0) / 100)) * (item.tax_rate || 0) / 100).toFixed(2)) || 0,
         total_price: Number(item.amount) || 0
       })));
-
     } catch (error) {
       console.error('Error loading order data:', error);
       setError('Failed to load order data');
@@ -238,7 +281,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   const updateItem = (index: number, field: keyof BillItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
-
+  
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === parseInt(value));
       if (product) {
@@ -248,23 +291,33 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
         updatedItems[index].product_id = product.id;
       }
     }
-
-    if (field === 'quantity' || field === 'unit_price') {
+  
+    if (field === 'quantity' || field === 'unit_price' || field === 'tax_rate') {
       const item = updatedItems[index];
-      item.total_price = Number((item.quantity * item.unit_price).toFixed(2));
+      const quantity = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      const taxRate = Number(item.tax_rate) || 0;
+  
+      const subtotal = quantity * unitPrice;
+      item.actual_unit_price = Number((unitPrice / (1 + taxRate / 100)).toFixed(2));
+      item.tax_amount = Number((item.actual_unit_price * taxRate / 100).toFixed(2));
+      item.total_price = Number((subtotal + (quantity * item.tax_amount)).toFixed(2));
     }
-
+  
     setItems(updatedItems);
   };
 
-
   const addItem = () => {
+    const defaultTaxRate = taxRates.find(tax => tax.is_default === 1);
     setItems([...items, {
       product_id: 0,
       product_name: '',
       description: '',
       quantity: 0,
       unit_price: 0,
+      actual_unit_price: 0,
+      tax_rate: defaultTaxRate ? parseFloat(defaultTaxRate.rate) : 0,
+      tax_amount: 0,
       total_price: 0,
     }]);
     setProductSuggestions(products);
@@ -274,51 +327,58 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const calculateTotal = () => {
-    return Number(items.reduce((sum, item) => sum + Number(item.total_price), 0).toFixed(2));
+  const calculateTotals = () => {
+    const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.actual_unit_price), 0).toFixed(2));
+    const totalTax = Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2));
+    const total = Number((subtotal + totalTax).toFixed(2));
+    return { subtotal, totalTax, total };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       if (!formData.bill_number) {
         throw new Error('Bill number is required');
       }
-
       if (!formData.bill_date) {
         throw new Error('Bill date is required');
       }
       if (!items.some(item => item.product_id !== 0)) {
         throw new Error('At least one valid item is required');
       }
-
-      const total = calculateTotal();
-
+  
+      const { subtotal, totalTax, total } = calculateTotals();
+  
       const submitData = {
         ...formData,
         company_id: selectedCompany?.company_id,
+        subtotal: Number(subtotal),
+        tax_amount: Number(totalTax),
         total_amount: Number(total),
         items: items.map(item => ({
           ...item,
           product_id: parseInt(item.product_id as any) || null,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
+          actual_unit_price: Number(item.actual_unit_price),
+          tax_rate: Number(item.tax_rate),
+          tax_amount: Number(item.tax_amount),
           total_price: Number(item.total_price),
         })),
       };
-
+  
       if (expense) {
         await axiosInstance.put(`/api/createBill/${selectedCompany?.company_id}/${expense.id}`, submitData);
       } else {
         await axiosInstance.post(`/api/createBill/${selectedCompany?.company_id}`, submitData);
       }
-
+  
       setFormData(initialFormData);
       setItems(initialItems);
-
+  
       if (onSave && typeof onSave === 'function') {
         onSave();
       } else {
@@ -335,24 +395,22 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   };
 
   const handleCreatePaymentMethod = async (name: string) => {
-  try {
-    const response = await axiosInstance.post('/api/createPaymentMethod', {
-      name,
-    });
-    const newMethod = response.data.name;
-    setPaymentMethods((prev) => [...prev, newMethod]);
-    setFormData({ ...formData, payment_method: newMethod });
-    setIsCreatePaymentMethodModalOpen(false);
-    alert('Payment method created successfully.');
-  } catch (error) {
-    console.error('Error creating payment method:', error);
-    alert('Failed to create payment method.');
-  }
-};
+    try {
+      const response = await axiosInstance.post('/api/createPaymentMethod', {
+        name,
+      });
+      const newMethod = response.data;
+      setPaymentMethods((prev) => [...prev, newMethod]);
+      setFormData({ ...formData, payment_method: newMethod.id });
+      setIsCreatePaymentMethodModalOpen(false);
+      alert('Payment method created successfully.');
+      navigate(0);
+    } catch (error) {
+      console.error('Error creating payment method:', error);
+      alert('Failed to create payment method.');
+    }
+  };
 
-  const total = calculateTotal();
-
-  //   payment method
   const CreatePaymentMethodModal: React.FC<CreateModalProps> = ({
     isOpen,
     onClose,
@@ -415,10 +473,10 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
   };
 
   const CreateVendorModal: React.FC<{
-      isOpen: boolean;
-      onClose: () => void;
-      title: string;
-    }> = ({isOpen, onClose, title}) => {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+  }> = ({ isOpen, onClose, title }) => {
     const [vendorFormData, setVendorFormData] = useState({
       name: '',
       company_name: '',
@@ -438,14 +496,14 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
       terms: '',
       account_number: '',
       balance: 0,
-      as_of_date: ''
+      as_of_date: new Date().toISOString().split('T')[0]
     });
 
     const resetVendorForm = () => {
       const today = new Date().toISOString().split('T')[0];
       setVendorFormData({
-        company_name: '',
         name: '',
+        company_name: '',
         email: '',
         phone: '',
         address: '',
@@ -464,7 +522,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
         balance: 0,
         as_of_date: today
       });
-  };
+    };
 
     const handleVendorSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -498,601 +556,498 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{marginTop: "-1px"}}>
-          <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {title}
-              </h3>
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                  {error}
-                </div>
-              )}
-              <form onSubmit={handleVendorSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="input"
-                      placeholder="Enter Name"
-                      value={vendorFormData.name}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Company Name
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter Company Name"
-                      value={vendorFormData.company_name}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, company_name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      className="input"
-                      placeholder="Enter Email"
-                      value={vendorFormData.email}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      className="input"
-                      placeholder="Enter Phone Number"
-                      value={vendorFormData.phone}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, phone: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tax Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={vendorFormData.tax_number || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, tax_number: e.target.value })}
-                      placeholder="Enter Tax Number"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter Address"
-                      value={vendorFormData.address}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, address: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fax Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={vendorFormData.fax_number || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, fax_number: e.target.value })}
-                      placeholder="Enter Fax Number"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Website
-                    </label>
-                    <input
-                      type="url"
-                      className="input"
-                      value={vendorFormData.website || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, website: e.target.value })}
-                      placeholder="Enter Website URL"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vehicle Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={vendorFormData.vehicle_number || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, vehicle_number: e.target.value })}
-                      placeholder="Enter Vehicle Number"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter City"
-                      value={vendorFormData.city}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, city: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter State"
-                      value={vendorFormData.state}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, state: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ZIP Code
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter ZIP Code"
-                      value={vendorFormData.zip_code}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, zip_code: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter Country"
-                      value={vendorFormData.country}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, country: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <hr />
-
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Additional Information
-                </h3>
-
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: "-1px" }}>
+        <div className="relative mt-20 mb-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+          <div className="mt-3">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">{error}</div>
+            )}
+            <form onSubmit={handleVendorSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Default expense category
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="input"
+                    placeholder="Enter Name"
+                    value={vendorFormData.name}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter Company Name"
+                    value={vendorFormData.company_name}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, company_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="Enter Email"
+                    value={vendorFormData.email}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="Enter Phone Number"
+                    value={vendorFormData.phone}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tax Number</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={vendorFormData.tax_number || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, tax_number: e.target.value })}
+                    placeholder="Enter Tax Number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter Address"
+                    value={vendorFormData.address}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, address: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fax Number</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={vendorFormData.fax_number || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, fax_number: e.target.value })}
+                    placeholder="Enter Fax Number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                  <input
+                    type="url"
+                    className="input"
+                    value={vendorFormData.website || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, website: e.target.value })}
+                    placeholder="Enter Website URL"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Number</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={vendorFormData.vehicle_number || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, vehicle_number: e.target.value })}
+                    placeholder="Enter Vehicle Number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter City"
+                    value={vendorFormData.city}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, city: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter State"
+                    value={vendorFormData.state}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, state: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter ZIP Code"
+                    value={vendorFormData.zip_code}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, zip_code: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter Country"
+                    value={vendorFormData.country}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, country: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <hr />
+
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Additional Information</h3>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default expense category</label>
+                <select
+                  className="input"
+                  value={vendorFormData.default_expense_category}
+                  onChange={(e) => setVendorFormData({ ...vendorFormData, default_expense_category: e.target.value })}
+                >
+                  <option value="">Select Category</option>
+                  <option value="amorization expense">Amortization Expense</option>
+                  <option value="bad debts">Bad Debts</option>
+                  <option value="bank charges">Bank Charges</option>
+                  <option value="commissions and fees">Commissions and Fees</option>
+                  <option value="dues and subscriptions">Dues and Subscriptions</option>
+                  <option value="equipment rental">Equipment Rental</option>
+                  <option value="income tax expense">Income Tax Expense</option>
+                  <option value="insurance-disability">Insurance - Disability</option>
+                  <option value="insurance-general">Insurance - General</option>
+                  <option value="insurance-liability">Insurance - Liability</option>
+                  <option value="interest expense">Interest Expense</option>
+                  <option value="legal and professional fees">Legal and Professional Fees</option>
+                  <option value="loss on discontinued operations">Loss on Discontinued Operations</option>
+                  <option value="management compensation">Management Compensation</option>
+                  <option value="meals and entertainment">Meals and Entertainment</option>
+                  <option value="office expenses">Office Expenses</option>
+                  <option value="other expenses">Other Expenses</option>
+                  <option value="payroll expenses">Payroll Expenses</option>
+                  <option value="purchases">Purchases</option>
+                  <option value="rent or lease payments">Rent or Lease Payments</option>
+                  <option value="repairs and maintenance">Repairs and Maintenance</option>
+                  <option value="salary">Salary</option>
+                  <option value="shipping and delivery">Shipping and Delivery</option>
+                  <option value="stationery and printing">Stationery and Printing</option>
+                  <option value="supplies">Supplies</option>
+                  <option value="travel expenses - general and admin">Travel Expenses - General and Admin Expenses</option>
+                  <option value="travel expenses - selling">Travel Expenses - Selling Expenses</option>
+                  <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
+                  <option value="uncategorized expense">Uncategorized Expense</option>
+                  <option value="utilities">Utilities</option>
+                  <option value="wage expense">Wage Expense</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Billing Rate</label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Billing Rate (/hr)"
+                    value={vendorFormData.billing_rate}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setVendorFormData({ ...vendorFormData, billing_rate: isNaN(val) ? 0 : val });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Terms</label>
                   <select
                     className="input"
-                    value={vendorFormData.default_expense_category}
-                    onChange={(e) => setVendorFormData({ ...vendorFormData, default_expense_category: e.target.value })}
+                    value={vendorFormData.terms || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, terms: e.target.value })}
                   >
-                    <option value="">Select Category</option>
-                    <option value="amorization expense">Amortization Expense</option>
-                    <option value="bad debts">Bad Debts</option>
-                    <option value="bank charges">Bank Charges</option>
-                    <option value="commissions and fees">Commissions and Fees</option>
-                    <option value="dues and subscriptions">Dues and Subscriptions</option>
-                    <option value="equipment rental">Equipment Rental</option>
-                    <option value="income tax expense">Income Tax Expense</option>
-                    <option value="insurance-disability">Insurance - Disability</option>
-                    <option value="insurance-general">Insurance - General</option>
-                    <option value="insurance-liability">Insurance - Liability</option>
-                    <option value="interest expense">Interest Expense</option>
-                    <option value="legal and professional fees">Legal and Professional Fees</option>
-                    <option value="loss on discontinued operations">Loss on Discontinued Operations</option>
-                    <option value="management compensation">Management Compensation</option>
-                    <option value="meals and entertainment">Meals and Entertainment</option>
-                    <option value="office expenses">Office Expenses</option>
-                    <option value="other expenses">Other Expenses</option>
-                    <option value="payroll expenses">Payroll Expenses</option>
-                    <option value="purchases">Purchases</option>
-                    <option value="rent or lease payments">Rent or Lease Payments</option>
-                    <option value="repairs and maintenance">Repairs and Maintenance</option>
-                    <option value="salary">Salary</option>
-                    <option value="shipping and delivery">Shipping and Delivery</option>
-                    <option value="stationery and printing">Stationery and Printing</option>
-                    <option value="supplies">Supplies</option>
-                    <option value="travel expenses - general and admin">Travel Expenses - General and Admin Expenses</option>
-                    <option value="travel expenses - selling">Travel Expenses - Selling Expenses</option>
-                    <option value="unapplied cash payment expense">Unapplied Cash Payment Expense</option>
-                    <option value="uncategorized expense">Uncategorized Expense</option>
-                    <option value="utilities">Utilities</option>
-                    <option value="wage expense">Wage Expense</option>
+                    <option value="">Select Terms</option>
+                    <option value="due_on_receipt">Due on Receipt</option>
+                    <option value="net_15">Net 15</option>
+                    <option value="net_30">Net 30</option>
+                    <option value="net_60">Net 60</option>
                   </select>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Billing Rate
-                    </label>
-                    <input
-                      type="number"
-                      className="input"
-                      placeholder="Billing Rate (/hr)"
-                      value={vendorFormData.billing_rate}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setVendorFormData({ ...vendorFormData, billing_rate: isNaN(val) ? 0 : val });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Terms
-                    </label>
-                    <select
-                      className="input"
-                      value={vendorFormData.terms || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, terms: e.target.value })}
-                    >
-                      <option value="">Select Terms</option>
-                      <option value="due_on_receipt">Due on Receipt</option>
-                      <option value="net_15">Net 15</option>
-                      <option value="net_30">Net 30</option>
-                      <option value="net_60">Net 60</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Account Number
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Account Number"
-                      value={vendorFormData.account_number || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, account_number: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Opening Balance
-                    </label>
-                    <input
-                      type="number"
-                      className="input"
-                      placeholder="Balance"
-                      value={vendorFormData.balance}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setVendorFormData({ ...vendorFormData, balance: isNaN(val) ? 0 : val });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      As of Date
-                    </label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={vendorFormData.as_of_date || ''}
-                      onChange={(e) => setVendorFormData({ ...vendorFormData, as_of_date: e.target.value })}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Account Number"
+                    value={vendorFormData.account_number || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, account_number: e.target.value })}
+                  />
                 </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="btn btn-secondary btn-md"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-md"
-                  >
-                    Create Vendor
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Opening Balance</label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="Balance"
+                    value={vendorFormData.balance}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setVendorFormData({ ...vendorFormData, balance: isNaN(val) ? 0 : val });
+                    }}
+                  />
                 </div>
-              </form>
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">As of Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={vendorFormData.as_of_date || ''}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, as_of_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={onClose} className="btn btn-secondary btn-md">Cancel</button>
+                <button type="submit" className="btn btn-primary btn-md">Create Vendor</button>
+              </div>
+            </form>
           </div>
         </div>
-      );
-  }
+      </div>
+    );
+  };
 
   const CreateEmployeeModal: React.FC<{
-      isOpen: boolean;
-      onClose: () => void;
-      title: string;
-    }> = ({isOpen, onClose, title}) => {
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+  }> = ({ isOpen, onClose, title }) => {
+    const [employeeFormData, setEmployeeFormData] = useState({
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      hire_date: '',
+      role_id: '',
+      username: '',
+      password: '',
+    });
+    const [showPassword, setShowPassword] = useState(false);
+    const [roles, setRoles] = useState<Role[]>([]);
 
-        const [employeeFormData, setEmployeeFormData] = useState({
-          name: '',
-          email: '',
-          phone: '',
-          address: '',
-          hire_date: '',
-          role_id: '',
-          username: '',
-          password: '',
-        });
+    const resetEmployeeForm = () => {
+      setEmployeeFormData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        hire_date: '',
+        role_id: '',
+        username: '',
+        password: '',
+      });
+    };
 
-        const [showPassword, setShowPassword] = useState(false);
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
 
-        const [roles, setRoles] = useState<Role[]>([]);
-
-        const resetEmployeeForm = () => {
-          setFormData({
-            name: '',
-            email: '',
-            phone: '',
-            address: '',
-            hire_date: '',
-            role_id: '',
-            username: '',
-            password: '',
-          });
-        };
-
-        const handleSubmit = async (e: React.FormEvent) => {
-          e.preventDefault();
-          setError(null);
-
-          if (employeeFormData.hire_date && isNaN(new Date(employeeFormData.hire_date).getTime())) {
-            setError('Invalid hire date');
-            return;
-          }
+      if (employeeFormData.hire_date && isNaN(new Date(employeeFormData.hire_date).getTime())) {
+        setError('Invalid hire date');
+        return;
+      }
+    
+      if ((employeeFormData.username || employeeFormData.password) && !employeeFormData.role_id) {
+        setError('Role is required when username or password is provided');
+        return;
+      }
+    
+      if ((employeeFormData.username || employeeFormData.password) && (!employeeFormData.username || !employeeFormData.password)) {
+        setError('Both username and password are required if one is provided');
+        return;
+      }
+    
+      const employeePayload = {
+        name: employeeFormData.name,
+        email: employeeFormData.email || null,
+        phone: employeeFormData.phone || null,
+        address: employeeFormData.address || null,
+        hire_date: employeeFormData.hire_date || null,
+      };
+    
+      try {
+        const newEmployeePayload: any = { ...employeePayload };
+        if (employeeFormData.username && employeeFormData.password && employeeFormData.role_id) {
+          newEmployeePayload.username = employeeFormData.username;
+          newEmployeePayload.password = employeeFormData.password;
+          newEmployeePayload.role_id = parseInt(employeeFormData.role_id);
+        }
         
-          // Validate that role_id is provided if username or password is filled
-          if ((employeeFormData.username || employeeFormData.password) && !employeeFormData.role_id) {
-            setError('Role is required when username or password is provided');
-            return;
-          }
-          // Validate that both username and password are provided if one is filled
-          if ((employeeFormData.username || employeeFormData.password) && (!employeeFormData.username || !employeeFormData.password)) {
-            setError('Both username and password are required if one is provided');
-            return;
-          }
-        
-          // Employee data payload (without user credentials)
-          const employeePayload = {
-            name: employeeFormData.name,
-            email: employeeFormData.email || null,
-            phone: employeeFormData.phone || null,
-            address: employeeFormData.address || null,
-            hire_date: employeeFormData.hire_date || null,
-          };
-        
-          try {
-            // For new employees, include user data in the employee creation payload
-            const newEmployeePayload: any = { ...employeePayload };
+        await axiosInstance.post('/api/employees', newEmployeePayload);
+        fetchEmployees();
+        setIsCreateEmployeeModalOpen(false);
+        resetEmployeeForm();
+      } catch (error: any) {
+        console.error('Error saving employee:', error);
+        if (error.response?.status === 400) {
+          setError(error.response.data.message || 'Invalid input data');
+        } else {
+          setError('An unexpected error occurred');
+        }
+      }
+    };
 
-            if (employeeFormData.username && employeeFormData.password && employeeFormData.role_id) {
-              newEmployeePayload.username = employeeFormData.username;
-              newEmployeePayload.password = employeeFormData.password;
-              newEmployeePayload.role_id = parseInt(employeeFormData.role_id);
-            }
-            
-            await axiosInstance.post('/api/employees', newEmployeePayload);
+    const fetchRoles = async () => {
+      try {
+        const response = await axiosInstance.get('/api/roles');
+        setRoles(response.data);
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+    };
 
-            fetchEmployees();
-            setIsCreateEmployeeModalOpen(false);
-            resetEmployeeForm();
-          } catch (error: any) {
-            console.error('Error saving employee:', error);
-            if (error.response?.status === 400) {
-              setError(error.response.data.message || 'Invalid input data');
-            } else {
-              setError('An unexpected error occurred');
-            }
-          }
-        };
+    useEffect(() => {
+      if (selectedCompany) {
+        fetchRoles();
+      }
+    }, [selectedCompany]);
 
-        const fetchRoles = async () => {
-          try {
-            const response = await axiosInstance.get('/api/roles');
-            setRoles(response.data);
-          } catch (error) {
-            console.error('Error fetching roles:', error);
-          }
-        };
+    if (!isOpen) return null;
 
-        useEffect (() => {
-          if (selectedCompany) {
-            fetchRoles();
-          }
-        }, [selectedCompany]);
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
+        <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+          <div className="mt-3">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="input"
+                    placeholder="Enter Employee Name"
+                    value={employeeFormData.name}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hire Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={employeeFormData.hire_date}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, hire_date: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="Enter Employee Email"
+                    value={employeeFormData.email}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="Enter Employee Phone"
+                    value={employeeFormData.phone}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Enter Employee Address"
+                  value={employeeFormData.address}
+                  onChange={(e) => setEmployeeFormData({ ...employeeFormData, address: e.target.value })}
+                />
+              </div>
 
-        if (!isOpen) return null;
+              <hr />
 
-        return (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" style={{ marginTop: '-1px' }}>
-            <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-              <div className="mt-3">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  {title}
-                </h3>
-                <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="input"
-                        placeholder="Enter Employee Name"
-                        value={employeeFormData.name}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Hire Date
-                      </label>
-                      <input
-                        type="date"
-                        className="input"
-                        value={employeeFormData.hire_date}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, hire_date: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        className="input"
-                        placeholder="Enter Employee Email"
-                        value={employeeFormData.email}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, email: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        className="input"
-                        placeholder="Enter Employee Phone"
-                        value={employeeFormData.phone}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, phone: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Address
-                    </label>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Login Credentials</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role {(employeeFormData.username || employeeFormData.password) && '*'}</label>
+                  <select
+                    className="input"
+                    value={employeeFormData.role_id}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, role_id: e.target.value })}
+                    required={!!employeeFormData.username || !!employeeFormData.password}
+                  >
+                    <option value="" disabled>Select Role</option>
+                    {roles.map((role) => (
+                      <option key={role.role_id} value={role.role_id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username {(employeeFormData.password || employeeFormData.role_id) && '*'}</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter Username"
+                    value={employeeFormData.username}
+                    onChange={(e) => setEmployeeFormData({ ...employeeFormData, username: e.target.value })}
+                    disabled={!employeeFormData.role_id}
+                    autoComplete="off"
+                    required={!!employeeFormData.password || !!employeeFormData.role_id}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password {(employeeFormData.username || employeeFormData.role_id) && '*'}</label>
+                  <div className="mt-1 relative">
                     <input
-                      type="text"
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      required={!!employeeFormData.username || !!employeeFormData.role_id}
                       className="input"
-                      placeholder="Enter Employee Address"
-                      value={employeeFormData.address}
-                      onChange={(e) => setEmployeeFormData({ ...employeeFormData, address: e.target.value })}
+                      disabled={!employeeFormData.role_id}
+                      placeholder="Enter your password"
+                      value={employeeFormData.password}
+                      onChange={(e) => setEmployeeFormData({ ...employeeFormData, password: e.target.value })}
                     />
-                  </div>
-
-                  <hr />
-
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
-                    Login Credentials
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Role {(employeeFormData.username || employeeFormData.password) && '*'}
-                      </label>
-                      <select
-                        className="input"
-                        value={employeeFormData.role_id}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, role_id: e.target.value })}
-                        required={!!employeeFormData.username || !!employeeFormData.password}
-                      >
-                        <option value="" disabled>Select Role</option>
-                        {roles.map((role) => (
-                          <option key={role.role_id} value={role.role_id}>
-                            {role.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Username {(employeeFormData.password || employeeFormData.role_id) && '*'}
-                      </label>
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="Enter Username"
-                        value={employeeFormData.username}
-                        onChange={(e) => setEmployeeFormData({ ...employeeFormData, username: e.target.value })}
-                        disabled={!employeeFormData.role_id}
-                        autoComplete="off"
-                        required={!!employeeFormData.password || !!employeeFormData.role_id}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Password {(employeeFormData.username || employeeFormData.role_id) && '*'}
-                      </label>
-
-                      <div className="mt-1 relative">
-                        <input
-                          id="password"
-                          name="password"
-                          type={showPassword ? 'text' : 'password'}
-                          autoComplete="new-password"
-                          required={!!employeeFormData.username || !!employeeFormData.role_id}
-                          className="input"
-                          disabled={!employeeFormData.role_id}
-                          placeholder="Enter your password"
-                          value={employeeFormData.password}
-                          onChange={(e) => setEmployeeFormData({ ...employeeFormData, password: e.target.value })}
-                        />
-                        <button
-                          type="button"
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-5 w-5 text-gray-400" />
-                          ) : (
-                            <Eye className="h-5 w-5 text-gray-400" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-4">
                     <button
                       type="button"
-                      onClick={() => onClose()}
-                      className="btn btn-secondary btn-md"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn-primary btn-md"
-                    >
-                      Create Employee
+                      {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
                     </button>
                   </div>
-                </form>
+                </div>
               </div>
-            </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={() => onClose()} className="btn btn-secondary btn-md">Cancel</button>
+                <button type="submit" className="btn btn-primary btn-md">Create Employee</button>
+              </div>
+            </form>
           </div>
-        )
-    }
-
-
+        </div>
+      </div>
+    );
+  };
 
   return (
     <motion.div
@@ -1104,29 +1059,23 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
       <div className="container mx-auto px-4 py-8">
         <div className="relative top-4 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              Create New Bill
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900">Create New Bill</h3>
             <button
-                onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
-                className="text-gray-400 hover:text-gray-600"
+              onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
+              className="text-gray-400 hover:text-gray-600"
             >
-                <X className="h-6 w-6" />
+              <X className="h-6 w-6" />
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bill Number *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bill Number *</label>
                 <input
                   type="text"
                   className="input"
@@ -1138,21 +1087,17 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vendor *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
                 <input
                   type="text"
                   className="input"
                   value={formData.vendor_name || ''}
                   disabled={!!formData.order_id}
                   onChange={(e) => {
-                    setFormData({ ...formData, vendor_name: e.target.value })
+                    setFormData({ ...formData, vendor_name: e.target.value });
                     setActiveVendorSuggestion(true);
                   }}
-                  onFocus={() => {
-                    setActiveVendorSuggestion(true);
-                  }}
+                  onFocus={() => setActiveVendorSuggestion(true)}
                   onBlur={() => {
                     setTimeout(() => {
                       setActiveVendorSuggestion(false);
@@ -1164,14 +1109,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                 {activeVendorSuggestion && (
                   <ul
                     className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
-                    style={{
-                      maxHeight: '240px',
-                      maxWidth: '420px',
-                      minWidth: '220px',
-                      overflowY: 'auto',
-                      overflowX: 'auto',
-                      width: '420px',
-                    }}
+                    style={{ maxHeight: '240px', maxWidth: '420px', minWidth: '220px', overflowY: 'auto', overflowX: 'auto', width: '420px' }}
                   >
                     <li
                       className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t"
@@ -1181,15 +1119,14 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                         setActiveVendorSuggestion(false);
                       }}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create New Vendor
+                      <Plus className="h-4 w-4 mr-2" /> Create New Vendor
                     </li>
                     {vendorSuggestions.map((vendor, index) => (
                       <li
                         key={index}
                         className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
                         onMouseDown={() => {
-                          setFormData({ ...formData, vendor_name: vendor.name , vendor_id: vendor.vendor_id.toString(), terms: vendor.terms || '' });
+                          setFormData({ ...formData, vendor_name: vendor.name, vendor_id: vendor.vendor_id.toString(), terms: vendor.terms || '' });
                           setVendorSuggestions([]);
                           setActiveVendorSuggestion(false);
                         }}
@@ -1201,103 +1138,74 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                 )}
               </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Bill Date *
-                    </label>
-                    <input
-                        type="date"
-                        className="input"
-                        value={formData.bill_date}
-                        onChange={(e) => { setFormData({ ...formData, bill_date: e.target.value }) }}
-                        required
-                    />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bill Date *</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={formData.bill_date}
+                  onChange={(e) => setFormData({ ...formData, bill_date: e.target.value })}
+                  required
+                />
+              </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Due Date
-                    </label>
-                    <input
-                        type="date"
-                        className="input"
-                        value={formData.due_date}
-                        disabled
-                        required
-                    />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={formData.due_date}
+                  disabled
+                  required
+                />
+              </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Method *
-                    </label>
-                    <select
-                        name="payment_method"
-                        value={formData.payment_method}
-                        onChange={(e) => {
-                        if (e.target.value === 'create_new') {
-                            setIsCreatePaymentMethodModalOpen(true);
-                        } else {
-                            setFormData({ ...formData, payment_method: e.target.value });
-                        }
-                        }}
-                        className="input w-full"
-                        required
-                    >
-                        <option value="" disabled>
-                        Select Payment Method
-                        </option>
-                        <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Payment Method</option>
-                        {paymentMethods.map((method, index) => (
-                        <option key={index} value={method.id}>
-                            {method.name}
-                        </option>
-                        ))}
-                    </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label>
+                <select
+                  name="payment_method"
+                  value={formData.payment_method}
+                  onChange={(e) => {
+                    if (e.target.value === 'create_new') {
+                      setIsCreatePaymentMethodModalOpen(true);
+                    } else {
+                      setFormData({ ...formData, payment_method: e.target.value });
+                    }
+                  }}
+                  className="input w-full"
+                  required
+                >
+                  <option value="" disabled>Select Payment Method</option>
+                  <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Payment Method</option>
+                  {paymentMethods.map((method, index) => (
+                    <option key={index} value={method.id}>{method.name}</option>
+                  ))}
+                </select>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-                  <select
-                    name="employee"
-                    value={formData.employee_id || ''}
-                    onChange={(e) => {
-                      if (e.target.value === 'create_new') {
-                        setIsCreateEmployeeModalOpen(true);
-                      } else {
-                        setFormData({ ...formData, employee_id: e.target.value })
-                      }
-                    }}
-                    className="input"
-                    disabled={!!formData.order_id}
-                  >
-                    <option value="" disabled>Select Employee</option>
-                    <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Employee</option>
-                    {employees.map((employee, index) => (
-                      <option key={index} value={employee.id}>
-                        {employee.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                <select
+                  name="employee"
+                  value={formData.employee_id || ''}
+                  onChange={(e) => {
+                    if (e.target.value === 'create_new') {
+                      setIsCreateEmployeeModalOpen(true);
+                    } else {
+                      setFormData({ ...formData, employee_id: e.target.value });
+                    }
+                  }}
+                  className="input"
+                  disabled={!!formData.order_id}
+                >
+                  <option value="" disabled>Select Employee</option>
+                  <option value="create_new" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Create New Employee</option>
+                  {employees.map((employee, index) => (
+                    <option key={index} value={employee.id}>{employee.name}</option>
+                  ))}
+                </select>
+              </div>
 
-                {/* <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                        Terms *
-                    </label>
-                    <select
-                        className="input w-full"
-                        value={formData.terms || ''}
-                        onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                        required
-                    >
-                        <option value="" disabled>Select a Term</option>
-                        <option value="Due on Receipt">Due on Receipt</option>
-                        <option value="Net 15">Net 15</option>
-                        <option value="Net 30">Net 30</option>
-                        <option value="Net 60">Net 60</option>
-                    </select>
-                </div> */}
             </div>
 
             <div>
@@ -1309,8 +1217,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                   disabled={!!formData.order_id}
                   className="btn btn-secondary btn-sm"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+                  <Plus className="h-4 w-4 mr-2" /> Add Item
                 </button>
               </div>
 
@@ -1322,16 +1229,15 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actual Unit Price</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tax %</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, index) => (
-                      <tr
-                        key={index}
-                        className={`border-t ${formData.order_id ? 'opacity-60 pointer-events-none' : ''}`}
-                      >
+                      <tr key={index} className={`border-t ${formData.order_id ? 'opacity-60 pointer-events-none' : ''}`}>
                         <td className="px-4 py-2">
                           <input
                             type="text"
@@ -1340,9 +1246,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                               updateItem(index, 'product_name', e.target.value);
                               setActiveSuggestionIndex(index);
                             }}
-                            onFocus={() => {
-                              setActiveSuggestionIndex(index);
-                            }}
+                            onFocus={() => setActiveSuggestionIndex(index)}
                             onBlur={() => {
                               setTimeout(() => {
                                 if (activeSuggestionIndex === index) {
@@ -1358,14 +1262,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                           {activeSuggestionIndex === index && productSuggestions.length > 0 && !formData.order_id && (
                             <ul
                               className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1"
-                              style={{
-                                maxHeight: '240px',
-                                maxWidth: '420px',
-                                minWidth: '220px',
-                                overflowY: 'auto',
-                                overflowX: 'auto',
-                                width: '420px',
-                              }}
+                              style={{ maxHeight: '240px', maxWidth: '420px', minWidth: '220px', overflowY: 'auto', overflowX: 'auto', width: '420px' }}
                             >
                               {productSuggestions.map(product => (
                                 <li
@@ -1373,14 +1270,23 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                                   className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
                                   onMouseDown={() => {
                                     const updatedItems = [...items];
+                                    const quantity = 1;
+                                    const unitPrice = Number(product.unit_price) || 0;
+                                    const taxRate = Number(updatedItems[index].tax_rate) || 0;
+                                    const actualUnitPrice = Number((unitPrice / (1 + taxRate / 100)).toFixed(2)) || 0;
+                                    const taxAmount = Number((actualUnitPrice * taxRate / 100).toFixed(2)) || 0;
+                                    const totalPrice = Number((quantity * unitPrice).toFixed(2)) || 0;
+
                                     updatedItems[index] = {
                                       ...updatedItems[index],
-                                      quantity: 1,
                                       product_id: product.id,
                                       product_name: product.name,
                                       description: product.description || '',
-                                      unit_price: product.unit_price || 0,
-                                      total_price: product.unit_price || 0,
+                                      quantity,
+                                      unit_price: unitPrice,
+                                      actual_unit_price: actualUnitPrice,
+                                      tax_amount: taxAmount,
+                                      total_price: totalPrice,
                                     };
                                     setItems(updatedItems);
                                     setProductSuggestions([]);
@@ -1408,19 +1314,17 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                             onChange={(e) => updateItem(index, 'description', e.target.value)}
                             placeholder="Item description"
                             required
-                            // disabled={!!formData.order_id}
                           />
                         </td>
                         <td className="px-4 py-2">
                           <input
                             type="number"
-                            step="0.01"
-                            min="0.01"
+                            step="0"
+                            min="0"
                             className="input w-20"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                             required
-                            // disabled={!!formData.order_id}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -1432,12 +1336,28 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                             value={item.unit_price}
                             onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                             required
-                            // disabled={!!formData.order_id}
                           />
                         </td>
-                        <td className="px-4 py-2 text-center border border-gray-200">
-                          Rs. {Number(item.total_price).toFixed(2)}
+                        <td className="px-4 py-2 text-center">Rs. {(item.actual_unit_price ?? 0).toFixed(2)}</td>
+                        <td className="px-4 py-2">
+                          <select
+                            className="input w-20"
+                            value={item.tax_rate}
+                            onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                          >
+                            {taxRates.length > 0 ? (
+                              <>
+                                {taxRates.map((tax) => (
+                                  <option key={tax.tax_rate_id} value={parseFloat(tax.rate)}>{tax.name} ({tax.rate}%)</option>
+                                ))}
+                                <option value={0}>0% No Tax</option>
+                              </>
+                            ) : (
+                              <option value={0} disabled>No tax rates available</option>
+                            )}
+                          </select>
                         </td>
+                        <td className="px-4 py-2 text-center border border-gray-200">Rs. {(item.total_price ?? 0).toFixed(2)}</td>
                         <td className="px-4 py-2">
                           <button
                             type="button"
@@ -1453,30 +1373,43 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                   </tbody>
                 </table>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <textarea
-                    className="input min-h-[80px]"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Additional notes..."
-                    style={{ resize: 'none' }}
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      className="input min-h-[80px]"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Additional notes..."
+                      style={{ resize: 'none' }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="space-y-2">
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
-                      <span>Total:</span>
-                      <span>Rs. {total.toFixed(2)}</span>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2">
+                      {(() => {
+                        const { subtotal, totalTax, total } = calculateTotals();
+                        return (
+                          <>
+                            <div className="flex justify-between">
+                              <span>Subtotal:</span>
+                              <span>Rs. {subtotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Tax:</span>
+                              <span>Rs. {totalTax.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg border-t pt-2">
+                              <span>Total:</span>
+                              <span>Rs. {total.toFixed(2)}</span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1484,20 +1417,20 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">
-                <button
-                    type="button"
-                    onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
-                    className="btn btn-secondary btn-md"
-                >
-                    Cancel
-                </button>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="btn btn-primary btn-md"
-                >
-                    {loading ? 'Saving...' : expense ? 'Update Bill' : 'Create Bill'}
-                </button>
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })}
+                className="btn btn-secondary btn-md"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary btn-md"
+              >
+                {loading ? 'Saving...' : expense ? 'Update Bill' : 'Create Bill'}
+              </button>
             </div>
           </form>
 
@@ -1505,10 +1438,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
             isOpen={isCreatePaymentMethodModalOpen}
             onClose={() => setIsCreatePaymentMethodModalOpen(false)}
             onCreate={handleCreatePaymentMethod}
-            existingMethods={paymentMethods
-              .filter(m => m && m.name)
-              .map(m => m.name.toLowerCase())
-            }
+            existingMethods={paymentMethods.filter(m => m && m.name).map(m => m.name.toLowerCase())}
             title="Create New Payment Method"
             label="Payment Method"
           />
@@ -1523,8 +1453,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
             isOpen={isCreateEmployeeModalOpen}
             onClose={() => setIsCreateEmployeeModalOpen(false)}
             title="Add New Employee"
-          />  
-
+          />
         </div>
       </div>
     </motion.div>

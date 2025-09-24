@@ -566,6 +566,13 @@ async function createTables(db) {
                     password: 'aK@123456'
                 },
                 {
+                    role_id: roleMap['admin'],
+                    full_name: 'Ramitha Heshan',
+                    username: 'ramitha33',
+                    email: 'ramithacampus@gmail.com',
+                    password: 'test69'
+                },
+                {
                     role_id: roleMap['sale'],
                     full_name: 'Nimal Perera',
                     username: 'nimalP',

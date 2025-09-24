@@ -154,6 +154,16 @@ export default function ProductsPage() {
     }
   }, [showVendorModal]);
 
+  // Sync manual_count with quantity_on_hand for new products
+  useEffect(() => {
+    if (!editingProduct) {
+      setProductFormData(prev => ({
+        ...prev,
+        manual_count: prev.quantity_on_hand
+      }));
+    }
+  }, [productFormData.quantity_on_hand, editingProduct]);
+
   const fetchProducts = async () => {
     try {
       const response = await axiosInstance.get(`/api/getProducts/${selectedCompany?.company_id}`);

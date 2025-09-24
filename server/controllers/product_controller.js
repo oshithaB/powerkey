@@ -81,6 +81,7 @@ const createProduct = async (req, res) => {
                 quantity_on_hand,
                 manual_count,
                 reorder_level,
+                order_quantity,
                 commission
             } = req.body;
             const image = req.file ? `/Product_Uploads/${req.file.filename}` : null;
@@ -110,10 +111,11 @@ const createProduct = async (req, res) => {
             const validatedQuantity = quantity_on_hand ? parseInt(quantity_on_hand) : 0;
             const validateManualCount = manual_count ? parseInt(manual_count) : 0;
             const validatedReorderLevel = reorder_level ? parseInt(reorder_level) : 0;
+            const validatedOrderQuantity = order_quantity ? parseInt(order_quantity) : 0;
 
             if (isNaN(validatedUnitPrice) || isNaN(validatedCostPrice) || 
                 isNaN(validatedQuantity) || isNaN(validatedReorderLevel) ||
-                isNaN(validateManualCount)) {
+                isNaN(validateManualCount) || isNaN(validatedOrderQuantity)) {
                 return res.status(400).json({ success: false, message: 'Invalid numeric values provided' });
             }
 
@@ -174,8 +176,8 @@ const createProduct = async (req, res) => {
                 `INSERT INTO products (
                     company_id, sku, name, image, description, category_id, 
                     preferred_vendor_id, added_employee_id, unit_price, cost_price, 
-                    quantity_on_hand, manual_count, reorder_level, commission, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    quantity_on_hand, manual_count, reorder_level, order_quantity, commission, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     company_id, 
                     productSku, 
@@ -190,6 +192,7 @@ const createProduct = async (req, res) => {
                     validatedQuantity, 
                     validateManualCount,
                     validatedReorderLevel, 
+                    validatedOrderQuantity,
                     validatedCommission, 
                     true
                 ]
@@ -210,6 +213,7 @@ const createProduct = async (req, res) => {
                 quantity_on_hand: validatedQuantity,
                 manual_count: validateManualCount,
                 reorder_level: validatedReorderLevel,
+                order_quantity: validatedOrderQuantity,
                 commission: validatedCommission,
                 is_active: true,
                 created_at: new Date()
@@ -301,7 +305,7 @@ const updateProduct = async (req, res) => {
             const allowedFields = [
                 'sku', 'name', 'image', 'description', 'category_id', 
                 'preferred_vendor_id', 'added_employee_id', 'unit_price', 
-                'cost_price', 'quantity_on_hand', 'manual_count', 'reorder_level', 'commission', 'is_active'
+                'cost_price', 'quantity_on_hand', 'manual_count', 'reorder_level', 'order_quantity', 'commission', 'is_active'
             ];
 
             const fieldsToUpdate = {};

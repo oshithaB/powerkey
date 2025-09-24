@@ -21,6 +21,7 @@ interface Product {
   quantity_on_hand: number;
   manual_count: number;
   reorder_level: number;
+  order_quantity: number;
   commission: number;
   is_active: boolean;
   created_at: string;
@@ -91,6 +92,7 @@ export default function ProductsPage() {
     quantity_on_hand: 0,
     manual_count: 0,
     reorder_level: 0,
+    order_quantity: 0,
     commission: 0,
   });
   
@@ -263,6 +265,7 @@ export default function ProductsPage() {
       data.append('quantity_on_hand', productFormData.quantity_on_hand.toString());
       data.append('manual_count', productFormData.manual_count.toString());
       data.append('reorder_level', productFormData.reorder_level.toString());
+      data.append('order_quantity', productFormData.order_quantity.toString());
       data.append('commission', productFormData.commission.toString());
 
       if (editingProduct) {
@@ -332,6 +335,7 @@ export default function ProductsPage() {
       quantity_on_hand: product.quantity_on_hand || 0,
       manual_count: product.manual_count || product.quantity_on_hand || 0,
       reorder_level: product.reorder_level || 0,
+      order_quantity: product.order_quantity || 0,
       commission: product.commission || 0.00,
     });
     
@@ -392,6 +396,7 @@ export default function ProductsPage() {
       quantity_on_hand: 0,
       manual_count: 0,
       reorder_level: 0,
+      order_quantity: 0,
       commission: 0.00,
     });
     setImageFile(null);
@@ -792,6 +797,17 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Reorder Level</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={productFormData.order_quantity}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, order_quantity: parseInt(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>Manual Count</label>
                     <input
                       type="number"
@@ -805,7 +821,7 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Stock</label>
                     <input
                       type="number"
                       className="input"

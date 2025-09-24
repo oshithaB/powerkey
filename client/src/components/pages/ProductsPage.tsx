@@ -21,7 +21,9 @@ interface Product {
   quantity_on_hand: number;
   manual_count: number;
   reorder_level: number;
+  order_quantity: number;
   commission: number;
+  commission_type: 'fixed' | 'percentage';
   is_active: boolean;
   created_at: string;
 }
@@ -91,7 +93,9 @@ export default function ProductsPage() {
     quantity_on_hand: 0,
     manual_count: 0,
     reorder_level: 0,
+    order_quantity: 0,
     commission: 0,
+    commission_type: 'fixed',
   });
   
   const [categoryFormData, setCategoryFormData] = useState({
@@ -149,16 +153,6 @@ export default function ProductsPage() {
       setVendorFormData((prev) => ({ ...prev, as_of_date: today }));
     }
   }, [showVendorModal]);
-
-  // Sync manual_count with quantity_on_hand for new products
-  useEffect(() => {
-    if (!editingProduct) {
-      setProductFormData(prev => ({
-        ...prev,
-        manual_count: prev.quantity_on_hand
-      }));
-    }
-  }, [productFormData.quantity_on_hand, editingProduct]);
 
   const fetchProducts = async () => {
     try {
@@ -263,8 +257,17 @@ export default function ProductsPage() {
       data.append('quantity_on_hand', productFormData.quantity_on_hand.toString());
       data.append('manual_count', productFormData.manual_count.toString());
       data.append('reorder_level', productFormData.reorder_level.toString());
-      data.append('commission', productFormData.commission.toString());
-
+      data.append('order_quantity', productFormData.order_quantity.toString());
+      
+      // Calculate the final commission value based on type
+      const finalCommissionValue = productFormData.commission_type === 'percentage' 
+        ? (productFormData.unit_price * productFormData.commission) / 100 
+        : productFormData.commission;
+      
+      data.append('commission', finalCommissionValue.toString());
+      data.append('commission_type', productFormData.commission_type);
+      data.append('commission_input', productFormData.commission.toString()); // Store original input for editing
+  
       if (editingProduct) {
         await axiosInstance.put(`/api/products/${selectedCompany?.company_id}/${editingProduct.id}`, data, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -319,6 +322,14 @@ export default function ProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
+
+    // Calculate original input value based on commission type
+    let originalCommissionInput = product.commission || 0;
+    if (product.commission_type === 'percentage' && product.unit_price > 0 && product.commission > 0) {
+      // Reverse calculate the percentage from the stored commission value
+      originalCommissionInput = (product.commission * 100) / product.unit_price;
+    }
+
     setProductFormData({
       sku: product.sku || '',
       name: product.name,
@@ -330,9 +341,11 @@ export default function ProductsPage() {
       unit_price: product.unit_price || 0,
       cost_price: product.cost_price || 0,
       quantity_on_hand: product.quantity_on_hand || 0,
-      manual_count: product.manual_count || product.quantity_on_hand || 0,
+      manual_count: product.manual_count || 0,
       reorder_level: product.reorder_level || 0,
-      commission: product.commission || 0.00,
+      order_quantity: product.order_quantity || 0,
+      commission: originalCommissionInput, // Use calculated original input
+      commission_type: product.commission_type || 'fixed',
     });
     
     // Set vendor filter and selected vendor for editing
@@ -346,6 +359,13 @@ export default function ProductsPage() {
     
     setImageFile(null);
     setShowProductModal(true);
+  };
+
+  const calculateCommissionValue = () => {
+    if (productFormData.commission_type === 'percentage') {
+      return (productFormData.unit_price * productFormData.commission) / 100;
+    }
+    return productFormData.commission;
   };
 
   const handleEditCategory = (category: Category) => {
@@ -392,7 +412,9 @@ export default function ProductsPage() {
       quantity_on_hand: 0,
       manual_count: 0,
       reorder_level: 0,
-      commission: 0.00,
+      order_quantity: 0,
+      commission: 0,
+      commission_type: 'fixed',
     });
     setImageFile(null);
     setEditingProduct(null);
@@ -562,7 +584,14 @@ export default function ProductsPage() {
                     {product.category_name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.commission ? `Rs. ${Number(product.commission).toFixed(2)}` : 'N/A'}
+                    {product.commission ? (
+                      <>
+                        <div>Rs. {Number(product.commission).toFixed(2)}</div>
+                        <div className="text-xs text-gray-500">
+                          {product.commission_type === 'percentage' ? 'Percentage-based' : 'Fixed amount'}
+                        </div>
+                      </>
+                    ) : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -792,20 +821,18 @@ export default function ProductsPage() {
                     />
                   </div>
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>Manual Count</label>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Reorder Level</label>
                     <input
                       type="number"
                       className="input"
-                      placeholder="For manual stock adjustments"
-                      value={productFormData.manual_count}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value) || 0;
-                        setProductFormData({ ...productFormData, manual_count: value });
-                      }}
+                      value={productFormData.order_quantity}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, order_quantity: parseInt(e.target.value) || 0 })
+                      }
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Stock</label>
                     <input
                       type="number"
                       className="input"
@@ -817,18 +844,58 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>Commission</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input"
-                    value={productFormData.commission || 0}
-                    onChange={(e) =>
-                      setProductFormData({ ...productFormData, commission: parseFloat(e.target.value) || 0 })
-                    }
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Commission Type</label>
+                    <select
+                      className="input"
+                      value={productFormData.commission_type}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, commission_type: e.target.value })
+                      }
+                    >
+                      <option value="fixed">Fixed Amount</option>
+                      <option value="percentage">Percentage</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>
+                      Commission {productFormData.commission_type === 'percentage' ? '(%)' : '(Rs.)'}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      placeholder={productFormData.commission_type === 'percentage' ? 'Enter percentage' : 'Enter amount'}
+                      value={productFormData.commission || 0}
+                      onChange={(e) =>
+                        setProductFormData({ ...productFormData, commission: parseFloat(e.target.value) || 0 })
+                      }
+                    />
+                  </div>
+                  {productFormData.commission_type === 'percentage' && (
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-1'>Calculated Amount</label>
+                      <input
+                        type="text"
+                        className="input bg-gray-50"
+                        value={`Rs. ${calculateCommissionValue().toFixed(2)}`}
+                        readOnly
+                      />
+                    </div>
+                  )}
                 </div>
+                {productFormData.commission_type === 'percentage' && (
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Calculated Amount</label>
+                    <input
+                      type="text"
+                      className="input bg-gray-50"
+                      value={`Rs. ${calculateCommissionValue().toFixed(2)}`}
+                      readOnly
+                    />
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button

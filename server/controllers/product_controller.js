@@ -81,7 +81,10 @@ const createProduct = async (req, res) => {
                 quantity_on_hand,
                 manual_count,
                 reorder_level,
-                commission
+                order_quantity,
+                commission,
+                commission_type,  // Add this line
+                commission_input  // Add this line
             } = req.body;
             const image = req.file ? `/Product_Uploads/${req.file.filename}` : null;
 
@@ -104,16 +107,31 @@ const createProduct = async (req, res) => {
                 validatedCommission = commissionValue;
             }
 
+            // Validate commission_type
+            const validatedCommissionType = commission_type && ['fixed', 'percentage'].includes(commission_type) 
+                ? commission_type 
+                : 'fixed';
+
+            // Validate commission_input
+            let validatedCommissionInput = null;
+            if (commission_input !== undefined && commission_input !== null && commission_input !== '') {
+                const commissionInputValue = parseFloat(commission_input);
+                if (!isNaN(commissionInputValue) && commissionInputValue >= 0) {
+                    validatedCommissionInput = commissionInputValue;
+                }
+            }
+
             // Validate numeric fields
             const validatedUnitPrice = unit_price ? parseFloat(unit_price) : 0;
             const validatedCostPrice = cost_price ? parseFloat(cost_price) : 0;
             const validatedQuantity = quantity_on_hand ? parseInt(quantity_on_hand) : 0;
             const validateManualCount = manual_count ? parseInt(manual_count) : 0;
             const validatedReorderLevel = reorder_level ? parseInt(reorder_level) : 0;
+            const validatedOrderQuantity = order_quantity ? parseInt(order_quantity) : 0;
 
             if (isNaN(validatedUnitPrice) || isNaN(validatedCostPrice) || 
                 isNaN(validatedQuantity) || isNaN(validatedReorderLevel) ||
-                isNaN(validateManualCount)) {
+                isNaN(validateManualCount) || isNaN(validatedOrderQuantity)) {
                 return res.status(400).json({ success: false, message: 'Invalid numeric values provided' });
             }
 
@@ -174,8 +192,9 @@ const createProduct = async (req, res) => {
                 `INSERT INTO products (
                     company_id, sku, name, image, description, category_id, 
                     preferred_vendor_id, added_employee_id, unit_price, cost_price, 
-                    quantity_on_hand, manual_count, reorder_level, commission, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    quantity_on_hand, manual_count, reorder_level, order_quantity, 
+                    commission, commission_type, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     company_id, 
                     productSku, 
@@ -190,7 +209,9 @@ const createProduct = async (req, res) => {
                     validatedQuantity, 
                     validateManualCount,
                     validatedReorderLevel, 
+                    validatedOrderQuantity,
                     validatedCommission, 
+                    validatedCommissionType,  // Add this line
                     true
                 ]
             );
@@ -210,7 +231,9 @@ const createProduct = async (req, res) => {
                 quantity_on_hand: validatedQuantity,
                 manual_count: validateManualCount,
                 reorder_level: validatedReorderLevel,
+                order_quantity: validatedOrderQuantity,
                 commission: validatedCommission,
+                commission_type: validatedCommissionType,  // Add this line
                 is_active: true,
                 created_at: new Date()
             };
@@ -249,6 +272,10 @@ const updateProduct = async (req, res) => {
                 quantity_on_hand,
                 manual_count,
                 reorder_level,
+                order_quantity,  // Add this line
+                commission,      // Add this line
+                commission_type, // Add this line
+                commission_input, // Add this line
                 is_active
             } = req.body;
             const image = req.file ? `/Product_Uploads/${req.file.filename}` : req.body.image;
@@ -257,7 +284,7 @@ const updateProduct = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Company ID and Product ID are required' });
             }
 
-            const [ existingProduct] = await db.query(
+            const [existingProduct] = await db.query(
                 'SELECT * FROM products WHERE id = ? AND company_id = ?',
                 [product_id, company_id]
             );
@@ -301,7 +328,8 @@ const updateProduct = async (req, res) => {
             const allowedFields = [
                 'sku', 'name', 'image', 'description', 'category_id', 
                 'preferred_vendor_id', 'added_employee_id', 'unit_price', 
-                'cost_price', 'quantity_on_hand', 'manual_count', 'reorder_level', 'commission', 'is_active'
+                'cost_price', 'quantity_on_hand', 'manual_count', 'reorder_level', 
+                'order_quantity', 'commission', 'commission_type', 'is_active'  // Add commission_type here
             ];
 
             const fieldsToUpdate = {};

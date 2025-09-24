@@ -150,6 +150,7 @@ async function createTables(db) {
             reorder_level int DEFAULT 0,
             order_quantity int DEFAULT 0,
             commission decimal(10,2) DEFAULT 0.00,
+            commission_type ENUM('percentage', 'fixed') DEFAULT 'fixed',
             is_active BOOLEAN DEFAULT TRUE,
             created_at timestamp DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),

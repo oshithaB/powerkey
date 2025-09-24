@@ -15,7 +15,12 @@ const getUserByEmployeeId = async (req, res) => {
     try {
         const { id } = req.params;
         const [user] = await db.query(
-            'SELECT user_id, username, role_id FROM user WHERE user_id = ? AND is_active = 1',
+            `SELECT
+                u.user_id, u.username, u.role_id, e.email
+                FROM user u
+                JOIN employees e ON u.email = e.email
+                WHERE u.is_active = 1
+            `,
             [id]
         );
         if (user.length === 0) {
@@ -89,8 +94,8 @@ const createEmployee = async (req, res) => {
         if (username && password) {
             const hashedPassword = await bcrypt.hash(password, 10);
             await db.query(
-                'INSERT INTO user (user_id, role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [employeeResult.insertId, role_id, name, username, email || null, hashedPassword, true]
+                'INSERT INTO user (role_id, full_name, username, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+                [ role_id, name, username, email || null, hashedPassword, true]
             );
         }
 
@@ -156,23 +161,36 @@ const updateEmployee = async (req, res) => {
             }
         }
 
-        // Check for user existence and uniqueness of email/username if credentials provided
-        let userExists = false;
-        if (username && password) {
-            const [existingUser] = await db.query(
-                'SELECT * FROM user WHERE (email = ? OR username = ?) AND user_id != ? AND is_active = 1',
-                [email, username, id]
-            );
-            if (existingUser.length > 0) {
-                return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
+        // Check if user already exists for this employee
+        const [currentUser] = await db.query(
+            'SELECT * FROM user WHERE user_id = ?',
+            [id]
+        );
+        const userExists = currentUser.length > 0;
+
+        // Check for user uniqueness of email/username if email or credentials provided
+        if (email || (username && password)) {
+            // For email uniqueness in user table
+            if (email) {
+                const [emailUserCheck] = await db.query(
+                    'SELECT * FROM user WHERE email = ? AND user_id != ?',
+                    [email, id]
+                );
+                if (emailUserCheck.length > 0) {
+                    return res.status(400).json({ success: false, message: 'Email already in use by another user' });
+                }
             }
 
-            // Check if user already exists for this employee
-            const [currentUser] = await db.query(
-                'SELECT * FROM user WHERE user_id = ?',
-                [id]
-            );
-            userExists = currentUser.length > 0;
+            // For username uniqueness in user table
+            if (username) {
+                const [usernameCheck] = await db.query(
+                    'SELECT * FROM user WHERE username = ? AND user_id != ?',
+                    [username, id]
+                );
+                if (usernameCheck.length > 0) {
+                    return res.status(400).json({ success: false, message: 'Username already in use by another user' });
+                }
+            }
         }
 
         // Update employee
@@ -195,18 +213,12 @@ const updateEmployee = async (req, res) => {
                     [id, role_id, name, username, email || null, hashedPassword, is_active !== undefined ? is_active : true]
                 );
             }
-        } else {
-            // Update user details without changing password if user exists
-            const [currentUser] = await db.query(
-                'SELECT * FROM user WHERE user_id = ?',
-                [id]
+        } else if (userExists && (email || role_id !== undefined)) {
+            // Update user details without changing password if user exists and email or role_id is provided
+            await db.query(
+                'UPDATE user SET full_name = ?, email = ?, role_id = ?, is_active = ? WHERE user_id = ?',
+                [name, email || null, role_id || currentUser[0].role_id, is_active !== undefined ? is_active : true, id]
             );
-            if (currentUser.length > 0) {
-                await db.query(
-                    'UPDATE user SET full_name = ?, email = ?, role_id = ?, is_active = ? WHERE user_id = ?',
-                    [name, email || null, role_id || currentUser[0].role_id, is_active !== undefined ? is_active : true, id]
-                );
-            }
         }
 
         const employeeData = {

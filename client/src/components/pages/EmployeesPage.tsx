@@ -93,60 +93,36 @@ export default function EmployeesPage() {
       return;
     }
     // Validate that both username and password are provided if one is filled
-    if ((formData.username || formData.password) && (!formData.username || !formData.password)) {
+    if ((formData.username && !formData.password) || (!formData.username && formData.password)) {
       setErrorMessage('Both username and password are required if one is provided');
       return;
     }
   
-    // Employee data payload (without user credentials)
-    const employeePayload = {
+    // Prepare employee payload
+    const employeePayload: any = {
       name: formData.name,
       email: formData.email || null,
       phone: formData.phone || null,
       address: formData.address || null,
       hire_date: formData.hire_date || null,
     };
+
+    // Only add user credentials if both username and password are provided
+    if (formData.username && formData.password && formData.role_id) {
+      employeePayload.username = formData.username;
+      employeePayload.password = formData.password;
+      employeePayload.role_id = parseInt(formData.role_id);
+    }
   
     try {
-      // Update/Create employee first
       if (editingEmployee) {
+        // Update employee with all relevant data in a single request
         await axiosInstance.put(`/api/employees/${editingEmployee.id}`, employeePayload);
-        
-        // Handle user credentials separately for editing
-        if (formData.username && formData.password && formData.role_id) {
-          const userPayload = {
-            username: formData.username,
-            password: formData.password,
-            role_id: parseInt(formData.role_id),
-          };
-          
-          // Check if user already exists for this employee
-          const existingUser = await fetchUserData(editingEmployee.id);
-          
-          if (existingUser) {
-            // Update existing user
-            await axiosInstance.put(`/api/updateUser/${existingUser.user_id}`, userPayload);
-          } else {
-            // Create new user for existing employee
-            await axiosInstance.post('/api/addUser', {
-              ...userPayload,
-              employee_id: editingEmployee.id,
-            });
-          }
-        }
       } else {
-        // For new employees, include user data in the employee creation payload
-        const newEmployeePayload: any = { ...employeePayload };
-        
-        if (formData.username && formData.password && formData.role_id) {
-          newEmployeePayload.username = formData.username;
-          newEmployeePayload.password = formData.password;
-          newEmployeePayload.role_id = parseInt(formData.role_id);
-        }
-        
-        await axiosInstance.post('/api/employees', newEmployeePayload);
+        // Create new employee with all relevant data
+        await axiosInstance.post('/api/employees', employeePayload);
       }
-      
+  
       fetchEmployees();
       setShowModal(false);
       resetForm();
@@ -416,20 +392,22 @@ export default function EmployeesPage() {
                 <hr />
 
                 <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  Login Credentials
+                  Login Credentials (Optional)
                 </h4>
+                <div className="text-sm text-gray-500 mb-3">
+                  Fill all three fields below to create login access for this employee
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Role {(formData.username || formData.password) && '*'}
+                      Role
                     </label>
                     <select
                       className="input"
                       value={formData.role_id}
                       onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                      required={!!formData.username || !!formData.password}
                     >
-                      <option value="" disabled>Select Role</option>
+                      <option value="">Select Role (Optional)</option>
                       {roles.map((role) => (
                         <option key={role.role_id} value={role.role_id}>
                           {role.name}
@@ -439,30 +417,28 @@ export default function EmployeesPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Username {(formData.password || formData.role_id) && '*'}
+                      Username
                     </label>
                     <input
                       type="text"
                       className="input"
-                      placeholder="Enter Username"
+                      placeholder="Enter Username (Optional)"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                       autoComplete="off"
-                      required={!!formData.password || !!formData.role_id}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Password {(formData.username || formData.role_id) && '*'}
+                      Password
                     </label>
                     <input
                       type="password"
                       className="input"
-                      placeholder="Enter Password"
+                      placeholder="Enter Password (Optional)"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       autoComplete="new-password"
-                      required={!!formData.username || !!formData.role_id}
                     />
                   </div>
                 </div>

@@ -23,25 +23,18 @@ const createBill = async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // let calculated_due_date = bill_date;
+    // Recalculate total_price for each item if needed
+    const recalculatedItems = items.map(item => {
+      const quantity = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      const taxRate = Number(item.tax_rate) || 0;
+      const actualUnitPrice = Number((unitPrice / (1 + taxRate / 100)).toFixed(2));
+      const taxAmount = Number((actualUnitPrice * taxRate / 100).toFixed(2));
+      const totalPrice = Number((quantity * unitPrice + (quantity * taxAmount)).toFixed(2));
+      return { ...item, total_price: totalPrice };
+    });
 
-    // if (terms === 'due_on_receipt') {
-    //   calculated_due_date = bill_date;
-    // } else if (terms === 'net_15') {
-    //   calculated_due_date = new Date(bill_date);
-    //   calculated_due_date.setDate(calculated_due_date.getDate() + 15);
-    //   calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
-    // } else if (terms === 'net_30') {
-    //   calculated_due_date = new Date(bill_date);
-    //   calculated_due_date.setDate(calculated_due_date.getDate() + 30);
-    //   calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
-    // } else if (terms === 'net_60') {
-    //   calculated_due_date = new Date(bill_date);
-    //   calculated_due_date.setDate(calculated_due_date.getDate() + 60);
-    //   calculated_due_date = calculated_due_date.toISOString().slice(0, 10);
-    // } else {
-    //   calculated_due_date = due_date; // Use provided due_date if terms is custom or not recognized
-    // }
+    const calculatedTotal = recalculatedItems.reduce((sum, item) => sum + Number(item.total_price), 0).toFixed(2);
 
     console.log("Inserting bill: ", {
       company_id,
@@ -53,10 +46,9 @@ const createBill = async (req, res) => {
       due_date,
       payment_method,
       notes,
-      total_amount
+      total_amount: calculatedTotal
     });
 
-    // Insert Bill
     const [result] = await conn.execute(
       `INSERT INTO bills 
         (company_id, bill_number, order_id, vendor_id, employee_id, bill_date, due_date, payment_method_id, notes, total_amount)
@@ -71,14 +63,13 @@ const createBill = async (req, res) => {
         due_date,
         payment_method,
         notes || null,
-        total_amount,
+        calculatedTotal,
       ]
     );
 
     const billId = result.insertId;
 
-    // Insert Bill Items
-    for (const item of items) {
+    for (const item of recalculatedItems) {
       await conn.execute(
         `INSERT INTO bill_items 
           (bill_id, product_id, product_name, description, quantity, unit_price, total_price)

@@ -415,7 +415,7 @@ async function createTables(db) {
             company_id INT NOT NULL,
             expense_number VARCHAR(100) NOT NULL UNIQUE,
             payee_id INT NOT NULL,
-            payment_account_id INT NOT NULL,
+            payment_account_id INT,
             payment_date DATE NOT NULL,
             payment_method_id INT NOT NULL,
             amount DECIMAL(15,2) NOT NULL,

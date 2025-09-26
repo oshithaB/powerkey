@@ -388,7 +388,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount: total_amount || 0,
       balance_due: balance_due || 0,
       status,
-      updated_at: new Date(),
     };
 
     // --- Handle cancelled invoice ---
@@ -498,7 +497,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
           await connection.query(
             `UPDATE invoice_items 
              SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
-                 tax_rate = ?, tax_amount = ?, total_price = ?, updated_at = ? 
+                 tax_rate = ?, tax_amount = ?, total_price = ? 
              WHERE id = ?`,
             [
               item.quantity,
@@ -507,7 +506,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
               item.tax_rate,
               item.tax_amount,
               item.total_price,
-              new Date(),
               item.id,
             ]
           );
@@ -587,14 +585,12 @@ const updateInvoice = asyncHandler(async (req, res) => {
         [invoiceId]
       );
       await connection.query(
-        `INSERT INTO invoice_attachments (invoice_id, file_path, file_name, created_at, updated_at)
+        `INSERT INTO invoice_attachments (invoice_id, file_path, file_name)
         VALUES (?, ?, ?, ?, ?)`,
         [
           invoiceId,
           req.file.path,
-          req.file.originalname,
-          new Date(),
-          new Date(),
+          req.file.originalname
         ]
       );
     }
@@ -627,10 +623,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
       total_amount,
       balance_due,
       status,
-      created_at:
-        existingInvoice[0].created_at?.toISOString() ||
-        new Date().toISOString(),
-      updated_at: invoiceData.updated_at.toISOString(),
       items,
     };
 

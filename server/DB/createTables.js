@@ -297,12 +297,15 @@ async function createTables(db) {
             total_amount DECIMAL(15,2) DEFAULT 0.00,
             status ENUM('open', 'closed') DEFAULT 'open',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            bill_id INT,
             KEY company_id (company_id),
             KEY vendor_id (vendor_id),
             KEY customer_id (customer_id),
+            KEY bill_id (bill_id),
             CONSTRAINT orders_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE,
             CONSTRAINT orders_ibfk_2 FOREIGN KEY (vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
-            CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL
+            CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL,
+            CONSTRAINT orders_ibfk_4 FOREIGN KEY (bill_id) REFERENCES bills (id) ON DELETE SET NULL
         )`,
         `CREATE TABLE IF NOT EXISTS order_items (
             id INT AUTO_INCREMENT PRIMARY KEY,

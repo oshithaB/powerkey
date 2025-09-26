@@ -30,8 +30,22 @@ const createBill = async (req, res) => {
     if (!bill_date) {
       throw new Error('Bill date is required');
     }
+    if (!due_date) {
+      throw new Error('Due date is required - please reselect the vendor name');
+    }
     if (!items || items.length === 0) {
       throw new Error('Items are required');
+    }
+
+    // Check if order_id is provided and already has a bill
+    if (order_id) {
+      const [orderCheck] = await conn.execute(
+        'SELECT bill_id FROM orders WHERE id = ? AND company_id = ?',
+        [order_id, company_id]
+      );
+      if (orderCheck.length > 0 && orderCheck[0].bill_id !== null) {
+        throw new Error('This order has already been converted to a bill');
+      }
     }
 
     // Recalculate total_price for each item using the correct field names from frontend
@@ -81,6 +95,14 @@ const createBill = async (req, res) => {
     );
 
     const billId = result.insertId;
+
+    // Update the orders table with the bill_id if order_id is provided
+    if (order_id) {
+      await conn.execute(
+        'UPDATE orders SET bill_id = ? WHERE id = ? AND company_id = ?',
+        [billId, order_id, company_id]
+      );
+    }
 
     // Insert bill items
     for (const item of recalculatedItems) {
@@ -339,10 +361,6 @@ const recordPayment = async (req, res) => {
 
   if (!payment_method) {
     return res.status(400).json({ error: "Payment method is required" });
-  }
-
-  if (!deposit_to) {
-    return res.status(400).json({ error: "Deposit to is required" });
   }
 
   if (!bill_payments || !Array.isArray(bill_payments) || bill_payments.length === 0) {

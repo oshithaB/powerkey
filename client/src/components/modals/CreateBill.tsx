@@ -1091,8 +1091,7 @@ export default function BillModal({ expense, onSave }: BillModalProps) {
                 <input
                   type="text"
                   className="input"
-                  value={formData.vendor_name || ''}
-                  disabled={!!formData.order_id}
+                  value={formData.vendor_name || !!formData.vendor_id ? formData.vendor_name : ''}
                   onChange={(e) => {
                     setFormData({ ...formData, vendor_name: e.target.value });
                     setActiveVendorSuggestion(true);

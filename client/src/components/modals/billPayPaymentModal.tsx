@@ -272,21 +272,6 @@ const BillReceivePaymentModal: React.FC = () => {
     }
   };
 
-  const handleCreateDepositPurpose = async (name: string) => {
-    try {
-      const response = await axiosInstance.post('/api/createDepositPurposes', {
-        name,
-      });
-      const { name: newPurpose } = response.data;
-      setPayment((prev) => ({ ...prev, deposit_to: newPurpose }));
-      setIsCreateDepositModalOpen(false);
-      alert('Deposit purpose created successfully.');
-    } catch (error) {
-      console.error('Error creating deposit purpose:', error);
-      alert('Failed to create deposit purpose.');
-    }
-  };
-
   const formatAmount = (amount: number | string | null | undefined): string => {
     if (amount === '' || amount == null || isNaN(Number(amount))) {
       return '0';
@@ -305,10 +290,6 @@ const BillReceivePaymentModal: React.FC = () => {
     }
     if (!payment.payment_method) {
       alert('Please select a payment method.');
-      return;
-    }
-    if (!payment.deposit_to) {
-      alert('Please select a deposit purpose.');
       return;
     }
   

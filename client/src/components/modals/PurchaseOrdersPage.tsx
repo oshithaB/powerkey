@@ -96,6 +96,7 @@ export default function PurchaseOrdersPage() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [vendorSuggestions, setVendorSuggestions] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<any[]>([]); // New state for filtered products
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   
@@ -144,21 +145,33 @@ export default function PurchaseOrdersPage() {
     }
   }, [vendorFilter, vendors]);
 
+  // New useEffect to filter products based on selected vendor
+  useEffect(() => {
+    if (order.vendor_id && products.length > 0) {
+      const vendorProducts = products.filter(product => 
+        product.preferred_vendor_id === order.vendor_id
+      );
+      setFilteredProducts(vendorProducts);
+    } else {
+      setFilteredProducts(products);
+    }
+  }, [order.vendor_id, products]);
+
   useEffect(() => {
     if (activeSuggestionIndex !== null) {
       const activeItem = orderItems[activeSuggestionIndex];
       if (activeItem?.name) {
-        const filteredSuggestions = products.filter(product =>
+        const filteredSuggestions = filteredProducts.filter(product =>
           product.name.toLowerCase().includes(activeItem.name.toLowerCase())
         );
         setProductSuggestions(filteredSuggestions);
       } else {
-        setProductSuggestions(products);
+        setProductSuggestions(filteredProducts);
       }
     } else {
       setProductSuggestions([]);
     }
-  }, [orderItems, products, activeSuggestionIndex]);
+  }, [orderItems, filteredProducts, activeSuggestionIndex]);
 
   useEffect(() => {
     if (!vendorFormData.as_of_date) {
@@ -219,7 +232,8 @@ export default function PurchaseOrdersPage() {
       setOrder((prev) => ({
         ...prev,
         vendor_id: value === '' ? null : Number(value),
-        mailling_address: selectedVendor ? selectedVendor.address : '',
+        mailling_address: selectedVendor ? selectedVendor.address || '' : '',
+        email: selectedVendor ? selectedVendor.email || '' : '', // Auto-populate email
       }));
     } else {
       setOrder((prev) => ({
@@ -237,7 +251,8 @@ export default function PurchaseOrdersPage() {
       setOrder(prev => ({
         ...prev,
         vendor_id: null,
-        mailling_address: ''
+        mailling_address: '',
+        email: '' // Clear email when vendor is cleared
       }));
     }
   };
@@ -252,6 +267,7 @@ export default function PurchaseOrdersPage() {
         ...prev,
         vendor_id: vendor.vendor_id,
         mailling_address: vendor.address || '',
+        email: vendor.email || '', // Auto-populate email
       }));
     }
     setVendorSuggestions([]);
@@ -313,6 +329,7 @@ export default function PurchaseOrdersPage() {
         ...prev,
         vendor_id: newVendor.vendor_id || newVendor.id,
         mailling_address: vendorFormData.address,
+        email: vendorFormData.email, // Auto-populate email for new vendor
       }));
       
       setShowVendorModal(false);
@@ -340,7 +357,8 @@ export default function PurchaseOrdersPage() {
       isEditing: true,
     };
     setOrderItems([...orderItems, newItem]);
-    setProductSuggestions(products);
+    // Use filtered products instead of all products
+    setProductSuggestions(filteredProducts);
   };
 
   const updateItem = (id: number | string, field: keyof OrderItem, value: any) => {
@@ -349,7 +367,8 @@ export default function PurchaseOrdersPage() {
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
     if (field === 'product_id' && value) {
-      const product = products.find(p => p.id === parseInt(value));
+      // Use filteredProducts instead of products
+      const product = filteredProducts.find(p => p.id === parseInt(value));
       if (product) {
         updatedItems[index].name = product.name;
         updatedItems[index].sku = product.sku || '';
@@ -419,7 +438,7 @@ export default function PurchaseOrdersPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Order Number</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order Number</label>
                 <input
                   type="text"
                   name="order_no"
@@ -429,7 +448,7 @@ export default function PurchaseOrdersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Order Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order Date</label>
                 <input
                   type="date"
                   name="order_date"
@@ -459,10 +478,12 @@ export default function PurchaseOrdersPage() {
                           ...order,
                           vendor_id: e.target.value === '' ? null : Number(e.target.value),
                           mailling_address: selectedVendor ? selectedVendor.address || '' : '',
+                          email: selectedVendor ? selectedVendor.email || '' : '', // Auto-populate email
                         });
                         setVendorFilter(selectedVendor ? selectedVendor.name : '');
                       }
                     }}
+                    required
                   >
                     <option value="" disabled>Select Vendor</option>
                     <option value="add_new_vendor">Add New Vendor</option>
@@ -475,7 +496,7 @@ export default function PurchaseOrdersPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Mailing Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mailing Address</label>
                 <input
                   type="text"
                   name="mailling_address"
@@ -486,7 +507,7 @@ export default function PurchaseOrdersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
                   name="email"
@@ -499,7 +520,7 @@ export default function PurchaseOrdersPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <select
                   name="category"
                   value={order.category || ''}
@@ -511,7 +532,7 @@ export default function PurchaseOrdersPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Class</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
                 <select
                   name="class"
                   value={order.class || ''}
@@ -528,20 +549,8 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* <div>
-                <label className="block text-sm font-medium text-gray-700">Purchase Order Status</label>
-                <select
-                  name="status"
-                  value={order.status}
-                  onChange={handleOrderChange}
-                  className="input"
-                >
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div> */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">Ship Via</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ship Via</label>
                 <input
                   type="text"
                   name="ship_via"
@@ -553,6 +562,22 @@ export default function PurchaseOrdersPage() {
               </div>
             </div>
 
+            {/* Display message if no vendor is selected */}
+            {!order.vendor_id && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Vendor Selection Required
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>Please select a vendor to see available products for this purchase order.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-md font-medium text-gray-900">Order Items</h4>
@@ -560,6 +585,7 @@ export default function PurchaseOrdersPage() {
                   type="button"
                   onClick={addItem}
                   className="btn btn-primary btn-sm"
+                  disabled={!order.vendor_id} // Disable if no vendor selected
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
@@ -609,10 +635,10 @@ export default function PurchaseOrdersPage() {
                                   }}
                                   onFocus={() => {
                                     setActiveSuggestionIndex(index);
-                                    const filtered = products.filter(product =>
+                                    const filtered = filteredProducts.filter(product =>
                                       product.name.toLowerCase().includes(item.name?.toLowerCase() || '')
                                     );
-                                    setProductSuggestions(filtered.length > 0 ? filtered : products);
+                                    setProductSuggestions(filtered.length > 0 ? filtered : filteredProducts);
                                   }}
                                   onBlur={() => {
                                     setTimeout(() => {
@@ -649,6 +675,11 @@ export default function PurchaseOrdersPage() {
                                       </li>
                                     ))}
                                   </ul>
+                                )}
+                                {activeSuggestionIndex === index && productSuggestions.length === 0 && order.vendor_id && (
+                                  <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 p-4 text-center text-gray-500">
+                                    No products found for this vendor
+                                  </div>
                                 )}
                               </>
                             ) : (
@@ -1084,7 +1115,7 @@ export default function PurchaseOrdersPage() {
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })}
+                    onClick={() => setShowVendorModal(false)}
                     className="btn btn-secondary btn-md"
                   >
                     Cancel

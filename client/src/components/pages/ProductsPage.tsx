@@ -763,6 +763,7 @@ export default function ProductsPage() {
                             setVendorFilter(selectedVendor ? selectedVendor.name : '');
                           }
                         }}
+                        required
                       >
                         <option value="" disabled>Select Vendor</option>
                         <option value="add_new_vendor">Add New Vendor</option>

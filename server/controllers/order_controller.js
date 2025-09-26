@@ -211,15 +211,7 @@ const updateOrder = async (req, res) => {
         );
 
         // Handle vendor balance updates
-        // Step 1: Reverse the effect of the previous status if there was a previous vendor
-        if (previousVendorId && previousStatus === 'open') {
-            await connection.execute(
-                `UPDATE vendor SET balance = balance - ? WHERE vendor_id = ? AND company_id = ?`,
-                [previousTotalAmount, previousVendorId, companyId]
-            );
-        }
-
-        // Step 2: Apply the new status effect if there is a vendor
+        // Apply the new status effect if there is a vendor
         if (vendor_id && status === 'open') {
             await connection.execute(
                 `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,

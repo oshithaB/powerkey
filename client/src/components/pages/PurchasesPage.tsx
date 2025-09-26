@@ -91,20 +91,6 @@ export default function PurchasesPage() {
               </div>
             </div>
           </div>
-
-          {/* <div className="card">
-            <div className="card-content p-6">
-              <div className="flex items-center">
-                <div className="bg-pink-100 p-3 rounded-lg">
-                  <TrendingDown className="h-6 w-6 text-pink-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Avg Cost</p>
-                  <p className="text-2xl font-bold text-gray-900">${stats.avgCost}</p>
-                </div>
-              </div>
-            </div>
-          </div> */}
         </div>
 
         <OrdersPage />

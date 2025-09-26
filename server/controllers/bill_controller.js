@@ -30,6 +30,9 @@ const createBill = async (req, res) => {
     if (!bill_date) {
       throw new Error('Bill date is required');
     }
+    if(!due_date) {
+      throw new Error('Due date is required - please reselect the vendor name');
+    }
     if (!items || items.length === 0) {
       throw new Error('Items are required');
     }
@@ -339,10 +342,6 @@ const recordPayment = async (req, res) => {
 
   if (!payment_method) {
     return res.status(400).json({ error: "Payment method is required" });
-  }
-
-  if (!deposit_to) {
-    return res.status(400).json({ error: "Deposit to is required" });
   }
 
   if (!bill_payments || !Array.isArray(bill_payments) || bill_payments.length === 0) {

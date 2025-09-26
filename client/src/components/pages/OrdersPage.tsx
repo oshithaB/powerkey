@@ -18,6 +18,7 @@ interface Order {
   status: string;
   company_id: number;
   created_at: string;
+  bill_id: number | null;
 }
 
 interface OrderItem {
@@ -55,14 +56,15 @@ export default function OrdersPage() {
             const parsedOrders = response.data.map((order: Order) => ({
                 ...order,
                 total_amount: order.total_amount != null ? parseFloat(order.total_amount.toString()) : null,
-            }));
-            setOrders(parsedOrders);
+                bill_id: order.bill_id || null,
+          }));
+        setOrders(parsedOrders);
         } catch (error) {
-            console.error('Error fetching orders:', error);
+          console.error('Error fetching orders:', error);
         } finally {
-            setLoading(false);
+          setLoading(false);
         }
-    };
+      };
 
     const fetchOrderItems = async () => {
         try {
@@ -159,58 +161,59 @@ export default function OrdersPage() {
                             {filteredOrders.map((order) => (
                                 <tr key={order.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {order.supplier || '-'}
-                                        </div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {order.supplier || '-'}
+                                    </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.order_no || '-'}
+                                    {order.order_no || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.order_date || '-'}
+                                    {order.order_date || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.category || '-'}
+                                    {order.category || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.employee_name || '-'}
+                                    {order.employee_name || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.mailling_address || '-'}
+                                    {order.mailling_address || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.total_amount != null && !isNaN(Number(order.total_amount)) ? `Rs. ${Number(order.total_amount).toFixed(2)}` : '-'}
+                                    {order.total_amount != null && !isNaN(Number(order.total_amount)) ? `Rs. ${Number(order.total_amount).toFixed(2)}` : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {order.status || '-'}
+                                    {order.status || '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex space-x-2">
-                                            <button
-                                                onClick={() => navigate(`/purchase-orders/edit/${order.id}`)}
-                                                className="text-primary-600 hover:text-primary-900"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </button>
-                                            {order.status === 'closed' && (
-                                                <button
-                                                    onClick={() => handleConvertToBill(order)}
-                                                    className="text-green-600 hover:text-green-900"
-                                                    title="Convert to Bill"
-                                                >
-                                                    <FileText className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleDelete(order.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
+                                    <div className="flex space-x-2">
+                                        <button
+                                        onClick={() => navigate(`/purchase-orders/edit/${order.id}`)}
+                                        className="text-primary-600 hover:text-primary-900"
+                                        >
+                                        <Edit className="h-4 w-4" />
+                                        </button>
+                                        {order.status === 'closed' && (
+                                        <button
+                                            onClick={() => handleConvertToBill(order)}
+                                            className={`text-green-600 hover:text-green-900 ${order.bill_id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            title={order.bill_id ? 'Already converted to a bill' : 'Convert to Bill'}
+                                            disabled={!!order.bill_id}
+                                        >
+                                            <FileText className="h-4 w-4" />
+                                        </button>
+                                        )}
+                                        <button
+                                        onClick={() => handleDelete(order.id)}
+                                        className="text-red-600 hover:text-red-900"
+                                        >
+                                        <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                     </td>
                                 </tr>
-                            ))}
+                                ))}
                         </tbody>
                     </table>
                 </div>

@@ -97,6 +97,7 @@ const getSalesReportByEmployeeId = async (req, res) => {
                 i.company_id,
                 i.total_amount,
                 i.status,
+                i.paid_amount,
                 i.discount_amount,
                 co.name AS company_name,
                 c.name AS customer_name
@@ -137,6 +138,7 @@ const getSalesReportByEmployeeId = async (req, res) => {
                 companyName: invoice.company_name,
                 invoiceNumber: invoice.invoice_number,
                 invoiceDate: invoice.invoice_date,
+                paidAmount: parseFloat(invoice.paid_amount).toFixed(2),
                 discountAmount: parseFloat(invoice.discount_amount).toFixed(2),
                 totalAmount: parseFloat(invoice.total_amount).toFixed(2),
                 status: invoice.status,

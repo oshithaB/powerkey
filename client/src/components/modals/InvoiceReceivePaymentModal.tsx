@@ -60,7 +60,7 @@ interface Payment {
   payment_amount: number;
   payment_date: string;
   payment_method: string;
-  deposit_to: string;
+  deposit_to: string | number | null;
   notes?: string | undefined;
   [key: number]: number | string;
 }
@@ -141,13 +141,12 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
-  const [depositPurposesLoading, setDepositPurposesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<Payment>({
     payment_amount: 0,
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: '',
-    deposit_to: '',
+    deposit_to: null,
     notes: '',
   });
   const [selectedInvoices, setSelectedInvoices] = useState<number[]>([]);
@@ -155,7 +154,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
   const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
   const [isCreateDepositModalOpen, setIsCreateDepositModalOpen] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  const [depositPurposes, setDepositPurposes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -209,27 +207,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       }
     };
 
-    const fetchDepositPurposes = async () => {
-      if (!selectedCompany?.company_id) return;
-      setDepositPurposesLoading(true);
-      try {
-        const response = await axiosInstance.get('/api/getDepositPurposes');
-        const purposes = response.data.map((purpose: { name: string }) => purpose.name);
-        setDepositPurposes(purposes);
-        if (purposes.length > 0 && !payment.deposit_to) {
-          setPayment((prev) => ({ ...prev, deposit_to: purposes[0] }));
-        }
-      } catch (error) {
-        console.error('Error fetching deposit purposes:', error);
-        setDepositPurposes([]);
-        alert('Failed to fetch deposit purposes.');
-      } finally {
-        setDepositPurposesLoading(false);
-      }
-    };
-
     fetchPaymentMethods();
-    fetchDepositPurposes();
   }, [selectedCompany]);
 
   const handleSelectAll = () => {
@@ -313,22 +291,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   };
 
-  const handleCreateDepositPurpose = async (name: string) => {
-    try {
-      const response = await axiosInstance.post('/api/createDepositPurposes', {
-        name,
-      });
-      const { name: newPurpose } = response.data;
-      setDepositPurposes((prev) => [...prev, newPurpose]);
-      setPayment((prev) => ({ ...prev, deposit_to: newPurpose }));
-      setIsCreateDepositModalOpen(false);
-      alert('Deposit purpose created successfully.');
-    } catch (error) {
-      console.error('Error creating deposit purpose:', error);
-      alert('Failed to create deposit purpose.');
-    }
-  };
-
   const formatAmount = (amount: number | string | null | undefined): string => {
     if (amount === '' || amount == null || isNaN(Number(amount))) {
       return '0';
@@ -349,10 +311,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       alert('Please select a payment method.');
       return;
     }
-    if (!payment.deposit_to) {
-      alert('Please select a deposit purpose.');
-      return;
-    }
   
     const invoicePayments = invoices
       .filter((invoice) => selectedInvoices.includes(invoice.id) && Number(payment[invoice.id]) > 0)
@@ -365,14 +323,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
       alert('please select the invoices to pay.');
       return;
     }
-  
-    // const creditLimit = Number(state?.invoice?.customer_credit_limit) || 0;
-    // const payingAmount = Number(payment.payment_amount) || 0;
-  
-    // if (payingAmount > creditLimit) {
-    //   alert('The payment amount exceeds the customer\'s credit limit.');
-    //   return;
-    // }
   
     try {
       await axiosInstance.post(
@@ -395,7 +345,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
     }
   };
 
-  if (loading || paymentMethodsLoading || depositPurposesLoading) {
+  if (loading || paymentMethodsLoading) {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -627,30 +577,15 @@ const InvoiceReceivePaymentModal: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Deposit To</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                <input 
+                  className='flex items-center border rounded px-3 py-2 w-full'
+                  placeholder='Enter Reference'
+                  type="text"
                   name="deposit_to"
-                  value={payment.deposit_to}
-                  onChange={(e) => {
-                    if (e.target.value === 'create_new') {
-                      setIsCreateDepositModalOpen(true);
-                    } else {
-                      handlePaymentChange(e);
-                    }
-                  }}
-                  className="input w-full"
-                  disabled={depositPurposesLoading}
-                >
-                  <option value="" disabled>
-                    Select Deposit Purpose
-                  </option>
-                  <option value="create_new">Create New</option>
-                  {depositPurposes.map((purpose) => (
-                    <option key={purpose} value={purpose}>
-                      {purpose.replace('', ' ').charAt(0).toUpperCase() + purpose.replace('', ' ').slice(1)}
-                    </option>
-                  ))}
-                </select>
+                  value={payment.deposit_to || ''}
+                  onChange={handlePaymentChange}
+                />
               </div>
             </div>
             <div>
@@ -668,7 +603,7 @@ const InvoiceReceivePaymentModal: React.FC = () => {
               <button type="button" onClick={() => navigate("/dashboard/sales", { state: { activeTab: 'invoices' } })} className="btn btn-secondary btn-md">
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading || depositPurposesLoading}>
+              <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading}>
                 Save Payment
               </button>
             </div>
@@ -681,15 +616,6 @@ const InvoiceReceivePaymentModal: React.FC = () => {
             existingMethods={paymentMethods}
             title="Create New Payment Method"
             label="Payment Method"
-          />
-          
-          <CreateModal
-            isOpen={isCreateDepositModalOpen}
-            onClose={() => setIsCreateDepositModalOpen(false)}
-            onCreate={handleCreateDepositPurpose}
-            existingMethods={depositPurposes}
-            title="Create New Deposit Purpose"
-            label="Deposit Purpose"
           />
         </div>
       </div>

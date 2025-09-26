@@ -426,7 +426,7 @@ const BillsAndAppliedPayments: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Deposit To
+                          References
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -455,7 +455,7 @@ const BillsAndAppliedPayments: React.FC = () => {
                                 {bill.payment_method}
                               </td>
                               <td className="p-2 border-b">
-                                {bill.deposit_to}
+                                {bill.deposit_to || 'N/A'}
                               </td>
                               <td className="p-2 border-b text-right">
                                 {formatCurrency(bill.payment_amount)}
@@ -567,7 +567,7 @@ const BillsAndAppliedPayments: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Deposit To
+                        References
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -596,7 +596,7 @@ const BillsAndAppliedPayments: React.FC = () => {
                               {bill.payment_method}
                             </td>
                             <td className="p-2 border-b">
-                              {bill.deposit_to}
+                              {bill.deposit_to || 'N/A'}
                             </td>
                             <td className="p-2 border-b text-right">
                               {formatCurrency(bill.payment_amount)}

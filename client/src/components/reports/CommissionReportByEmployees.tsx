@@ -12,7 +12,7 @@ interface Invoice {
   companyId: string;
   companyName: string;
   invoiceNumber: string;
-  invoiceDate: string;
+  paidDate: string;
   discountAmount: string;
   totalAmount: string;
   customerId: string;
@@ -314,7 +314,7 @@ const CommissionReportByEmployees: React.FC = () => {
                           <tr key={invoice.invoiceId}>
                             <td className="p-2 border-b">{invoice.invoiceNumber}</td>
                             <td className="p-2 border-b">{invoice.companyName}</td>
-                            <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                            <td className="p-2 border-b">{formatDate(invoice.paidDate)}</td>
                             <td className="p-2 border-b">{invoice.customerName}</td>
                             <td className="p-2 border-b">{invoice.productName}</td>
                             <td className="p-2 border-b text-right">{invoice.quantity}</td>
@@ -410,7 +410,7 @@ const CommissionReportByEmployees: React.FC = () => {
                         <tr key={invoice.invoiceId}>
                           <td className="p-2 border-b">{invoice.invoiceNumber}</td>
                             <td className="p-2 border-b">{invoice.companyName}</td>
-                          <td className="p-2 border-b">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="p-2 border-b">{formatDate(invoice.paidDate)}</td>
                           <td className="p-2 border-b">{invoice.customerName}</td>
                           <td className="p-2 border-b">{invoice.productName}</td>
                           <td className="p-2 border-b text-right">{invoice.quantity}</td>

@@ -717,6 +717,7 @@ export default function ProductsPage() {
                     value={productFormData.description}
                     onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                     placeholder="Product description"
+                    required
                   />
                 </div>
 

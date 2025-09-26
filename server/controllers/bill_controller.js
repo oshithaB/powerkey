@@ -23,74 +23,93 @@ const createBill = async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // Recalculate total_price for each item if needed
+    // Validate required fields
+    if (!bill_number) {
+      throw new Error('Bill number is required');
+    }
+    if (!bill_date) {
+      throw new Error('Bill date is required');
+    }
+    if (!items || items.length === 0) {
+      throw new Error('Items are required');
+    }
+
+    // Recalculate total_price for each item using the correct field names from frontend
     const recalculatedItems = items.map(item => {
       const quantity = Number(item.quantity) || 0;
-      const unitPrice = Number(item.unit_price) || 0;
+      const costPrice = Number(item.cost_price) || 0; // Using cost_price from frontend
       const taxRate = Number(item.tax_rate) || 0;
-      const actualUnitPrice = Number((unitPrice / (1 + taxRate / 100)).toFixed(2));
-      const taxAmount = Number((actualUnitPrice * taxRate / 100).toFixed(2));
-      const totalPrice = Number((quantity * unitPrice + (quantity * taxAmount)).toFixed(2));
-      return { ...item, total_price: totalPrice };
+      
+      // Calculate actual unit price (price before tax)
+      const actualUnitPrice = Number((costPrice / (1 + taxRate / 100)).toFixed(2));
+      const taxAmount = Number((actualUnitPrice * quantity * taxRate / 100).toFixed(2));
+      const totalPrice = Number((quantity * costPrice).toFixed(2));
+      
+      return { 
+        ...item, 
+        actual_unit_price: actualUnitPrice,
+        tax_amount: taxAmount,
+        total_price: totalPrice 
+      };
     });
 
-    const calculatedTotal = recalculatedItems.reduce((sum, item) => sum + Number(item.total_price), 0).toFixed(2);
+    const calculatedTotal = Number(recalculatedItems.reduce((sum, item) => sum + Number(item.total_price || 0), 0).toFixed(2));
 
-    console.log("Inserting bill: ", {
+    console.log("Inserting bill with calculated total:", calculatedTotal);
+
+    // Ensure all parameters are properly handled (convert undefined to null)
+    const insertParams = [
       company_id,
       bill_number,
-      order_id,
-      vendor_id,
-      employee_id,
+      order_id || null,
+      vendor_id || null,
+      employee_id || null,
       bill_date,
-      due_date,
-      payment_method,
-      notes,
-      total_amount: calculatedTotal
-    });
+      due_date || null,
+      payment_method || null,
+      notes || null,
+      calculatedTotal,
+    ];
+
+    console.log("Insert parameters:", insertParams);
 
     const [result] = await conn.execute(
       `INSERT INTO bills 
         (company_id, bill_number, order_id, vendor_id, employee_id, bill_date, due_date, payment_method_id, notes, total_amount)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        company_id,
-        bill_number,
-        order_id || null,
-        vendor_id || null,
-        employee_id || null,
-        bill_date,
-        due_date,
-        payment_method,
-        notes || null,
-        calculatedTotal,
-      ]
+      insertParams
     );
 
     const billId = result.insertId;
 
+    // Insert bill items
     for (const item of recalculatedItems) {
+      const itemParams = [
+        billId,
+        item.product_id || null,
+        item.product_name || '',
+        item.description || '',
+        Number(item.quantity) || 0,
+        Number(item.cost_price) || 0, // Using cost_price as unit_price
+        Number(item.total_price) || 0,
+      ];
+
+      console.log("Inserting item with params:", itemParams);
+
       await conn.execute(
         `INSERT INTO bill_items 
           (bill_id, product_id, product_name, description, quantity, unit_price, total_price)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          billId,
-          item.product_id || null,
-          item.product_name,
-          item.description,
-          item.quantity,
-          item.unit_price,
-          item.total_price,
-        ]
+        itemParams
       );
     }
+    
     await conn.commit();
     res.status(201).json({ message: "Bill created successfully", billId });
   } catch (error) {
     await conn.rollback();
     console.error("Error creating bill:", error);
-    res.status(500).json({ error: "Failed to create bill" });
+    res.status(500).json({ error: error.message || "Failed to create bill" });
   } finally {
     conn.release();
   }
@@ -107,7 +126,7 @@ const getAllBills = async (req, res) => {
             o.order_no AS order_number,
             emp.name AS employee_name
             FROM bills b
-            JOIN payment_methods pm ON b.payment_method_id = pm.id
+            LEFT JOIN payment_methods pm ON b.payment_method_id = pm.id
             LEFT JOIN vendor v ON b.vendor_id = v.vendor_id
             LEFT JOIN orders o ON b.order_id = o.id
             LEFT JOIN employees emp ON b.employee_id = emp.id
@@ -121,7 +140,6 @@ const getAllBills = async (req, res) => {
             ...bill,
             bill_date: bill.bill_date ? bill.bill_date : null,
             due_date: bill.due_date ? bill.due_date : null,
-            // Keep created_at as full datetime for sorting/display purposes
             created_at: bill.created_at
         }));
 
@@ -183,41 +201,45 @@ const updateBill = async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // Update Bill
+    // Update Bill - ensure all undefined values are converted to null
+    const updateParams = [
+      order_id || null,
+      vendor_id || null,
+      employee_id || null,
+      due_date || null,
+      payment_method_id || null,
+      notes || null,
+      Number(total_amount) || 0,
+      bill_id,
+      company_id,
+    ];
+
     await conn.execute(
       `UPDATE bills 
        SET order_id=?, vendor_id=?, employee_id=?, due_date=?, payment_method_id=?, notes=?, total_amount=?
        WHERE id=? AND company_id=?`,
-      [
-        order_id || null,
-        vendor_id,
-        employee_id,
-        due_date,
-        payment_method_id,
-        notes,
-        total_amount,
-        bill_id,
-        company_id,
-      ]
+      updateParams
     );
 
     // Replace Items
     await conn.execute(`DELETE FROM bill_items WHERE bill_id=?`, [bill_id]);
 
     for (const item of items) {
+      const itemParams = [
+        bill_id,
+        item.product_id || null,
+        item.product_name || '',
+        item.description || '',
+        Number(item.quantity) || 0,
+        Number(item.cost_price || item.unit_price) || 0, // Handle both field names
+        Number(item.total_price) || 0,
+      ];
+
       await conn.execute(
         `INSERT INTO bill_items 
           (bill_id, product_id, product_name, description, quantity, unit_price, total_price)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          bill_id,
-          item.product_id,
-          item.product_name,
-          item.description,
-          item.quantity,
-          item.unit_price,
-          item.total_price,
-        ]
+        itemParams
       );
     }
 
@@ -260,9 +282,9 @@ const getBillsByVendor = async (req, res) => {
       for (const bill of bills) {
         const dueDate = new Date(bill.due_date);
         
-        // FIXED: Only update status to overdue if NOT proforma
+        // Only update status to overdue if NOT proforma
         if (
-          bill.status !== 'proforma' && // Added this check
+          bill.status !== 'proforma' &&
           dueDate < currentDate &&
           bill.status !== 'paid' &&
           bill.status !== 'cancelled' &&
@@ -337,24 +359,6 @@ const recordPayment = async (req, res) => {
       return res.status(400).json({ error: "Sum of bill payments does not match total payment amount" });
     }
 
-    // await connection.query(`
-    //   CREATE TABLE IF NOT EXISTS bill_payments (
-    //     id INT AUTO_INCREMENT PRIMARY KEY,
-    //     bill_id INT NOT NULL,
-    //     vendor_id INT NOT NULL,
-    //     company_id INT NOT NULL,
-    //     payment_amount DECIMAL(10,2) NOT NULL,
-    //     payment_date DATE NOT NULL,
-    //     payment_method VARCHAR(50) NOT NULL,
-    //     deposit_to VARCHAR(100) NOT NULL,
-    //     notes TEXT,
-    //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    //     FOREIGN KEY (bill_id) REFERENCES bills(id),
-    //     FOREIGN KEY (vendor_id) REFERENCES vendor(vendor_id),
-    //     FOREIGN KEY (company_id) REFERENCES company(company_id)
-    //   )
-    // `);
-
     const currentDate = new Date();
 
     for (const billPayment of bill_payments) {
@@ -382,7 +386,7 @@ const recordPayment = async (req, res) => {
       const balanceDue = totalAmount - newPaidAmount;
       let status = bill[0].status;
       
-      // FIXED: Only update status if the invoice is NOT proforma
+      // Only update status if the invoice is NOT proforma
       if (status !== 'proforma') {
         status = 'opened';
       
@@ -402,7 +406,6 @@ const recordPayment = async (req, res) => {
           status = 'overdue';
         }
       }
-      // If status is 'proforma', it remains unchanged regardless of payment status
       
       // Insert payment
       await connection.query(
@@ -419,7 +422,7 @@ const recordPayment = async (req, res) => {
         [billPaymentAmount, vendor_id, company_id]
       );
       
-      // Update bill - paid_amount and balance_due are updated, but status is preserved for proforma
+      // Update bill
       await connection.query(
         `UPDATE bills
           SET paid_amount = ?, 

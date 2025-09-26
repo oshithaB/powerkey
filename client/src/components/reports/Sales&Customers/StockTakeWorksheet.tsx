@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
 interface StockTakeData {
+  id: number;
   product_name: string;
   description: string;
   quantity_on_hand: number;
@@ -15,6 +16,7 @@ interface StockTakeData {
   reorder_level: number;
   category_name: string;
   preferred_vendor: string;
+  cost_price: number;
 }
 
 const StockTakeWorksheet: React.FC = () => {
@@ -27,6 +29,8 @@ const StockTakeWorksheet: React.FC = () => {
   const [filteredData, setFilteredData] = useState<StockTakeData[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [tempManualCount, setTempManualCount] = useState<number>(0);
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,60 @@ const StockTakeWorksheet: React.FC = () => {
     }
   };
 
+  const updateManualCount = async (productId: number, newManualCount: number) => {
+    try {
+      const response = await axiosInstance.put(`/api/update-product-manual-count/${selectedCompany?.company_id}/${productId}`, {
+        manual_count: newManualCount
+      });
+  
+      if (response.status !== 200) {
+        throw new Error(`Unexpected response status: ${response.status}`);
+      }
+  
+      // Update local state
+      const updatedData = data.map(item =>
+        item.id === productId ? { ...item, manual_count: newManualCount } : item
+      );
+      setData(updatedData);
+      
+      // Apply current filters to updated data
+      applyFiltersToData(updatedData, productFilter, categoryFilter);
+    } catch (error: any) {
+      console.error('Error updating manual count:', {
+        error: error.message,
+        productId,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      alert(`Failed to update manual count for product ID ${productId}: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  const handleManualCountEdit = (item: StockTakeData) => {
+    setEditingId(item.id);
+    setTempManualCount(item.manual_count);
+  };
+
+  const handleManualCountSave = async (productId: number) => {
+    console.log('Saving manual count for productId:', productId);
+    await updateManualCount(productId, tempManualCount);
+    setEditingId(null);
+    setTempManualCount(0);
+  };
+
+  const handleManualCountCancel = () => {
+    setEditingId(null);
+    setTempManualCount(0);
+  };
+
+  const handleManualCountKeyPress = (e: React.KeyboardEvent, productId: number) => {
+    if (e.key === 'Enter') {
+      handleManualCountSave(productId);
+    } else if (e.key === 'Escape') {
+      handleManualCountCancel();
+    }
+  };
+
   useEffect(() => {
     if (selectedCompany?.company_id) {
       fetchStockTakeWorksheet();
@@ -80,7 +138,11 @@ const StockTakeWorksheet: React.FC = () => {
   };
 
   const applyFilters = (productSearch: string, categorySearch: string) => {
-    let filtered = data;
+    applyFiltersToData(data, productSearch, categorySearch);
+  };
+
+  const applyFiltersToData = (dataToFilter: StockTakeData[], productSearch: string, categorySearch: string) => {
+    let filtered = dataToFilter;
 
     if (productSearch.trim() !== '') {
       filtered = filtered.filter(item =>
@@ -176,8 +238,20 @@ const StockTakeWorksheet: React.FC = () => {
     return manualCount - systemCount;
   };
 
+  // Calculate shrinkage value (variance * cost price)
+  const getShrinkageValue = (variance: number, costPrice: number) => {
+    return variance * costPrice;
+  };
+
   // Get variance color based on difference
   const getVarianceColor = (variance: number) => {
+    if (variance === 0) return 'text-green-600';
+    if (variance > 0) return 'text-blue-600';
+    return 'text-red-600';
+  };
+
+  // Get shrinkage color based on variance
+  const getShrinkageColor = (variance: number) => {
     if (variance === 0) return 'text-green-600';
     if (variance > 0) return 'text-blue-600';
     return 'text-red-600';
@@ -354,6 +428,10 @@ const StockTakeWorksheet: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Shrinkage
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Reorder Level
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-center" 
@@ -365,6 +443,7 @@ const StockTakeWorksheet: React.FC = () => {
                     <tbody>
                       {filteredData.map((item, index) => {
                         const variance = getVariance(item.quantity_on_hand, item.manual_count);
+                        const shrinkageValue = getShrinkageValue(variance, item.cost_price);
                         const needsReordering = needsReorder(item.quantity_on_hand, item.reorder_level);
                         
                         return (
@@ -381,11 +460,45 @@ const StockTakeWorksheet: React.FC = () => {
                             <td className="p-2 border-b text-right">
                               {item.quantity_on_hand}
                             </td>
-                            <td className="p-2 border-b text-right font-medium">
-                              {item.manual_count}
+                            <td className="p-2 border-b text-right">
+                              {editingId === item.id ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    value={tempManualCount}
+                                    onChange={(e) => setTempManualCount(parseInt(e.target.value) || 0)}
+                                    onKeyDown={(e) => handleManualCountKeyPress(e, item.id)}
+                                    className="w-16 px-1 py-1 text-right border rounded focus:outline-none focus:border-blue-500"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleManualCountSave(item.id)}
+                                    className="text-green-600 hover:text-green-800 text-xs"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={handleManualCountCancel}
+                                    className="text-red-600 hover:text-red-800 text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <span
+                                  className="cursor-pointer font-medium hover:bg-gray-100 px-2 py-1 rounded"
+                                  onClick={() => handleManualCountEdit(item)}
+                                  title="Click to edit"
+                                >
+                                  {item.manual_count}
+                                </span>
+                              )}
                             </td>
                             <td className={`p-2 border-b text-right font-bold ${getVarianceColor(variance)}`}>
                               {variance > 0 ? '+' : ''}{variance}
+                            </td>
+                            <td className={`p-2 border-b text-right font-bold ${getShrinkageColor(variance)}`}>
+                              {shrinkageValue > 0 ? '+' : ''}{shrinkageValue.toFixed(2)}
                             </td>
                             <td className="p-2 border-b text-right">
                               {item.reorder_level}
@@ -415,11 +528,15 @@ const StockTakeWorksheet: React.FC = () => {
                       </div>
                       <div className="flex items-center">
                         <span className="text-red-600 font-bold mr-2">-</span>
-                        <span>Negative variance (shortage)</span>
+                        <span>Negative variance/shrinkage (shortage)</span>
                       </div>
                       <div className="flex items-center">
                         <span className="text-blue-600 font-bold mr-2">+</span>
-                        <span>Positive variance (overage)</span>
+                        <span>Positive variance/shrinkage (overage)</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="mr-2">💡</span>
+                        <span>Click manual count to edit</span>
                       </div>
                     </div>
                   </div>
@@ -484,10 +601,6 @@ const StockTakeWorksheet: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Category
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Vendor
-                      </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         System Count
@@ -502,6 +615,10 @@ const StockTakeWorksheet: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                        Shrinkage
+                      </th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
+                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Reorder Level
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-center" 
@@ -513,6 +630,7 @@ const StockTakeWorksheet: React.FC = () => {
                   <tbody>
                     {filteredData.map((item, index) => {
                       const variance = getVariance(item.quantity_on_hand, item.manual_count);
+                      const shrinkageValue = getShrinkageValue(variance, item.cost_price);
                       const needsReordering = needsReorder(item.quantity_on_hand, item.reorder_level);
                       
                       return (
@@ -523,9 +641,6 @@ const StockTakeWorksheet: React.FC = () => {
                           <td className="p-2 border-b">
                             {item.category_name || 'N/A'}
                           </td>
-                          <td className="p-2 border-b">
-                            {item.preferred_vendor || 'N/A'}
-                          </td>
                           <td className="p-2 border-b text-right">
                             {item.quantity_on_hand}
                           </td>
@@ -534,6 +649,9 @@ const StockTakeWorksheet: React.FC = () => {
                           </td>
                           <td className="p-2 border-b text-right font-bold">
                             {variance > 0 ? '+' : ''}{variance}
+                          </td>
+                          <td className="p-2 border-b text-right font-bold">
+                            {shrinkageValue > 0 ? '+' : ''}{shrinkageValue.toFixed(2)}
                           </td>
                           <td className="p-2 border-b text-right">
                             {item.reorder_level}

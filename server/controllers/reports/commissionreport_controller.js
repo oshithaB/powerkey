@@ -1,13 +1,20 @@
 const db = require('../../DB/db');
 
+
 const getCommissionReport = async (req, res) => {
     const { start_date, end_date } = req.query;
     try {
         let sumExpression = 'COALESCE(SUM(ii.quantity * p.commission), 0)';
         let params = [];
+        
         if (start_date && end_date) {
-            sumExpression = 'COALESCE(SUM(CASE WHEN i.invoice_date >= ? AND i.invoice_date <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
+            // Option 1: Use DATE() function to compare only the date part
+            sumExpression = 'COALESCE(SUM(CASE WHEN DATE(i.updated_at) >= ? AND DATE(i.updated_at) <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
             params = [start_date, end_date];
+            
+            // Option 2: If you want to include full day ranges, use this instead:
+            // sumExpression = 'COALESCE(SUM(CASE WHEN i.updated_at >= ? AND i.updated_at < DATE_ADD(?, INTERVAL 1 DAY) THEN ii.quantity * p.commission ELSE 0 END), 0)';
+            // params = [start_date, end_date];
         }
 
         const query = `
@@ -25,7 +32,7 @@ const getCommissionReport = async (req, res) => {
             LEFT JOIN
                 products p ON ii.product_id = p.id
             WHERE
-                e.is_active = TRUE
+                e.is_active = TRUE AND i.status = 'paid'
             GROUP BY
                 e.id, e.name, e.email
             ORDER BY
@@ -67,7 +74,8 @@ const getCommissionReportByEmployeeId = async (req, res) => {
         let sumExpression = 'COALESCE(SUM(ii.quantity * p.commission), 0)';
         let paramsTotal = [employeeId];
         if (start_date && end_date) {
-            sumExpression = 'COALESCE(SUM(CASE WHEN i.invoice_date >= ? AND i.invoice_date <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
+            // Use DATE() function to compare only the date part
+            sumExpression = 'COALESCE(SUM(CASE WHEN DATE(i.updated_at) >= ? AND DATE(i.updated_at) <= ? THEN ii.quantity * p.commission ELSE 0 END), 0)';
             paramsTotal = [start_date, end_date, employeeId];
         }
 
@@ -87,7 +95,7 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             LEFT JOIN
                 products p ON ii.product_id = p.id
             WHERE
-                e.is_active = TRUE AND e.id = ?
+                e.is_active = TRUE AND e.id = ? AND i.status = 'paid'
             GROUP BY
                 e.id, e.name, e.email
         `;
@@ -95,7 +103,8 @@ const getCommissionReportByEmployeeId = async (req, res) => {
         let whereDate = '';
         let paramsInvoices = [];
         if (start_date && end_date) {
-            whereDate = ' AND i.invoice_date >= ? AND i.invoice_date <= ?';
+            // Use DATE() function for date comparison
+            whereDate = ' AND DATE(i.updated_at) >= ? AND DATE(i.updated_at) <= ?';
             paramsInvoices = [employeeId, start_date, end_date];
         } else {
             paramsInvoices = [employeeId];
@@ -107,6 +116,7 @@ const getCommissionReportByEmployeeId = async (req, res) => {
                 i.id AS invoice_id,
                 i.invoice_number,
                 i.invoice_date,
+                i.updated_at AS paid_date,
                 i.customer_id,
                 i.company_id,
                 i.total_amount,
@@ -131,9 +141,9 @@ const getCommissionReportByEmployeeId = async (req, res) => {
             LEFT JOIN
                 company co ON i.company_id = co.company_id
             WHERE
-                e.is_active = TRUE AND e.id = ?${whereDate}
+                e.is_active = TRUE AND e.id = ?${whereDate} AND i.status = 'paid'
             ORDER BY
-                i.invoice_date DESC
+                i.updated_at DESC
         `;
 
         // Execute the queries
@@ -159,6 +169,7 @@ const getCommissionReportByEmployeeId = async (req, res) => {
                 companyName: invoice.company_name,
                 invoiceNumber: invoice.invoice_number,
                 invoiceDate: invoice.invoice_date,
+                paidDate: invoice.paid_date,
                 discountAmount: parseFloat(invoice.discount_amount || 0).toFixed(2),
                 totalAmount: parseFloat(invoice.total_amount).toFixed(2),
                 customerId: invoice.customer_id,

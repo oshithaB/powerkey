@@ -122,7 +122,6 @@ const BillReceivePaymentModal: React.FC = () => {
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
     const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
-    const [depositPurposesLoading, setDepositPurposesLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [payment, setPayment] = useState<Payment>({
         payment_amount: 0,
@@ -136,7 +135,6 @@ const BillReceivePaymentModal: React.FC = () => {
     const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
     const [isCreateDepositModalOpen, setIsCreateDepositModalOpen] = useState(false);
     const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-    const [depositPurposes, setDepositPurposes] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -190,27 +188,7 @@ const BillReceivePaymentModal: React.FC = () => {
             }
         };
 
-        const fetchDepositPurposes = async () => {
-            if (!selectedCompany?.company_id) return;
-            setDepositPurposesLoading(true);
-            try {
-                const response = await axiosInstance.get('/api/getDepositPurposes');
-                const purposes = response.data.map((purpose: { name: string }) => purpose.name);
-                setDepositPurposes(purposes);
-                if (purposes.length > 0 && !payment.deposit_to) {
-                    setPayment((prev) => ({ ...prev, deposit_to: purposes[0] }));
-                }
-            } catch (error) {
-                console.error('Error fetching deposit purposes:', error);
-                setDepositPurposes([]);
-                alert('Failed to fetch deposit purposes.');
-            } finally {
-                setDepositPurposesLoading(false);
-            }
-        };
-
         fetchPaymentMethods();
-        fetchDepositPurposes();
     }, [selectedCompany]);
 
   const handleSelectAll = () => {
@@ -300,7 +278,6 @@ const BillReceivePaymentModal: React.FC = () => {
         name,
       });
       const { name: newPurpose } = response.data;
-      setDepositPurposes((prev) => [...prev, newPurpose]);
       setPayment((prev) => ({ ...prev, deposit_to: newPurpose }));
       setIsCreateDepositModalOpen(false);
       alert('Deposit purpose created successfully.');
@@ -376,7 +353,7 @@ const BillReceivePaymentModal: React.FC = () => {
     }
   };
 
-  if (loading || paymentMethodsLoading || depositPurposesLoading) {
+  if (loading || paymentMethodsLoading) {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -602,30 +579,15 @@ const BillReceivePaymentModal: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Deposit To</label>
-                <select
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                <input 
+                  className='flex items-center border rounded px-3 py-2 w-full'
+                  placeholder='Enter Reference'
+                  type="text"
                   name="deposit_to"
-                  value={payment.deposit_to}
-                  onChange={(e) => {
-                    if (e.target.value === 'create_new') {
-                      setIsCreateDepositModalOpen(true);
-                    } else {
-                      handlePaymentChange(e);
-                    }
-                  }}
-                  className="input w-full"
-                  disabled={depositPurposesLoading}
-                >
-                  <option value="" disabled>
-                    Select Deposit Purpose
-                  </option>
-                  <option value="create_new">Create New</option>
-                  {depositPurposes.map((purpose) => (
-                    <option key={purpose} value={purpose}>
-                      {purpose.replace('', ' ').charAt(0).toUpperCase() + purpose.replace('', ' ').slice(1)}
-                    </option>
-                  ))}
-                </select>
+                  value={payment.deposit_to || ''}
+                  onChange={handlePaymentChange}
+                />
               </div>
             </div>
             <div>
@@ -643,7 +605,7 @@ const BillReceivePaymentModal: React.FC = () => {
               <button type="button" onClick={() => navigate("/dashboard/expenses", { state: { activeTab: 'bills' } })} className="btn btn-secondary btn-md">
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading || depositPurposesLoading}>
+              <button type="submit" className="btn btn-primary btn-md" disabled={paymentMethodsLoading}>
                 Save Payment
               </button>
             </div>
@@ -656,15 +618,6 @@ const BillReceivePaymentModal: React.FC = () => {
             existingMethods={paymentMethods}
             title="Create New Payment Method"
             label="Payment Method"
-          />
-
-          <CreateModal
-            isOpen={isCreateDepositModalOpen}
-            onClose={() => setIsCreateDepositModalOpen(false)}
-            onCreate={handleCreateDepositPurpose}
-            existingMethods={depositPurposes}
-            title="Create New Deposit Purpose"
-            label="Deposit Purpose"
           />
         </div>
       </div>

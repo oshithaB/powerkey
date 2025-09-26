@@ -13,6 +13,7 @@ interface Invoice {
   companyName: string;
   invoiceNumber: string;
   invoiceDate: string;
+  paidAmount: string;
   discountAmount: string;
   totalAmount: string;
   customerId: string;
@@ -301,6 +302,7 @@ const SalesReportByEmployees: React.FC = () => {
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Customer</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Status</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Discount Amount</th>
+                          <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Paid Amount</th>
                           <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Amount</th>
                         </tr>
                       </thead>
@@ -313,11 +315,12 @@ const SalesReportByEmployees: React.FC = () => {
                             <td className="p-2 border-b">{invoice.customerName}</td>
                             <td className="p-2 border-b">{invoice.status}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.discountAmount)}</td>
+                            <td className="p-2 border-b text-right">{formatCurrency(invoice.paidAmount)}</td>
                             <td className="p-2 border-b text-right">{formatCurrency(invoice.totalAmount)}</td>
                           </tr>
                         ))}
                         <tr>
-                          <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={6}>Total Sales</td>
+                          <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={7}>Total Sales</td>
                           <td className="p-2 border-t-2 border-gray-800 font-bold text-right">{formatCurrency(data.totalSalesAmount)}</td>
                         </tr>
                       </tbody>

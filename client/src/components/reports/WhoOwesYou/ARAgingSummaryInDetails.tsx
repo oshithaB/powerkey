@@ -392,7 +392,7 @@ const ARAgingSummaryInDetails: React.FC = () => {
                   {data.due_15_days.length > 0 && renderInvoiceTable(data.due_15_days, '1-15 Days')}
                   {data.due_30_days.length > 0 && renderInvoiceTable(data.due_30_days, '16-30 Days')}
                   {data.due_60_days.length > 0 && renderInvoiceTable(data.due_60_days, '31-60 Days')}
-                  {data.over_60_days.length > 0 && renderInvoiceTable(data.over_60_days, 'Over 60 Days')}
+                  {data.over_60_days.length > 0 && renderInvoiceTable(data.over_60_days, 'Overdues')}
 
                   <p className="text-sm mt-5 text-gray-600">
                     Report generated at {new Date().toLocaleString()}
@@ -448,7 +448,7 @@ const ARAgingSummaryInDetails: React.FC = () => {
                 {data.due_15_days.length > 0 && renderInvoiceTable(data.due_15_days, '1-15 Days')}
                 {data.due_30_days.length > 0 && renderInvoiceTable(data.due_30_days, '16-30 Days')}
                 {data.due_60_days.length > 0 && renderInvoiceTable(data.due_60_days, '31-60 Days')}
-                {data.over_60_days.length > 0 && renderInvoiceTable(data.over_60_days, 'Over 60 Days')}
+                {data.over_60_days.length > 0 && renderInvoiceTable(data.over_60_days, 'Overdues')}
 
                 <div className="border-t pt-2 mt-6">
                   <div className="flex justify-between items-center">

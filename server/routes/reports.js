@@ -89,6 +89,7 @@ const {
     getInventoryValuationDetail,
     getPaymentMethodList,
     getStockTakeWorksheet,
+    updateProductManualCount,
     getTimeActivitiesByCustomerDetail,
     getTransactionListByCustomer,
     getProductServiceList,
@@ -484,6 +485,13 @@ router.get(
     verifyToken,
     authorizedRoles(['admin', 'sales', 'staff']),
     getStockTakeWorksheet
+);
+
+router.put(
+    '/update-product-manual-count/:company_id/:product_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    updateProductManualCount
 );
 
 router.get(

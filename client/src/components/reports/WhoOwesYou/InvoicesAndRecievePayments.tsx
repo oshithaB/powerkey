@@ -427,7 +427,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Deposit To
+                          Reference
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -456,7 +456,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                                 {deposit.payment_method}
                               </td>
                               <td className="p-2 border-b">
-                                {deposit.deposit_to}
+                                {deposit.deposit_to || 'N/A'}
                               </td>
                               <td className="p-2 border-b text-right">
                                 {formatCurrency(deposit.payment_amount)}
@@ -568,7 +568,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Deposit To
+                        Reference
                       </th>
                       <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -597,7 +597,7 @@ const InvoicesAndRecievePayments: React.FC = () => {
                               {deposit.payment_method}
                             </td>
                             <td className="p-2 border-b">
-                              {deposit.deposit_to}
+                              {deposit.deposit_to || 'N/A'}
                             </td>
                             <td className="p-2 border-b text-right">
                               {formatCurrency(deposit.payment_amount)}

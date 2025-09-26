@@ -639,7 +639,7 @@ const getDepositDetail = async (req, res) => {
       queryParams.push(start_date, end_date);
     }
 
-    query += ` ORDER BY i.invoice_number DESC, p.payment_date DESC, p.id DESC`;
+    query += ` ORDER BY p.payment_date DESC, p.id DESC`;
 
     const [rows] = await db.query(query, queryParams);
 
@@ -807,11 +807,13 @@ const getStockTakeWorksheet = async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT 
+          p.id,
           p.name AS product_name,
           p.description,
           p.quantity_on_hand,
           p.manual_count,
           p.reorder_level,
+          p.cost_price,
           pc.name AS category_name,
           v.name AS preferred_vendor
        FROM products p
@@ -829,6 +831,48 @@ const getStockTakeWorksheet = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching stock take worksheet:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error'
+    });
+  }
+};
+
+const updateProductManualCount = async (req, res) => {
+  const { company_id } = req.params;
+  const { product_id } = req.params;
+  const { manual_count } = req.body;
+
+  if (manual_count == null || isNaN(manual_count) || manual_count < 0) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Invalid manual count value'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `UPDATE products 
+       SET manual_count = ? 
+       WHERE id = ? AND company_id = ?`,
+      [manual_count, product_id, company_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Product not found or not updated'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Manual count updated successfully'
+    });
+  }
+
+  catch (error) {
+    console.error('Error updating product manual count:', error);
     res.status(500).json({
       status: 'error',
       message: 'Internal server error'
@@ -947,6 +991,7 @@ module.exports = {
   getInventoryValuationDetail,
   getPaymentMethodList,
   getStockTakeWorksheet,
+  updateProductManualCount,
   getTimeActivitiesByCustomerDetail,
   getTransactionListByCustomer,
   getSalesByCustomerIDDetail

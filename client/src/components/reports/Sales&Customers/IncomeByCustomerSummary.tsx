@@ -382,7 +382,7 @@ const IncomeByCustomerSummary: React.FC = () => {
                       </th>
                       <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Expenses
+                        Cost
                       </th>
                       <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right" 
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>

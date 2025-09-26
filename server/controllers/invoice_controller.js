@@ -994,10 +994,6 @@ const recordPayment = async (req, res) => {
     return res.status(400).json({ error: "Payment method is required" });
   }
 
-  if (!deposit_to) {
-    return res.status(400).json({ error: "Deposit to is required" });
-  }
-
   if (!invoice_payments || !Array.isArray(invoice_payments) || invoice_payments.length === 0) {
     return res.status(400).json({ error: "Invoice payment distribution is required" });
   }
@@ -1021,7 +1017,7 @@ const recordPayment = async (req, res) => {
         payment_amount DECIMAL(10,2) NOT NULL,
         payment_date DATE NOT NULL,
         payment_method VARCHAR(50) NOT NULL,
-        deposit_to VARCHAR(100) NOT NULL,
+        deposit_to VARCHAR(100),
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (invoice_id) REFERENCES invoices(id),
@@ -1142,16 +1138,17 @@ const checkCustomerEligibility = async (req, res) => {
     const creditLimit = Number(customerRows[0].credit_limit) || 0;
     const currentBalance = Number(customerRows[0].current_balance) || 0;
       
-
+    // Check for overdue invoices that are 60+ days past due
     const [hasOverdue] = await connection.query(
       `SELECT * FROM invoices 
-       WHERE customer_id = ? AND company_id = ? AND status = 'overdue'`,
+       WHERE customer_id = ? AND company_id = ? AND status = 'overdue'
+       AND DATEDIFF(CURDATE(), due_date) >= 60`,
       [customer_id, company_id]
     );
 
     if (hasOverdue.length > 0) {
       connection.release();
-      return res.status(403).json({ eligible: false, reason: "Customer has overdue invoices" });
+      return res.status(403).json({ eligible: false, reason: "Customer has overdue invoices (60+ days past due)" });
     }
 
     let totalBalanceDue = currentBalance + invoice_total;

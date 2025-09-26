@@ -251,7 +251,7 @@ const GetExpenseBySupplierSummary: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">Expense by Supplier Summary</h1>
+                <h1 className="text-2xl font-bold mb-4">Expense Summary</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
@@ -397,33 +397,17 @@ const GetExpenseBySupplierSummary: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Payee Name
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Expenses
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Unpaid Expenses
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Paid Expenses
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Expense Amount
-                        </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          First Expense Date
-                        </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Last Expense Date
+                          Expense Date
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Expense Categories
+                        </th>
+                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                          Total Expense Amount
                         </th>
                       </tr>
                     </thead>
@@ -433,46 +417,24 @@ const GetExpenseBySupplierSummary: React.FC = () => {
                           <td className="p-2 border-b">
                             {item.payee_name || 'N/A'}
                           </td>
-                          <td className="p-2 border-b text-right">
-                            {item.total_expenses}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {item.unpaid_expenses}
-                          </td>
-                          <td className="p-2 border-b text-right">
-                            {item.paid_expenses}
-                          </td>
-                          <td className="p-2 border-b text-right font-bold">
-                            {formatCurrency(item.total_expense_amount)}
-                          </td>
-                          <td className="p-2 border-b">
-                            {formatDate(item.first_expense_date) || 'N/A'}
-                          </td>
                           <td className="p-2 border-b">
                             {formatDate(item.last_expense_date) || 'N/A'}
                           </td>
                           <td className="p-2 border-b">
                             {item.expense_categories || 'N/A'}
                           </td>
+                          <td className="p-2 border-b text-right font-bold">
+                            {formatCurrency(item.total_expense_amount)}
+                          </td>
                         </tr>
                       ))}
                       <tr>
                         <td className="p-3 border-t-2 border-gray-800 font-bold">Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_expenses')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('unpaid_expenses')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('paid_expenses')}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_expense_amount'))}
                         </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
                       </tr>
                     </tbody>
                   </table>
@@ -536,33 +498,17 @@ const GetExpenseBySupplierSummary: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             Payee Name
                         </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total Expenses
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Unpaid Expenses
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Paid Expenses
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Total Expense Amount
-                        </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            First Expense Date
-                        </th>
-                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Last Expense Date
+                            Expense Date
                         </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                             Expense Categories
+                        </th>
+                        <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
+                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                            Total Expense Amount
                         </th>
                     </tr>
                   </thead>
@@ -572,46 +518,24 @@ const GetExpenseBySupplierSummary: React.FC = () => {
                         <td className="p-2 border-b">
                           {item.payee_name || 'N/A'}
                         </td>
-                        <td className="p-2 border-b text-right">
-                          {item.total_expenses}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {item.unpaid_expenses}
-                        </td>
-                        <td className="p-2 border-b text-right">
-                          {item.paid_expenses}
-                        </td>
-                        <td className="p-2 border-b text-right font-bold">
-                          {formatCurrency(item.total_expense_amount)}
-                        </td>
-                        <td className="p-2 border-b">
-                          {formatDate(item.first_expense_date) || 'N/A'}
-                        </td>
                         <td className="p-2 border-b">
                           {formatDate(item.last_expense_date) || 'N/A'}
                         </td>
                         <td className="p-2 border-b">
                           {item.expense_categories || 'N/A'}
                         </td>
+                        <td className="p-2 border-b text-right font-bold">
+                          {formatCurrency(item.total_expense_amount)}
+                        </td>
                       </tr>
                     ))}
                     <tr>
                         <td className="p-3 border-t-2 border-gray-800 font-bold">Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_expenses')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('unpaid_expenses')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('paid_expenses')}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_expense_amount'))}
                         </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold"></td>
                     </tr>
                   </tbody>
                 </table>

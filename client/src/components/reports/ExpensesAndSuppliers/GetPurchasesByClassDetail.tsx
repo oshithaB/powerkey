@@ -417,7 +417,7 @@ const GetPurchasesByClassDetail: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Unit Price
+                          Cost Price
                         </th>
                         <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -455,13 +455,7 @@ const GetPurchasesByClassDetail: React.FC = () => {
                         </tr>
                       ))}
                       <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('quantity')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('unit_price') / (classSuggestions.length > 0 ? classSuggestions.length : 1))}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={7}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_price'))}
                         </td>
@@ -550,7 +544,7 @@ const GetPurchasesByClassDetail: React.FC = () => {
                         </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                            Unit Price
+                            Cost Price
                         </th>
                         <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right min-w-[120px]" 
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -588,13 +582,7 @@ const GetPurchasesByClassDetail: React.FC = () => {
                       </tr>
                     ))}
                     <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('quantity')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('unit_price') / (classSuggestions.length > 0 ? classSuggestions.length : 1))}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={7}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_price'))}
                         </td>

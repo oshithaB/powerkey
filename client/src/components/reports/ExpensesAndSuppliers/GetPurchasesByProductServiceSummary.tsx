@@ -434,13 +434,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                         </tr>
                       ))}
                       <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={3}>Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_quantity_purchased')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('average_unit_price') / productSuggestions.length)}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_purchase_amount'))}
                         </td>
@@ -553,13 +547,7 @@ const GetPurchasesByProductServiceSummary: React.FC = () => {
                       </tr>
                     ))}
                     <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={3}>Total</td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {getTotal('total_quantity_purchased')}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('average_unit_price') / productSuggestions.length)}
-                        </td>
+                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={5}>Total</td>
                         <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
                           {formatCurrency(getTotal('total_purchase_amount'))}
                         </td>

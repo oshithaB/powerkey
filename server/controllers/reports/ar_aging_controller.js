@@ -26,17 +26,21 @@ const getARAgingSummary = async (req, res) => {
         next30Days.setDate(currentDate.getDate() + 30);
         const next60Days = new Date(currentDate);
         next60Days.setDate(currentDate.getDate() + 60);
+        
+        // Add this line to calculate 60 days ago from current date
+        const past60Days = new Date(currentDate);
+        past60Days.setDate(currentDate.getDate() - 60);
 
         const query = `
             SELECT 
                 co.name AS company_name,
                 c.id AS customer_id,
                 c.name AS customer_name,
-                SUM(CASE WHEN i.due_date = ? THEN i.total_amount ELSE 0 END) AS due_today,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_15_days,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_30_days,
-                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.total_amount ELSE 0 END) AS due_60_days,
-                SUM(CASE WHEN i.due_date < ? OR i.due_date IS NULL THEN i.total_amount ELSE 0 END) AS over_60_days,
+                SUM(CASE WHEN i.due_date = ? THEN i.balance_due ELSE 0 END) AS due_today,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_15_days,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_30_days,
+                SUM(CASE WHEN i.due_date > ? AND i.due_date <= ? THEN i.balance_due ELSE 0 END) AS due_60_days,
+                SUM(CASE WHEN i.due_date < ? THEN i.balance_due ELSE 0 END) AS over_60_days,
                 SUM(i.balance_due) AS total_due
             FROM 
                 invoices i
@@ -45,7 +49,7 @@ const getARAgingSummary = async (req, res) => {
             LEFT JOIN 
                 company co ON i.company_id = co.company_id
             WHERE 
-                i.status != 'proforma'
+                i.status != 'proforma' AND i.status != 'paid'
                 AND i.company_id = ?
                 AND i.invoice_date >= ?
                 AND i.invoice_date <= ?
@@ -56,11 +60,11 @@ const getARAgingSummary = async (req, res) => {
         `;
 
         const params = [
-            currentDate.toISOString().split('T')[0],
-            currentDate.toISOString().split('T')[0], next15Days.toISOString().split('T')[0],
-            next15Days.toISOString().split('T')[0], next30Days.toISOString().split('T')[0],
-            next30Days.toISOString().split('T')[0], next60Days.toISOString().split('T')[0],
-            currentDate.toISOString().split('T')[0],
+            currentDate.toISOString().split('T')[0], // due_today
+            currentDate.toISOString().split('T')[0], next15Days.toISOString().split('T')[0], // due_15_days
+            next15Days.toISOString().split('T')[0], next30Days.toISOString().split('T')[0], // due_30_days
+            next30Days.toISOString().split('T')[0], next60Days.toISOString().split('T')[0], // due_60_days
+            past60Days.toISOString().split('T')[0], // over_60_days - changed this line
             company_id,
             startDate.toISOString().split('T')[0],
             currentDate.toISOString().split('T')[0]

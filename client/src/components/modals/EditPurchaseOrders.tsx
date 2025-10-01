@@ -21,6 +21,7 @@ interface Order {
   ship_via?: string;
   total_amount: number | null | string;
   status: string;
+  prev_status?: string;
   created_at: string;
 }
 
@@ -151,6 +152,7 @@ export default function EditOrdersPage() {
         ...orderData,
         order_date: orderData.order_date ? orderData.order_date.split('T')[0] : new Date().toISOString().split('T')[0],
         category: orderData.category || '',
+        prev_status: orderData.status || 'open',
       });
       if (orderData.supplier) {
         setVendorFilter(orderData.supplier);
@@ -279,20 +281,21 @@ export default function EditOrdersPage() {
         ...order,
         total_amount: calculateTotal(),
         company_id: selectedCompany?.company_id,
+        items: orderItems,
       };
 
       // Update the order
       await axiosInstance.put(`/api/orders/${selectedCompany?.company_id}/${orderId}`, orderData);
 
       // Delete existing order items and create new ones
-      await axiosInstance.delete(`/api/order-items/${selectedCompany?.company_id}/${orderId}`);
+      // await axiosInstance.delete(`/api/order-items/${selectedCompany?.company_id}/${orderId}`);
       
-      for (const item of orderItems) {
-        await axiosInstance.post(`/api/order-items/${selectedCompany?.company_id}`, {
-          ...item,
-          order_id: parseInt(orderId!),
-        });
-      }
+      // for (const item of orderItems) {
+      //   await axiosInstance.post(`/api/order-items/${selectedCompany?.company_id}`, {
+      //     ...item,
+      //     order_id: parseInt(orderId!),
+      //   });
+      // }
 
       navigate('/dashboard/purchases');
     } catch (error: any) {
@@ -334,6 +337,7 @@ export default function EditOrdersPage() {
                   name="order_no"
                   value={order.order_no}
                   className="input"
+                  disabled
                   readOnly
                 />
               </div>
@@ -345,6 +349,7 @@ export default function EditOrdersPage() {
                   value={order.order_date}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                   required
                 />
               </div>
@@ -358,6 +363,7 @@ export default function EditOrdersPage() {
                     className="input"
                     name="vendor_id"
                     value={order.vendor_id || ''}
+                    disabled={order.prev_status === 'closed'}
                     onChange={(e) => {
                       const selectedVendor = vendors.find(vendor => vendor.vendor_id === Number(e.target.value));
                       setOrder({
@@ -385,6 +391,7 @@ export default function EditOrdersPage() {
                   value={order.mailling_address || ''}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                   placeholder="Enter mailing address"
                 />
               </div>
@@ -396,6 +403,7 @@ export default function EditOrdersPage() {
                   value={order.email || ''}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                   placeholder="Enter email"
                 />
               </div>
@@ -409,6 +417,7 @@ export default function EditOrdersPage() {
                   value={order.category || ''}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                 >
                   <option value="">Select Category</option>
                   <option value="cost_of_sales">Cost of Sales</option>
@@ -421,6 +430,7 @@ export default function EditOrdersPage() {
                   value={order.class || ''}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                 >
                   <option value="">Select Employee</option>
                   {employees.map((employee) => (
@@ -440,6 +450,7 @@ export default function EditOrdersPage() {
                   value={order.status}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                 >
                   <option value="open">Open</option>
                   <option value="closed">Closed</option>
@@ -453,6 +464,7 @@ export default function EditOrdersPage() {
                   value={order.ship_via || ''}
                   onChange={handleOrderChange}
                   className="input"
+                  disabled={order.prev_status === 'closed'}
                   placeholder="Enter shipping method"
                 />
               </div>
@@ -465,6 +477,7 @@ export default function EditOrdersPage() {
                   type="button"
                   onClick={addItem}
                   className="btn btn-primary btn-sm"
+                  disabled={order.prev_status === 'closed'}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
@@ -508,6 +521,7 @@ export default function EditOrdersPage() {
                                 <input
                                   type="text"
                                   value={item.name}
+                                  disabled={order.prev_status === 'closed'}
                                   onChange={(e) => {
                                     updateItem(item.id, 'name', e.target.value);
                                     setActiveSuggestionIndex(index);
@@ -574,6 +588,7 @@ export default function EditOrdersPage() {
                                 onChange={(e) => updateItem(item.id, 'sku', e.target.value)}
                                 className="input w-full"
                                 placeholder="Product SKU"
+                                disabled={order.status === 'closed'}
                               />
                             ) : (
                               <div
@@ -591,6 +606,7 @@ export default function EditOrdersPage() {
                                 name="description"
                                 value={item.description}
                                 onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                disabled={order.status === 'closed'}
                                 className="input w-full"
                                 placeholder="Product Description"
                               />
@@ -612,6 +628,7 @@ export default function EditOrdersPage() {
                                 onChange={(e) => updateItem(item.id, 'qty', parseInt(e.target.value) || 1)}
                                 className="input w-full"
                                 min="1"
+                                disabled={order.prev_status === 'closed'}
                                 required
                               />
                             ) : (
@@ -632,6 +649,7 @@ export default function EditOrdersPage() {
                                 onChange={(e) => updateItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
                                 className="input w-full"
                                 step="0.01"
+                                disabled={order.prev_status === 'closed'}
                                 required
                               />
                             ) : (
@@ -667,6 +685,7 @@ export default function EditOrdersPage() {
                             ) : (
                               <button
                                 onClick={() => removeItem(item.id)}
+                                disabled={order.prev_status === 'closed'}
                                 className="text-red-600 hover:text-red-900"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -701,6 +720,7 @@ export default function EditOrdersPage() {
               </button>
               <button
                 type="submit"
+                disabled={order.prev_status === 'closed'}
                 className="btn btn-primary btn-md"
               >
                 Update Order

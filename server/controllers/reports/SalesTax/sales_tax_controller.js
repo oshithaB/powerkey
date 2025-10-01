@@ -1,7 +1,7 @@
 const db = require('../../../DB/db');
 
-// SSCL (100%) - Tax Detail Report
-const SSCL100percentTaxDetail = async (req, res) => {
+// SSCL (50%) - Tax Detail Report
+const SSCL50percentTaxDetail = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
@@ -13,15 +13,13 @@ const SSCL100percentTaxDetail = async (req, res) => {
                 i.invoice_number,
                 i.invoice_date,
                 c.name AS customer_name,
-                ii.tax_rate AS tax_rate,
-                SUM(ii.tax_amount) AS total_tax_amount,
+                1.25 AS tax_rate,
+                i.SSCLper50 AS total_tax_amount,
                 i.total_amount,
                 'SSCL' AS tax_rate_name
             FROM invoices i
-            JOIN invoice_items ii ON i.id = ii.invoice_id
             JOIN customer c ON i.customer_id = c.id
             WHERE i.company_id = ?
-                AND (ii.tax_rate = 2.564 OR ii.tax_rate = 5.00)
                 AND i.status != 'cancelled' 
                 AND i.status != 'proforma'
         `;
@@ -35,7 +33,66 @@ const SSCL100percentTaxDetail = async (req, res) => {
             console.log('Date filter applied:', { start_date, end_date });
         }
 
-        query += ` GROUP BY i.id, i.invoice_number, i.invoice_date, c.name, ii.tax_rate, i.total_amount, 'SSCL'`;
+        query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
+
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
+        const [results] = await db.execute(query, queryParams);
+        
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: results,
+            total_records: results.length,
+            filter_applied: { start_date, end_date }
+        });
+    } catch (error) {
+        console.error('Error fetching SSCL 50% tax detail report:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+// SSCL (100%) - Tax Detail Report
+const SSCL100percentTaxDetail = async (req, res) => {
+    try {
+        const { company_id } = req.params;
+        const { start_date, end_date } = req.query;
+
+        console.log('Received params:', { company_id, start_date, end_date });
+
+        let query = `
+            SELECT
+                i.invoice_number,
+                i.invoice_date,
+                c.name AS customer_name,
+                2.5 AS tax_rate,
+                i.SSCLper100 AS total_tax_amount,
+                i.total_amount,
+                'SSCL' AS tax_rate_name
+            FROM invoices i
+            JOIN customer c ON i.customer_id = c.id
+            WHERE i.company_id = ?
+                AND i.status != 'cancelled' 
+                AND i.status != 'proforma'
+        `;
+
+        const queryParams = [company_id];
+
+        // Add date filtering if provided
+        if (start_date && end_date) {
+            query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
+            queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
+        }
+
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
         console.log('Final query:', query);
@@ -562,6 +619,7 @@ const transactionDetailByTaxCode = async (req, res) => {
 };
 
 module.exports = {
+    SSCL50percentTaxDetail,
     SSCL100percentTaxDetail,
     VAT18percentTaxDetail,
     SSCL100percentTaxException,

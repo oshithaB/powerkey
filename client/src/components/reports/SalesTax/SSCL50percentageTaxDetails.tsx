@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-interface SSCL100percentTaxDetailData {
+interface SSCL50percentTaxDetailData {
   invoice_number: string;
   invoice_date: string;
   customer_name: string;
@@ -17,14 +17,14 @@ interface SSCL100percentTaxDetailData {
   tax_rate_name: string;
 }
 
-const SSCL100percentTaxDetails: React.FC = () => {
+const SSCL50percentageTaxDetails: React.FC = () => {
   const { selectedCompany } = useCompany();
-  const [data, setData] = useState<SSCL100percentTaxDetailData[]>([]);
+  const [data, setData] = useState<SSCL50percentTaxDetailData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [customerFilter, setCustomerFilter] = useState<string>('');
-  const [filteredData, setFilteredData] = useState<SSCL100percentTaxDetailData[]>([]);
+  const [filteredData, setFilteredData] = useState<SSCL50percentTaxDetailData[]>([]);
   const [filter, setFilter] = useState<string>('year');
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
@@ -50,7 +50,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
     });
   };
 
-  const fetchSSCL100percentTaxDetail = async (startDate?: string, endDate?: string) => {
+  const fetchSSCL50percentTaxDetail = async (startDate?: string, endDate?: string) => {
     if (!selectedCompany?.company_id) {
       setError('No company selected');
       return;
@@ -59,7 +59,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axiosInstance.get(`/api/sscl-100percent-tax-detail/${selectedCompany.company_id}`, {
+      const response = await axiosInstance.get(`/api/sscl-50percent-tax-detail/${selectedCompany.company_id}`, {
         params: { start_date: startDate, end_date: endDate },
       });
       console.log('API Response:', response.data);
@@ -73,7 +73,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
         setError('Invalid data format received from server');
       }
     } catch (err) {
-      setError('Failed to fetch SSCL 100% Tax Detail data. Please try again.');
+      setError('Failed to fetch SSCL 50% Tax Detail data. Please try again.');
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -100,7 +100,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
 
       setPeriodStart(startDate || '');
       setPeriodEnd(endDate);
-      fetchSSCL100percentTaxDetail(startDate, endDate);
+      fetchSSCL50percentTaxDetail(startDate, endDate);
     }
   }, [selectedCompany?.company_id, filter, isCustomRange]);
 
@@ -113,7 +113,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
     }).format(value);
   };
 
-  const getTotal = (field: keyof SSCL100percentTaxDetailData) => {
+  const getTotal = (field: keyof SSCL50percentTaxDetailData) => {
     return filteredData.reduce((total, item) => {
       const value = Number(item[field]) || 0;
       return total + value;
@@ -194,7 +194,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
         }
       }
 
-      const filename = `sscl-100percent-tax-detail-${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `sscl-50percent-tax-detail-${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
       setShowPrintPreview(false);
     } catch (error) {
@@ -224,7 +224,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-600">Please select a company to view SSCL 100% Tax Details.</p>
+          <p className="text-gray-600">Please select a company to view SSCL 50% Tax Details.</p>
           <button
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -256,7 +256,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
-                <h1 className="text-2xl font-bold mb-4">SSCL 100% Tax Details</h1>
+                <h1 className="text-2xl font-bold mb-4">SSCL 50% Tax Details</h1>
               </div>
               <div className="flex space-x-2 items-end">
                 <div className="flex flex-col">
@@ -323,7 +323,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                           console.log('Custom date range selected:', { startDate, endDate });
                           setPeriodStart(startDate);
                           setPeriodEnd(endDate);
-                          fetchSSCL100percentTaxDetail(startDate, endDate);
+                          fetchSSCL50percentTaxDetail(startDate, endDate);
                         }
                       }}
                       disabled={!startDate || !endDate}
@@ -352,7 +352,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
 
             <div id="print-content">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm font-medium">SSCL 100% Tax Details Report</p>
+                <p className="text-sm font-medium">SSCL 50% Tax Details Report</p>
                 <p className="text-sm text-gray-600">
                   {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                   {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
@@ -376,7 +376,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
               
               {!loading && !error && filteredData.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No SSCL 100% tax data available.
+                  No SSCL 50% tax data available.
                 </div>
               )}
               
@@ -450,7 +450,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
           <div className="relative mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-hidden">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
-                Print Preview - SSCL 100% Tax Details
+                Print Preview - SSCL 50% Tax Details
               </h3>
               <button
                 onClick={() => setShowPrintPreview(false)}
@@ -465,7 +465,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
               <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2">SSCL 100% Tax Details</h1>
+                    <h1 className="text-3xl font-bold mb-2">SSCL 50% Tax Details</h1>
                     <h2 className="text-xl text-gray-600 mb-2">Tax Detail Report</h2>
                     <h2 className="text-xl text-gray-600 mb-2">
                       {selectedCompany?.name || 'Company Name'} (Pvt) Ltd.
@@ -549,7 +549,7 @@ const SSCL100percentTaxDetails: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">
-                        SSCL 100% Tax Details Report
+                        SSCL 50% Tax Details Report
                       </p>
                     </div>
                   </div>
@@ -578,4 +578,4 @@ const SSCL100percentTaxDetails: React.FC = () => {
   );
 };
 
-export default SSCL100percentTaxDetails;
+export default SSCL50percentageTaxDetails;

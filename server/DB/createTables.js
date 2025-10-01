@@ -238,6 +238,8 @@ async function createTables(db) {
             paid_amount DECIMAL(15,2) DEFAULT 0.00,
             balance_due DECIMAL(15,2) DEFAULT 0.00,
             status ENUM('opened', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'proforma') DEFAULT 'opened',
+            SSCLper50 DECIMAL(15,2) DEFAULT 0.00,
+            SSCLper100 DECIMAL(15,2) DEFAULT 0.00,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id),

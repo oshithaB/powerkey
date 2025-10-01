@@ -82,6 +82,7 @@ import GetExpenseBySupplierSummary from './components/reports/ExpensesAndSupplie
 import GetExpenseBySupplierDetail from './components/reports/ExpensesAndSuppliers/GetExpenseBySupplierDetail';
 
 // Sales Tax
+import SSCL50percentageTaxDetails from './components/reports/SalesTax/SSCL50percentageTaxDetails';
 import SSCL100percentTaxDetails from './components/reports/SalesTax/SSCL100percentTaxDetails';
 import VAT18percentTaxDetails from './components/reports/SalesTax/VAT18percentTaxDetails';
 import TransactionDetailsByTaxCode from './components/reports/SalesTax/TransactionDetailsByTaxCode';
@@ -636,6 +637,15 @@ function AppContent() {
         />
 
         {/* Sales Tax section */}
+        <Route
+          path="/reports/sscl-50-tax-detail"
+          element={
+            <ProtectedRoute>
+              <SSCL50percentageTaxDetails />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/reports/sscl-tax-detail"
           element={

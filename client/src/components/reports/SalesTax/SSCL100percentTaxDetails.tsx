@@ -405,10 +405,6 @@ const SSCL100percentTaxDetails: React.FC = () => {
                             style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                           Tax Amount
                         </th>
-                        <th className="bg-gray-100 p-3 font-semibold text-lg border section-header text-right min-w-[120px]" 
-                            style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                          Total Amount
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -429,20 +425,11 @@ const SSCL100percentTaxDetails: React.FC = () => {
                           <td className="p-2 border-b text-right font-semibold">
                             {formatCurrency(item.total_tax_amount)}
                           </td>
-                          <td className="p-2 border-b text-right">
-                            {formatCurrency(item.total_amount)}
-                          </td>
                         </tr>
                       ))}
                       <tr>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold" colSpan={4}>
-                          Total
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
+                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right" colSpan={5}>
                           {formatCurrency(getTotal('total_tax_amount'))}
-                        </td>
-                        <td className="p-3 border-t-2 border-gray-800 font-bold text-right">
-                          {formatCurrency(getTotal('total_amount'))}
                         </td>
                       </tr>
                     </tbody>
@@ -523,10 +510,6 @@ const SSCL100percentTaxDetails: React.FC = () => {
                           style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
                         Tax Amount
                       </th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" 
-                          style={{ backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                        Total Amount
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -547,20 +530,11 @@ const SSCL100percentTaxDetails: React.FC = () => {
                         <td className="p-2 border-b text-right font-semibold">
                           {formatCurrency(item.total_tax_amount)}
                         </td>
-                        <td className="p-2 border-b text-right">
-                          {formatCurrency(item.total_amount)}
-                        </td>
                       </tr>
                     ))}
                     <tr>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold" colSpan={4}>
-                        Total
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
+                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right" colSpan={5}>
                         {formatCurrency(getTotal('total_tax_amount'))}
-                      </td>
-                      <td className="p-2 border-t-2 border-gray-800 font-bold text-right">
-                        {formatCurrency(getTotal('total_amount'))}
                       </td>
                     </tr>
                   </tbody>

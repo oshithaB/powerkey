@@ -13,15 +13,13 @@ const SSCL100percentTaxDetail = async (req, res) => {
                 i.invoice_number,
                 i.invoice_date,
                 c.name AS customer_name,
-                ii.tax_rate AS tax_rate,
-                SUM(ii.tax_amount) AS total_tax_amount,
+                2.5 AS tax_rate,
+                i.SSCLper100 AS total_tax_amount,
                 i.total_amount,
                 'SSCL' AS tax_rate_name
             FROM invoices i
-            JOIN invoice_items ii ON i.id = ii.invoice_id
             JOIN customer c ON i.customer_id = c.id
             WHERE i.company_id = ?
-                AND (ii.tax_rate = 2.564 OR ii.tax_rate = 5.00)
                 AND i.status != 'cancelled' 
                 AND i.status != 'proforma'
         `;
@@ -35,7 +33,6 @@ const SSCL100percentTaxDetail = async (req, res) => {
             console.log('Date filter applied:', { start_date, end_date });
         }
 
-        query += ` GROUP BY i.id, i.invoice_number, i.invoice_date, c.name, ii.tax_rate, i.total_amount, 'SSCL'`;
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
         console.log('Final query:', query);

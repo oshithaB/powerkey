@@ -79,6 +79,9 @@ const createInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
 
+    // --- Calculate total actual price for SSCL calculations ---
+    let totalActualPrice = 0;
+
     // --- Prepare invoice data ---
     const invoiceData = {
       company_id,
@@ -143,6 +146,9 @@ const createInvoice = asyncHandler(async (req, res) => {
       const taxAmount = Number((actualUnitPrice * item.tax_rate / 100 * item.quantity).toFixed(2));
       const totalPrice = Number((subtotal).toFixed(2));
 
+      // Add to total actual price for SSCL calculation
+      totalActualPrice += actualUnitPrice * item.quantity;
+
       const itemData = [
         invoiceId,
         item.product_id,
@@ -191,6 +197,18 @@ const createInvoice = asyncHandler(async (req, res) => {
       }
     }
 
+    // --- Calculate SSCL values ---
+    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
+    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
+    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025).toFixed(2));
+
+    // --- Update invoice with SSCL values ---
+    await connection.query(
+      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
+      [SSCLper50, SSCLper100, invoiceId]
+    );
+
     // --- Handle file attachment ---
     if (req.file) {
       await connection.query(
@@ -227,6 +245,8 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount,
       shipping_cost,
       total_amount,
+      SSCLper50,
+      SSCLper100,
       status,
       created_at: invoiceData.created_at.toISOString(),
       updated_at: invoiceData.updated_at.toISOString(),
@@ -461,6 +481,9 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
+    // --- Calculate total actual price for SSCL calculations ---
+    let totalActualPrice = 0;
+
     // --- Update invoice items with inventory control ---
     const [oldRows] = await connection.query(
       "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
@@ -475,6 +498,9 @@ const updateInvoice = asyncHandler(async (req, res) => {
     const usedIds = new Set();
 
     for (const item of items) {
+      // Add to total actual price
+      totalActualPrice += Number(item.actual_unit_price) * Number(item.quantity);
+
       if (item.id && oldItems[item.id]) {
         const oldQty = oldItems[item.id].qty;
         const diff = item.quantity - oldQty;
@@ -578,6 +604,18 @@ const updateInvoice = asyncHandler(async (req, res) => {
       }
     }
 
+    // --- Calculate SSCL values ---
+    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
+    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
+    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025)).toFixed(2);
+
+    // --- Update invoice with SSCL values ---
+    await connection.query(
+      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
+      [SSCLper50, SSCLper100, invoiceId]
+    );
+
     // Handle file attachment if provided
     if (req.file) {
       await connection.query(
@@ -586,7 +624,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       );
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name)
-        VALUES (?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?)`,
         [
           invoiceId,
           req.file.path,
@@ -622,6 +660,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
       shipping_cost,
       total_amount,
       balance_due,
+      SSCLper50,
+      SSCLper100,
       status,
       items,
     };

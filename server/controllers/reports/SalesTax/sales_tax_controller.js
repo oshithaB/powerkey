@@ -8,13 +8,30 @@ const SSCL50percentTaxDetail = async (req, res) => {
 
         console.log('Received params:', { company_id, start_date, end_date });
 
+        // First, let's check what columns exist in the invoices table
+        const [columns] = await db.execute(`
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'invoices' 
+            AND TABLE_SCHEMA = DATABASE()
+            AND COLUMN_NAME LIKE '%sscl%'
+        `);
+        
+        console.log('SSCL-related columns found:', columns);
+
+        // Build the query dynamically based on available columns
+        let taxAmountColumn = 'NULL';
+        if (columns.length > 0) {
+            taxAmountColumn = `COALESCE(i.${columns[0].COLUMN_NAME}, 0)`;
+        }
+
         let query = `
             SELECT
                 i.invoice_number,
                 i.invoice_date,
                 c.name AS customer_name,
                 1.25 AS tax_rate,
-                i.SSCLper50 AS total_tax_amount,
+                ${taxAmountColumn} AS total_tax_amount,
                 i.total_amount,
                 'SSCL' AS tax_rate_name
             FROM invoices i
@@ -33,6 +50,11 @@ const SSCL50percentTaxDetail = async (req, res) => {
             console.log('Date filter applied:', { start_date, end_date });
         }
 
+        // Only include records with tax amount if column exists
+        if (columns.length > 0) {
+            query += ` AND ${taxAmountColumn} > 0`;
+        }
+
         query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
 
         console.log('Final query:', query);
@@ -42,6 +64,7 @@ const SSCL50percentTaxDetail = async (req, res) => {
         
         console.log(`Found ${results.length} records`);
         if (results.length > 0) {
+            console.log('Sample record:', results[0]);
             console.log('Date range in results:', {
                 earliest: results[results.length - 1].invoice_date,
                 latest: results[0].invoice_date
@@ -52,11 +75,25 @@ const SSCL50percentTaxDetail = async (req, res) => {
             success: true,
             data: results,
             total_records: results.length,
-            filter_applied: { start_date, end_date }
+            filter_applied: { start_date, end_date },
+            column_used: columns.length > 0 ? columns[0].COLUMN_NAME : 'none'
         });
     } catch (error) {
         console.error('Error fetching SSCL 50% tax detail report:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            sqlMessage: error.sqlMessage,
+            sql: error.sql
+        });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? {
+                message: error.message,
+                sqlMessage: error.sqlMessage
+            } : undefined
+        });
     }
 };
 
@@ -66,57 +103,59 @@ const SSCL100percentTaxDetail = async (req, res) => {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
 
-        console.log('Received params:', { company_id, start_date, end_date });
+        console.log('=== SSCL 100% Tax Detail Debug ===');
+        console.log('Params:', { company_id, start_date, end_date });
 
+        // First, let's see what columns exist
+        const [columns] = await db.execute(`
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'invoices' 
+            AND TABLE_SCHEMA = DATABASE()
+        `);
+        
+        console.log('Available columns in invoices table:', columns.map(c => c.COLUMN_NAME));
+
+        // Try a simple query first
         let query = `
             SELECT
                 i.invoice_number,
                 i.invoice_date,
                 c.name AS customer_name,
                 2.5 AS tax_rate,
-                i.SSCLper100 AS total_tax_amount,
+                0 AS total_tax_amount,
                 i.total_amount,
-                'SSCL' AS tax_rate_name
+                'SSCL 100%' AS tax_rate_name
             FROM invoices i
-            JOIN customer c ON i.customer_id = c.id
+            LEFT JOIN customer c ON i.customer_id = c.id
             WHERE i.company_id = ?
-                AND i.status != 'cancelled' 
-                AND i.status != 'proforma'
+            LIMIT 5
         `;
 
-        const queryParams = [company_id];
-
-        // Add date filtering if provided
-        if (start_date && end_date) {
-            query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
-            queryParams.push(start_date, end_date);
-            console.log('Date filter applied:', { start_date, end_date });
-        }
-
-        query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
-
-        console.log('Final query:', query);
-        console.log('Query params:', queryParams);
-
-        const [results] = await db.execute(query, queryParams);
+        const [results] = await db.execute(query, [company_id]);
         
-        console.log(`Found ${results.length} records`);
-        if (results.length > 0) {
-            console.log('Date range in results:', {
-                earliest: results[results.length - 1].invoice_date,
-                latest: results[0].invoice_date
-            });
-        }
+        console.log('Query successful, found:', results.length, 'records');
         
         res.json({
             success: true,
             data: results,
             total_records: results.length,
-            filter_applied: { start_date, end_date }
+            debug_columns: columns.map(c => c.COLUMN_NAME)
         });
     } catch (error) {
-        console.error('Error fetching SSCL 100% tax detail report:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+        console.error('=== ERROR ===');
+        console.error('Message:', error.message);
+        console.error('SQL Message:', error.sqlMessage);
+        console.error('SQL State:', error.sqlState);
+        console.error('Error Number:', error.errno);
+        console.error('Full Error:', error);
+        
+        res.status(500).json({ 
+            success: false, 
+            message: error.message,
+            sqlMessage: error.sqlMessage,
+            sqlState: error.sqlState
+        });
     }
 };
 

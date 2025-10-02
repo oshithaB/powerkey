@@ -299,7 +299,7 @@ export default function CreateCompany() {
                     value={formData.notes}
                     onChange={handleInputChange}
                     placeholder="Enter any additional notes"
-                    style={{ height: '100px' }}
+                    style={{ height: '100px', resize: 'none' }}
                   ></textarea>
                 </div>
 
@@ -313,7 +313,7 @@ export default function CreateCompany() {
                     value={formData.termsAndConditions}
                     onChange={handleInputChange}
                     placeholder="Enter terms and conditions"
-                    style={{ height: '100px' }}
+                    style={{ height: '100px', resize: 'none' }}
                   ></textarea>
                 </div>
               </div>

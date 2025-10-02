@@ -99,6 +99,17 @@ export default function OrdersPage() {
         order.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+      const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'opened':
+        return 'bg-gray-100 text-gray-800';
+      case 'closed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -137,9 +148,9 @@ export default function OrdersPage() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Order Date
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Category
-                                </th>
+                                </th> */}
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Class
                                 </th>
@@ -171,9 +182,9 @@ export default function OrdersPage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                     {order.order_date || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                     {order.category || '-'}
-                                    </td>
+                                    </td> */}
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                     {order.employee_name || '-'}
                                     </td>
@@ -183,8 +194,10 @@ export default function OrdersPage() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                     {order.total_amount != null && !isNaN(Number(order.total_amount)) ? `Rs. ${Number(order.total_amount).toFixed(2)}` : '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                    {order.status || '-'}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                                        {order.status.replace('_', ' ').charAt(0).toUpperCase() + order.status.replace('_', ' ').slice(1)}
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div className="flex space-x-2">

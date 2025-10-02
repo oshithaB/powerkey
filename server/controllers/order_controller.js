@@ -137,12 +137,12 @@ const createOrder = async (req, res) => {
         );
 
         // Update vendor balance if vendor_id exists and status is 'open'
-        if (vendor_id && (status || 'open') === 'open') {
-            await connection.execute(
-                `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,
-                [total_amount || 0, vendor_id, companyId]
-            );
-        }
+        // if (vendor_id && (status || 'open') === 'open') {
+        //     await connection.execute(
+        //         `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,
+        //         [total_amount || 0, vendor_id, companyId]
+        //     );
+        // }
 
         await connection.commit();
 
@@ -162,7 +162,7 @@ const updateOrder = async (req, res) => {
     const { companyId, orderId } = req.params;
     const {
         vendor_id, mailling_address, email, customer_id, shipping_address, order_no, order_date,
-        category, class: orderClass, location, ship_via, total_amount, status
+        category, class: orderClass, location, ship_via, total_amount, status, items
     } = req.body;
 
     const connection = await db.getConnection();
@@ -210,9 +210,41 @@ const updateOrder = async (req, res) => {
             ]
         );
 
+        await connection.execute(
+            'DELETE FROM order_items WHERE order_id = ?',
+            [orderId]
+        );
+
+        if (Array.isArray(items) && items.length > 0) {
+            const insertPromises = items.map(item => {
+                const {
+                    product_id, name, sku, description, qty, rate, amount, class: itemClass, received, closed
+                } = item;
+                return connection.execute(
+                    `INSERT INTO order_items (
+                        order_id, product_id, name, sku, description, qty, rate, amount, class, received, closed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [ 
+                        orderId,
+                        product_id || null,
+                        name,
+                        sku || null,
+                        description || null,
+                        qty,
+                        rate,
+                        amount || 0,
+                        itemClass || null,
+                        received || false,
+                        closed || false
+                    ]
+                );
+            });
+            await Promise.all(insertPromises);
+        }
+
         // Handle vendor balance updates
         // Apply the new status effect if there is a vendor
-        if (vendor_id && status === 'open') {
+        if (vendor_id && status === 'closed') {
             await connection.execute(
                 `UPDATE vendor SET balance = balance + ? WHERE vendor_id = ? AND company_id = ?`,
                 [total_amount || 0, vendor_id, companyId]
@@ -222,21 +254,26 @@ const updateOrder = async (req, res) => {
         // Update product quantity in inventory if status is 'closed'
         if (status === 'closed') {
             const [orderItems] = await connection.execute(
-                'SELECT product_id, qty FROM order_items WHERE order_id = ?',
+                'SELECT product_id, qty, rate FROM order_items WHERE order_id = ?',
                 [orderId]
             );
 
             for (const item of orderItems) {
                 await connection.execute(
-                    'UPDATE products SET quantity_on_hand = quantity_on_hand + ? WHERE id = ? AND company_id = ?',
-                    [item.qty, item.product_id, companyId]
+                    'UPDATE products SET quantity_on_hand = quantity_on_hand + ?, cost_price = ? WHERE id = ? AND company_id = ?',
+                    [item.qty, item.rate, item.product_id, companyId]
                 );
             }
+
+            await connection.execute(
+                'UPDATE order_items SET remaining_qty = qty, stock_status = ? WHERE order_id = ?',
+                ['in_stock', orderId]
+            );
         }
 
         await connection.commit();
-
         res.json({ message: 'Order updated successfully' });
+
     } catch (error) {
         await connection.rollback();
         console.error('Error updating order:', error);

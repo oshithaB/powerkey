@@ -714,6 +714,7 @@ export default function ProductsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     className="input min-h-[80px]"
+                    style={{ resize: 'none' }}
                     value={productFormData.description}
                     onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                     placeholder="Product description"
@@ -737,7 +738,9 @@ export default function ProductsPage() {
                         }}
                       >
                         <option value="" disabled>Select Category</option>
-                        <option value="add_new_category">Add New Category</option>
+                        <option value="add_new_category" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">
+                          + Add New Category
+                        </option>
                         {categories.map((category) => (
                           <option key={category.id} value={category.id}>
                             {category.name}
@@ -766,7 +769,7 @@ export default function ProductsPage() {
                         required
                       >
                         <option value="" disabled>Select Vendor</option>
-                        <option value="add_new_vendor">Add New Vendor</option>
+                        <option value="add_new_vendor" className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-blue-600 font-semibold flex items-center border-t">+ Add New Vendor</option>
                         {vendors.map((vendor) => (
                           <option key={vendor.vendor_id} value={vendor.vendor_id}>
                             {vendor.name}
@@ -813,6 +816,7 @@ export default function ProductsPage() {
                       step="0.01"
                       className="input"
                       value={productFormData.cost_price}
+                      disabled
                       onChange={(e) =>
                         setProductFormData({ ...productFormData, cost_price: parseFloat(e.target.value) || 0 })
                       }

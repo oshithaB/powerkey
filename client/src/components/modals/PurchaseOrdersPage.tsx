@@ -444,6 +444,7 @@ export default function PurchaseOrdersPage() {
                   name="order_no"
                   value={order.order_no}
                   className="input"
+                  disabled
                   readOnly
                 />
               </div>

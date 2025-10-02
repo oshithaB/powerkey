@@ -116,6 +116,7 @@ const {
 
 // Importing sales tax controller functions
 const {
+    SSCL50percentTaxDetail,
     SSCL100percentTaxDetail,
     VAT18percentTaxDetail,
     SSCL100percentTaxException,
@@ -551,6 +552,13 @@ router.get(
 );
 
 // Sales Tax routes ===========================================================================================================
+router.get(
+    '/sscl-50percent-tax-detail/:company_id',
+    verifyToken,
+    authorizedRoles(['admin', 'sales', 'staff']),
+    SSCL50percentTaxDetail
+);
+
 router.get(
     '/sscl-100percent-tax-detail/:company_id',
     verifyToken,

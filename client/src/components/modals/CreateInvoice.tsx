@@ -777,6 +777,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                   className="input"
                   value={formData.employee_id}
                   onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                  required
                 >
                   <option value="">Select Employee</option>
                   {employees.map((employee) => (

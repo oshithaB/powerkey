@@ -266,8 +266,13 @@ export default function ReportsPage() {
 
   const salesTax = [
     {
+      name: 'SSCL(50%) - Tax Detail Report',
+      description: 'Detailed report of SSCL tax collected at 50%',
+      path: '/reports/sscl-50-tax-detail'
+    },
+    {
       name: 'SSCL(100%) - Tax Detail Report',
-      description: 'Detailed report of SSCL tax collected',
+      description: 'Detailed report of SSCL tax collected at 100%',
       path: '/reports/sscl-tax-detail'
     },
     {

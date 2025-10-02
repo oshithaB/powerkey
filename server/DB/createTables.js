@@ -238,6 +238,8 @@ async function createTables(db) {
             paid_amount DECIMAL(15,2) DEFAULT 0.00,
             balance_due DECIMAL(15,2) DEFAULT 0.00,
             status ENUM('opened', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'proforma') DEFAULT 'opened',
+            SSCLper50 DECIMAL(15,2) DEFAULT 0.00,
+            SSCLper100 DECIMAL(15,2) DEFAULT 0.00,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES company(company_id),
@@ -257,6 +259,7 @@ async function createTables(db) {
             tax_rate DECIMAL(5,2) NOT NULL,
             tax_amount DECIMAL(10,2) NOT NULL,
             total_price DECIMAL(10,2) NOT NULL,
+            stock_detail JSON DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (invoice_id) REFERENCES invoices(id),
@@ -297,15 +300,12 @@ async function createTables(db) {
             total_amount DECIMAL(15,2) DEFAULT 0.00,
             status ENUM('open', 'closed') DEFAULT 'open',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            bill_id INT,
             KEY company_id (company_id),
             KEY vendor_id (vendor_id),
             KEY customer_id (customer_id),
-            KEY bill_id (bill_id),
             CONSTRAINT orders_ibfk_1 FOREIGN KEY (company_id) REFERENCES company (company_id) ON DELETE CASCADE,
             CONSTRAINT orders_ibfk_2 FOREIGN KEY (vendor_id) REFERENCES vendor (vendor_id) ON DELETE SET NULL,
-            CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL,
-            CONSTRAINT orders_ibfk_4 FOREIGN KEY (bill_id) REFERENCES bills (id) ON DELETE SET NULL
+            CONSTRAINT orders_ibfk_3 FOREIGN KEY (customer_id) REFERENCES customer (id) ON DELETE SET NULL
         )`,
         `CREATE TABLE IF NOT EXISTS order_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -320,6 +320,8 @@ async function createTables(db) {
             class VARCHAR(100),
             received BOOLEAN DEFAULT FALSE,
             closed BOOLEAN DEFAULT FALSE,
+            remaining_qty INT DEFAULT 0,
+            stock_status ENUM('not_tracked', 'in_stock', 'out_of_stock') DEFAULT 'not_tracked',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             KEY order_id (order_id),
             KEY product_id (product_id),
@@ -487,9 +489,7 @@ async function createTables(db) {
             unit_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             total_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
-        );`
-
-
+        );`,
 
     ];
 

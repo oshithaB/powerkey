@@ -46,8 +46,12 @@ const createInvoice = asyncHandler(async (req, res) => {
     return res.status(422).json({ error: "Invalid invoice status" });
   }
 
+  console.log('Invoice number, company ID, customer ID, valid subtotal, valid items, valid status and invoice date validation passed');
+
   // Validate items (only input fields, not calculations)
   for (const item of items) {
+    console.log('Validating item:', item);
+
     if (!item.product_id || item.product_id === 0) {
       return res.status(422).json({ error: "Each item must have a valid product ID" });
     }
@@ -65,6 +69,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     }
   }
 
+  console.log('All items validation passed');
+
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -78,6 +84,9 @@ const createInvoice = asyncHandler(async (req, res) => {
       await connection.rollback();
       return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
+
+    // --- Calculate total actual price for SSCL calculations ---
+    let totalActualPrice = 0;
 
     // --- Prepare invoice data ---
     const invoiceData = {
@@ -111,6 +120,9 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     // --- Update customer balance (if not proforma) ---
     if (status !== 'proforma') {
+
+      console.log('Updating customer balance for invoice (Not Proforma):', invoiceData.invoice_number);
+
       const [customerRows] = await connection.query(
         `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
         [customer_id, company_id]
@@ -127,14 +139,16 @@ const createInvoice = asyncHandler(async (req, res) => {
       );
     }
 
+    console.log('Customer balance updated'); 
+
     // --- Insert invoice ---
     const [result] = await connection.query(`INSERT INTO invoices SET ?`, invoiceData);
     const invoiceId = result.insertId;
 
     // --- Insert invoice items ---
     const itemQuery = `INSERT INTO invoice_items
-      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price, stock_detail)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     for (const item of items) {
       // Backend recalculates tax_amount and total_price
@@ -142,6 +156,9 @@ const createInvoice = asyncHandler(async (req, res) => {
       const actualUnitPrice = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
       const taxAmount = Number((actualUnitPrice * item.tax_rate / 100 * item.quantity).toFixed(2));
       const totalPrice = Number((subtotal).toFixed(2));
+
+      // Add to total actual price for SSCL calculation
+      totalActualPrice += actualUnitPrice * item.quantity;
 
       const itemData = [
         invoiceId,
@@ -173,6 +190,54 @@ const createInvoice = asyncHandler(async (req, res) => {
             error: `Insufficient quantity for ${item.product_name}. Available: ${availableQuantity}, Requested: ${item.quantity}`
           });
         }
+
+        const [stockItems] = await connection.query(
+          `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
+          [item.product_id]
+        );
+
+        console.log('Stock items for product', item.product_id, '[', item.product_name, '] :', stockItems);
+
+        if (stockItems.length === 0 && status !== 'proforma') {
+          await connection.rollback();
+          return res.status(404).json({
+            error: `No stock available for ${item.product_name}.`
+          });
+        }
+
+        let itemQtyCopy = item.quantity; //10
+        let invoiceItemStockDetails = [];
+
+        for (const stockItem of stockItems) {
+          if (itemQtyCopy > stockItem.remaining_qty) {
+            itemQtyCopy -= stockItem.remaining_qty;
+            stockItem.remaining_qty = 0;
+            stockItem.stock_status = 'out_of_stock';
+            invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+            );
+          } else if (itemQtyCopy < stockItem.remaining_qty) {
+            stockItem.remaining_qty -= itemQtyCopy;
+            invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+            );
+            break;
+          } else {
+            stockItem.remaining_qty = 0;
+            stockItem.stock_status = 'out_of_stock';
+            invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+            );
+            break;
+          }
+        }
+        itemData.push(JSON.stringify(invoiceItemStockDetails));
       }
 
       // Insert item
@@ -190,6 +255,18 @@ const createInvoice = asyncHandler(async (req, res) => {
         );
       }
     }
+
+    // --- Calculate SSCL values ---
+    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
+    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
+    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025).toFixed(2));
+
+    // --- Update invoice with SSCL values ---
+    await connection.query(
+      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
+      [SSCLper50, SSCLper100, invoiceId]
+    );
 
     // --- Handle file attachment ---
     if (req.file) {
@@ -227,6 +304,8 @@ const createInvoice = asyncHandler(async (req, res) => {
       discount_amount,
       shipping_cost,
       total_amount,
+      SSCLper50,
+      SSCLper100,
       status,
       created_at: invoiceData.created_at.toISOString(),
       updated_at: invoiceData.updated_at.toISOString(),
@@ -329,7 +408,9 @@ const updateInvoice = asyncHandler(async (req, res) => {
   }
 
   const connection = await db.getConnection();
+
   try {
+
     await connection.beginTransaction();
 
     // Check if invoice exists
@@ -390,91 +471,86 @@ const updateInvoice = asyncHandler(async (req, res) => {
       status,
     };
 
-    // --- Handle cancelled invoice ---
+    // handle cancelled status of invoices (Not for proforma invoices)
     if (status === 'cancelled' && invoice_type !== 'proforma') {
-      console.log("inside cancelled invoice handler");
+
       const [cancelItems] = await connection.query(
-        `SELECT product_id, quantity FROM invoice_items WHERE invoice_id = ?`,
+        `SELECT id, product_id, quantity, stock_detail FROM invoice_items WHERE invoice_id = ?`,
         [invoiceId]
       );
+
+      console.log("Cancel items:", cancelItems);
 
       for (const item of cancelItems) {
         await connection.query(
           `UPDATE products 
-           SET quantity_on_hand = quantity_on_hand + ? 
-           WHERE id = ?`,
+            SET quantity_on_hand = quantity_on_hand + ? 
+            WHERE id = ?`,
           [item.quantity, item.product_id]
         );
-      }
 
+        const stockDetails = typeof item.stock_detail === 'string'
+        ? JSON.parse(item.stock_detail || '[]')
+        : (item.stock_detail || []);
+
+
+        for (const invoiceStockItem of stockDetails) {
+          const [orderItemRows] = await connection.query(
+            `SELECT remaining_qty, stock_status FROM order_items WHERE id = ?`,
+            [invoiceStockItem.order_item_id]
+          );
+
+          if (orderItemRows.length > 0) {
+            const newQty = orderItemRows[0].remaining_qty + invoiceStockItem.used_qty;
+            const newStatus = orderItemRows[0].stock_status === 'out_of_stock' ? 'in_stock' : orderItemRows[0].stock_status;
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [newQty, newStatus, invoiceStockItem.order_item_id]
+            );
+          }
+        }
+
+        await connection.query(
+          `UPDATE invoice_items SET stock_detail = ? WHERE id = ?`,
+          [JSON.stringify([]), item.id]
+        );
+      }
       await connection.query(
         `UPDATE customer 
-         SET current_balance = current_balance - ? 
-         WHERE id = ? AND company_id = ?`,
+          SET current_balance = current_balance - ? 
+          WHERE id = ? AND company_id = ?`,
         [balance_due, customer_id, company_id]
       );
     }
 
-    console.log("passed cancelled invoice handler");
-
-    if (status === "opened") {
-      const [customerRows] = await connection.query(
-        `SELECT current_balance FROM customer WHERE id = ? AND company_id = ?`,
-        [customer_id, company_id]
-      );
-
-      if (customerRows.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ error: "Customer not found" });
-      }
-
-      const [invoiceRows] = await connection.query(
-        `SELECT balance_due FROM invoices WHERE id = ? AND company_id = ?`,
+    if (status === 'cancelled' && invoice_type === 'proforma') {
+      await connection.query(
+        `UPDATE invoices SET status = 'cancelled' WHERE id = ? AND company_id = ?`,
         [invoiceId, company_id]
       );
-
-      if (invoiceRows.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-
-      const currentBalance = Number(customerRows[0].current_balance) || 0;
-      const newBalance =
-        currentBalance -
-        Number(invoiceRows[0].balance_due || 0) +
-        (invoiceData.balance_due || 0);
-
-      await connection.query(
-        `UPDATE customer SET current_balance = ? WHERE id = ? AND company_id = ?`,
-        [newBalance, customer_id, company_id]
-      );
-    } 
-
-    // Update existing invoice
-    const [updateResult] = await connection.query(
-      `UPDATE invoices SET ? WHERE id = ? AND company_id = ?`,
-      [invoiceData, invoiceId, company_id]
-    );
-
-    if (updateResult.affectedRows === 0) {
-      await connection.rollback();
-      return res.status(400).json({ error: "Failed to update invoice" });
     }
+
+    // --- Calculate total actual price for SSCL calculations ---
+    let totalActualPrice = 0;
 
     // --- Update invoice items with inventory control ---
     const [oldRows] = await connection.query(
-      "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
+      "SELECT id, product_id, quantity, stock_detail FROM invoice_items WHERE invoice_id = ?",
       [invoiceId]
     );
 
     const oldItems = {};
+
     oldRows.forEach((r) => {
-      oldItems[r.id] = { product_id: r.product_id, qty: r.quantity };
+      oldItems[r.id] = { product_id: r.product_id, qty: r.quantity, stock_detail: r.stock_detail };
     });
 
     const usedIds = new Set();
 
     for (const item of items) {
+      // Add to total actual price
+      totalActualPrice += Number(item.actual_unit_price) * Number(item.quantity);
+
       if (item.id && oldItems[item.id]) {
         const oldQty = oldItems[item.id].qty;
         const diff = item.quantity - oldQty;
@@ -485,20 +561,117 @@ const updateInvoice = asyncHandler(async (req, res) => {
             [item.product_id]
           );
 
-          if (quantity_on_hand < diff) {
-            await connection.rollback();
-            return res.status(400).json({
-              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
-            });
+            if (quantity_on_hand < diff) {
+              await connection.rollback();
+              return res.status(400).json({
+                error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+              });
+            }
           }
-        }
 
-        if (diff !== 0) {
+          if (diff !== 0) {
+
+            let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
+
+            if (diff > 0) {
+              const [stockItems] = await connection.query(
+                `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
+                [item.product_id]
+              );
+
+              if (stockItems.length === 0) {
+                await connection.rollback();
+                return res.status(400).json({
+                  error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+                });
+              }
+
+              let itemQtyCopy = diff;
+
+              for (const stockItem of stockItems) {
+                if (itemQtyCopy > stockItem.remaining_qty) {
+                  itemQtyCopy -= stockItem.remaining_qty;
+                  stockItem.remaining_qty = 0;
+                  stockItem.stock_status = 'out_of_stock';
+                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
+                  if (existingStockDetail) {
+                    existingStockDetail.used_qty += stockItem.remaining_qty;
+                  } else {
+                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+                  }
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+                  );
+                } else if (itemQtyCopy < stockItem.remaining_qty) {
+                  stockItem.remaining_qty -= itemQtyCopy;
+                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
+                  if (existingStockDetail) {
+                    existingStockDetail.used_qty += stockItem.remaining_qty;
+                  } else {
+                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+                  }
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+                  );
+                  break;
+                } else {
+                  stockItem.remaining_qty = 0;
+                  stockItem.stock_status = 'out_of_stock';
+                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
+                  if (existingStockDetail) {
+                    existingStockDetail.used_qty += stockItem.remaining_qty;
+                  } else {
+                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+                  }
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+                  );
+                  break;
+                }
+              }
+            }
+
+            if (diff < 0) {
+              const absDiff = Math.abs(diff);
+              let qtyToRevert = absDiff;
+
+              // Go from last to first in invoiceItemStockDetails
+              for (let i = invoiceItemStockDetails.length - 1; i >= 0 && qtyToRevert > 0; i--) {
+                if (invoiceItemStockDetails[i].used_qty < qtyToRevert) {
+                  qtyToRevert -= invoiceItemStockDetails[i].used_qty;
+                  invoiceItemStockDetails.splice(i, 1);
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
+                    [invoiceItemStockDetails[i].used_qty, invoiceItemStockDetails[i].order_item_id]
+                  );
+                } else if (invoiceItemStockDetails[i].used_qty > qtyToRevert) {
+                  invoiceItemStockDetails[i].used_qty -= qtyToRevert;
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
+                    [qtyToRevert, invoiceItemStockDetails[i].order_item_id]
+                  );
+                  break;
+                } else {
+                  invoiceItemStockDetails[i].used_qty = 0;
+                  invoiceItemStockDetails.splice(i, 1);
+                  await connection.query(
+                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
+                    [qtyToRevert, invoiceItemStockDetails[i].order_item_id]
+                  );
+                  break;
+                }
+              }
+            }
+          }
+
           await connection.query(
             `UPDATE invoice_items 
-             SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
-                 tax_rate = ?, tax_amount = ?, total_price = ? 
-             WHERE id = ?`,
+              SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
+                  tax_rate = ?, tax_amount = ?, total_price = ?, stock_detail = ?
+              WHERE id = ?`,
             [
               item.quantity,
               item.unit_price,
@@ -506,77 +679,297 @@ const updateInvoice = asyncHandler(async (req, res) => {
               item.tax_rate,
               item.tax_amount,
               item.total_price,
+              JSON.stringify(invoiceItemStockDetails || []),
               item.id,
             ]
           );
 
           await connection.query(
             `UPDATE products 
-             SET quantity_on_hand = quantity_on_hand - ? 
-             WHERE id = ?`,
+            SET quantity_on_hand = quantity_on_hand - ? 
+            WHERE id = ?`,
             [diff, item.product_id]
           );
         }
 
-        usedIds.add(item.id);
-      } else if (!item.id) {
-        const [[{ quantity_on_hand }]] = await connection.query(
-          "SELECT quantity_on_hand FROM products WHERE id = ?",
-          [item.product_id]
-        );
+        if (status === 'opened' && invoice_type === 'proforma') {
+          const [[{ quantity_on_hand }]] = await connection.query(
+            "SELECT quantity_on_hand FROM products WHERE id = ?",
+            [item.product_id]
+          );
 
-        if (quantity_on_hand < item.quantity) {
-          await connection.rollback();
-          return res.status(400).json({
-            error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${item.quantity}`,
-          });
+          if (quantity_on_hand < item.quantity) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${item.quantity}`,
+            });
+          }
+
+          let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
+
+          const [stockItems] = await connection.query(
+            `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
+            [item.product_id]
+          );
+
+          if (stockItems.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+            });
+          }
+
+          let itemQtyCopy = item.quantity;
+
+          for (const stockItem of stockItems) {
+            if (itemQtyCopy > stockItem.remaining_qty) {
+              itemQtyCopy -= stockItem.remaining_qty;
+              stockItem.remaining_qty = 0;
+              stockItem.stock_status = 'out_of_stock';
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+            } else if (itemQtyCopy < stockItem.remaining_qty) {
+              stockItem.remaining_qty -= itemQtyCopy;
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, 'in_stock', stockItem.id]
+              );
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+              break;
+            } else {
+              stockItem.remaining_qty = 0;
+              stockItem.stock_status = 'out_of_stock';
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+              break;
+            }
+          }
+
+          await connection.query(
+            `UPDATE invoice_items
+              SET quantity = ?, unit_price = ?, actual_unit_price = ?, 
+                  tax_rate = ?, tax_amount = ?, total_price = ?, stock_detail = ?
+              WHERE id = ?`,
+            [
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              JSON.stringify(invoiceItemStockDetails),
+              item.id
+            ]
+          );
+
+          await connection.query(
+            `UPDATE products 
+            SET quantity_on_hand = quantity_on_hand - ? 
+            WHERE id = ?`,
+            [item.quantity, item.product_id]
+          );
         }
 
-        const [result] = await connection.query(
-          `INSERT INTO invoice_items 
-           (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            invoiceId,
-            item.product_id,
-            item.product_name || null,
-            item.description,
-            item.quantity,
-            item.unit_price,
-            item.actual_unit_price,
-            item.tax_rate,
-            item.tax_amount,
-            item.total_price,
-          ]
-        );
+        if (status === 'proforma' && invoice_type === 'proforma') {
 
-        await connection.query(
-          `UPDATE products 
-           SET quantity_on_hand = quantity_on_hand - ? 
-           WHERE id = ?`,
-          [item.quantity, item.product_id]
-        );
+          let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
 
-        usedIds.add(result.insertId);
+          await connection.query(
+            `UPDATE invoice_items
+              SET quantity = ?, unit_price = ?, actual_unit_price = ?,
+                  tax_rate = ?, tax_amount = ?, total_price = ?, stock_detail = ?
+              WHERE id = ?`,
+            [
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              JSON.stringify(invoiceItemStockDetails),
+              item.id
+            ]
+          );
+        }
+
+        usedIds.add(item.id);
+
+      } else if (!item.id) { // new items that are not in the DB
+
+        if ((status === 'opened' || status === 'overdue') && (invoice_type === 'invoice' || invoice_type === 'proforma')) {
+          const [[{ quantity_on_hand }]] = await connection.query(
+            "SELECT quantity_on_hand FROM products WHERE id = ?",
+            [item.product_id]
+          );
+
+          if (quantity_on_hand < item.quantity) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${item.quantity}`,
+            });
+          }
+
+          const [stockItems] = await connection.query(
+            `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
+            [item.product_id]
+          );
+
+          if (stockItems.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+            });
+          }
+
+          let itemQtyCopy = item.quantity; 
+          let invoiceItemStockDetails = [];
+
+          for (const stockItem of stockItems) {
+            if (itemQtyCopy > stockItem.remaining_qty) {
+              itemQtyCopy -= stockItem.remaining_qty;
+              stockItem.remaining_qty = 0;
+              stockItem.stock_status = 'out_of_stock';
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
+            } else if (itemQtyCopy < stockItem.remaining_qty) {
+              stockItem.remaining_qty -= itemQtyCopy;
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
+              break;
+            } else {
+              stockItem.remaining_qty = 0;
+              stockItem.stock_status = 'out_of_stock';
+              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
+              break;
+            }
+          }
+
+          const [result] = await connection.query(
+            `INSERT INTO invoice_items 
+            (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price, stock_detail) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              invoiceId,
+              item.product_id,
+              item.product_name || null,
+              item.description,
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              JSON.stringify(invoiceItemStockDetails)
+            ]
+          );
+
+          await connection.query(
+            `UPDATE products 
+            SET quantity_on_hand = quantity_on_hand - ? 
+            WHERE id = ?`,
+            [item.quantity, item.product_id]
+          );
+
+          usedIds.add(result.insertId);
+        }
+
+        if (status === 'proforma' && invoice_type === 'proforma') {
+          let invoiceItemStockDetails = [];
+
+          const [result] = await connection.query(
+            `INSERT INTO invoice_items 
+            (invoice_id, product_id, product_name, description, quantity, unit_price, actual_unit_price, tax_rate, tax_amount, total_price, stock_detail) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              invoiceId,
+              item.product_id,
+              item.product_name || null,
+              item.description,
+              item.quantity,
+              item.unit_price,
+              item.actual_unit_price,
+              item.tax_rate,
+              item.tax_amount,
+              item.total_price,
+              JSON.stringify(invoiceItemStockDetails)
+            ]
+          );
+
+          usedIds.add(result.insertId);
+        }
       }
     }
 
     for (const oldId in oldItems) {
-      if (!usedIds.has(parseInt(oldId))) {
-        const { product_id, qty } = oldItems[oldId];
+      if (!usedIds.has(parseInt(oldId))) {  // This old item has been removed in the update, so revert stock changes
 
-        await connection.query(
-          `UPDATE products 
-           SET quantity_on_hand = quantity_on_hand + ? 
-           WHERE id = ?`,
-          [qty, product_id]
-        );
+        if ((status === 'opened' || status === 'overdue') && invoice_type === 'invoice') {
+          const { product_id, qty, stock_detail } = oldItems[oldId];
+
+          const stockDetails = typeof stock_detail === 'string'
+          ? JSON.parse(stock_detail || '[]')
+          : (stock_detail || []);
+
+          for (const invoiceStockItem of stockDetails) {
+            const [orderItemRows] = await connection.query(
+              `SELECT remaining_qty, stock_status FROM order_items WHERE id = ?`,
+              [invoiceStockItem.order_item_id]
+            );
+
+            if (orderItemRows.length > 0) {
+              const newQty = orderItemRows[0].remaining_qty + invoiceStockItem.used_qty;
+              const newStatus = orderItemRows[0].stock_status === 'out_of_stock' ? 'in_stock' : orderItemRows[0].stock_status;
+
+              await connection.query(
+                `UPDATE order_items 
+                SET remaining_qty = ?, stock_status = ? 
+                WHERE id = ?`,
+                [newQty, newStatus, invoiceStockItem.order_item_id]
+              );
+            }
+          }
+
+          await connection.query(
+            `UPDATE products 
+            SET quantity_on_hand = quantity_on_hand + ? 
+            WHERE id = ?`,
+            [qty, product_id]
+          );
+        }
 
         await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [
           oldId,
         ]);
       }
     }
+
+    // --- Calculate SSCL values ---
+    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
+    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
+    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025)).toFixed(2);
+
+    // --- Update invoice with SSCL values ---
+    await connection.query(
+      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
+      [SSCLper50, SSCLper100, invoiceId]
+    );
 
     // Handle file attachment if provided
     if (req.file) {
@@ -586,7 +979,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       );
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name)
-        VALUES (?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?)`,
         [
           invoiceId,
           req.file.path,
@@ -622,6 +1015,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
       shipping_cost,
       total_amount,
       balance_due,
+      SSCLper50,
+      SSCLper100,
       status,
       items,
     };

@@ -259,8 +259,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     // --- Calculate SSCL values ---
     // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
     // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
-    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025).toFixed(2));
+    const SSCLper50 = Number((totalPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalPrice * 1.00 * 0.025).toFixed(2));
 
     // --- Update invoice with SSCL values ---
     await connection.query(
@@ -410,7 +410,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
   const connection = await db.getConnection();
 
   try {
-
     await connection.beginTransaction();
 
     // Check if invoice exists
@@ -473,7 +472,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
     // handle cancelled status of invoices (Not for proforma invoices)
     if (status === 'cancelled' && invoice_type !== 'proforma') {
-
       const [cancelItems] = await connection.query(
         `SELECT id, product_id, quantity, stock_detail FROM invoice_items WHERE invoice_id = ?`,
         [invoiceId]
@@ -490,9 +488,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
         );
 
         const stockDetails = typeof item.stock_detail === 'string'
-        ? JSON.parse(item.stock_detail || '[]')
-        : (item.stock_detail || []);
-
+          ? JSON.parse(item.stock_detail || '[]')
+          : (item.stock_detail || []);
 
         for (const invoiceStockItem of stockDetails) {
           const [orderItemRows] = await connection.query(
@@ -549,7 +546,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
     for (const item of items) {
       // Add to total actual price
-      totalActualPrice += Number(item.actual_unit_price) * Number(item.quantity);
+      totalActualPrice += Number(item.actual_unit_price || 0) * Number(item.quantity);
 
       if (item.id && oldItems[item.id]) {
         const oldQty = oldItems[item.id].qty;
@@ -561,108 +558,86 @@ const updateInvoice = asyncHandler(async (req, res) => {
             [item.product_id]
           );
 
-            if (quantity_on_hand < diff) {
+          if (quantity_on_hand < diff) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+            });
+          }
+        }
+
+        if (diff !== 0 && status !== 'cancelled' && invoice_type !== 'proforma') {
+          let invoiceItemStockDetails = oldItems[item.id].stock_detail 
+            ? (typeof oldItems[item.id].stock_detail === 'string' 
+                ? JSON.parse(oldItems[item.id].stock_detail) 
+                : oldItems[item.id].stock_detail)
+            : [];
+
+          if (diff > 0) {
+            const [stockItems] = await connection.query(
+              `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
+              [item.product_id]
+            );
+
+            if (stockItems.length === 0) {
               await connection.rollback();
               return res.status(400).json({
-                error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+                error: `Not enough stock for product ${item.product_id}. No stock items available`,
               });
             }
-          }
 
-          if (diff !== 0) {
+            let itemQtyCopy = diff;
 
-            let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
+            for (const stockItem of stockItems) {
+              const usedQty = Math.min(itemQtyCopy, stockItem.remaining_qty);
+              
+              stockItem.remaining_qty -= usedQty;
+              itemQtyCopy -= usedQty;
+              
+              if (stockItem.remaining_qty === 0) {
+                stockItem.stock_status = 'out_of_stock';
+              }
 
-            if (diff > 0) {
-              const [stockItems] = await connection.query(
-                `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
-                [item.product_id]
+              const existingStockDetail = invoiceItemStockDetails.find(
+                detail => detail.order_item_id === stockItem.id
               );
-
-              if (stockItems.length === 0) {
-                await connection.rollback();
-                return res.status(400).json({
-                  error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+              
+              if (existingStockDetail) {
+                existingStockDetail.used_qty += usedQty;
+              } else {
+                invoiceItemStockDetails.push({ 
+                  order_item_id: stockItem.id, 
+                  used_qty: usedQty 
                 });
               }
 
-              let itemQtyCopy = diff;
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              );
 
-              for (const stockItem of stockItems) {
-                if (itemQtyCopy > stockItem.remaining_qty) {
-                  itemQtyCopy -= stockItem.remaining_qty;
-                  stockItem.remaining_qty = 0;
-                  stockItem.stock_status = 'out_of_stock';
-                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
-                  if (existingStockDetail) {
-                    existingStockDetail.used_qty += stockItem.remaining_qty;
-                  } else {
-                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
-                  }
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-                  );
-                } else if (itemQtyCopy < stockItem.remaining_qty) {
-                  stockItem.remaining_qty -= itemQtyCopy;
-                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
-                  if (existingStockDetail) {
-                    existingStockDetail.used_qty += stockItem.remaining_qty;
-                  } else {
-                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
-                  }
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-                  );
-                  break;
-                } else {
-                  stockItem.remaining_qty = 0;
-                  stockItem.stock_status = 'out_of_stock';
-                  const existingStockDetail = invoiceItemStockDetails.find(detail => detail.order_item_id === stockItem.id);
-                  if (existingStockDetail) {
-                    existingStockDetail.used_qty += stockItem.remaining_qty;
-                  } else {
-                    invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
-                  }
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                    [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-                  );
-                  break;
-                }
-              }
+              if (itemQtyCopy === 0) break;
             }
+          }
 
-            if (diff < 0) {
-              const absDiff = Math.abs(diff);
-              let qtyToRevert = absDiff;
+          if (diff < 0) {
+            const absDiff = Math.abs(diff);
+            let qtyToRevert = absDiff;
 
-              // Go from last to first in invoiceItemStockDetails
-              for (let i = invoiceItemStockDetails.length - 1; i >= 0 && qtyToRevert > 0; i--) {
-                if (invoiceItemStockDetails[i].used_qty < qtyToRevert) {
-                  qtyToRevert -= invoiceItemStockDetails[i].used_qty;
-                  invoiceItemStockDetails.splice(i, 1);
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
-                    [invoiceItemStockDetails[i].used_qty, invoiceItemStockDetails[i].order_item_id]
-                  );
-                } else if (invoiceItemStockDetails[i].used_qty > qtyToRevert) {
-                  invoiceItemStockDetails[i].used_qty -= qtyToRevert;
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
-                    [qtyToRevert, invoiceItemStockDetails[i].order_item_id]
-                  );
-                  break;
-                } else {
-                  invoiceItemStockDetails[i].used_qty = 0;
-                  invoiceItemStockDetails.splice(i, 1);
-                  await connection.query(
-                    `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
-                    [qtyToRevert, invoiceItemStockDetails[i].order_item_id]
-                  );
-                  break;
-                }
+            for (let i = invoiceItemStockDetails.length - 1; i >= 0 && qtyToRevert > 0; i--) {
+              const stockDetail = invoiceItemStockDetails[i];
+              const revertQty = Math.min(qtyToRevert, stockDetail.used_qty);
+
+              await connection.query(
+                `UPDATE order_items SET remaining_qty = remaining_qty + ?, stock_status = 'in_stock' WHERE id = ?`,
+                [revertQty, stockDetail.order_item_id]
+              );
+
+              stockDetail.used_qty -= revertQty;
+              qtyToRevert -= revertQty;
+
+              if (stockDetail.used_qty === 0) {
+                invoiceItemStockDetails.splice(i, 1);
               }
             }
           }
@@ -675,7 +650,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
             [
               item.quantity,
               item.unit_price,
-              item.actual_unit_price,
+              item.actual_unit_price || 0,
               item.tax_rate,
               item.tax_amount,
               item.total_price,
@@ -705,7 +680,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
             });
           }
 
-          let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
+          let invoiceItemStockDetails = oldItems[item.id].stock_detail 
+            ? (typeof oldItems[item.id].stock_detail === 'string' 
+                ? JSON.parse(oldItems[item.id].stock_detail) 
+                : oldItems[item.id].stock_detail)
+            : [];
 
           const [stockItems] = await connection.query(
             `SELECT * FROM order_items WHERE product_id = ? AND stock_status = 'in_stock' ORDER BY created_at ASC`,
@@ -715,40 +694,33 @@ const updateInvoice = asyncHandler(async (req, res) => {
           if (stockItems.length === 0) {
             await connection.rollback();
             return res.status(400).json({
-              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+              error: `Not enough stock for product ${item.product_id}. No stock items available`,
             });
           }
 
           let itemQtyCopy = item.quantity;
 
           for (const stockItem of stockItems) {
-            if (itemQtyCopy > stockItem.remaining_qty) {
-              itemQtyCopy -= stockItem.remaining_qty;
-              stockItem.remaining_qty = 0;
+            const usedQty = Math.min(itemQtyCopy, stockItem.remaining_qty);
+            
+            stockItem.remaining_qty -= usedQty;
+            itemQtyCopy -= usedQty;
+            
+            if (stockItem.remaining_qty === 0) {
               stockItem.stock_status = 'out_of_stock';
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-              );
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
-            } else if (itemQtyCopy < stockItem.remaining_qty) {
-              stockItem.remaining_qty -= itemQtyCopy;
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, 'in_stock', stockItem.id]
-              );
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
-              break;
-            } else {
-              stockItem.remaining_qty = 0;
-              stockItem.stock_status = 'out_of_stock';
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-              );
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
-              break;
             }
+
+            invoiceItemStockDetails.push({ 
+              order_item_id: stockItem.id, 
+              used_qty: usedQty 
+            });
+
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+            );
+
+            if (itemQtyCopy === 0) break;
           }
 
           await connection.query(
@@ -759,7 +731,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
             [
               item.quantity,
               item.unit_price,
-              item.actual_unit_price,
+              item.actual_unit_price || 0,
               item.tax_rate,
               item.tax_amount,
               item.total_price,
@@ -777,8 +749,11 @@ const updateInvoice = asyncHandler(async (req, res) => {
         }
 
         if (status === 'proforma' && invoice_type === 'proforma') {
-
-          let invoiceItemStockDetails = oldItems[item.id].stock_detail ? JSON.parse(oldItems[item.id].stock_detail) : [];
+          let invoiceItemStockDetails = oldItems[item.id].stock_detail 
+            ? (typeof oldItems[item.id].stock_detail === 'string' 
+                ? JSON.parse(oldItems[item.id].stock_detail) 
+                : oldItems[item.id].stock_detail)
+            : [];
 
           await connection.query(
             `UPDATE invoice_items
@@ -788,7 +763,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
             [
               item.quantity,
               item.unit_price,
-              item.actual_unit_price,
+              item.actual_unit_price || 0,
               item.tax_rate,
               item.tax_amount,
               item.total_price,
@@ -800,8 +775,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
 
         usedIds.add(item.id);
 
-      } else if (!item.id) { // new items that are not in the DB
-
+      } else if (!item.id) {
         if ((status === 'opened' || status === 'overdue') && (invoice_type === 'invoice' || invoice_type === 'proforma')) {
           const [[{ quantity_on_hand }]] = await connection.query(
             "SELECT quantity_on_hand FROM products WHERE id = ?",
@@ -823,7 +797,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
           if (stockItems.length === 0) {
             await connection.rollback();
             return res.status(400).json({
-              error: `Not enough stock for product ${item.product_id}. Available: ${quantity_on_hand}, required: ${diff}`,
+              error: `Not enough stock for product ${item.product_id}. No stock items available`,
             });
           }
 
@@ -831,33 +805,26 @@ const updateInvoice = asyncHandler(async (req, res) => {
           let invoiceItemStockDetails = [];
 
           for (const stockItem of stockItems) {
-            if (itemQtyCopy > stockItem.remaining_qty) {
-              itemQtyCopy -= stockItem.remaining_qty;
-              stockItem.remaining_qty = 0;
+            const usedQty = Math.min(itemQtyCopy, stockItem.remaining_qty);
+            
+            stockItem.remaining_qty -= usedQty;
+            itemQtyCopy -= usedQty;
+            
+            if (stockItem.remaining_qty === 0) {
               stockItem.stock_status = 'out_of_stock';
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-              );
-            } else if (itemQtyCopy < stockItem.remaining_qty) {
-              stockItem.remaining_qty -= itemQtyCopy;
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-              );
-              break;
-            } else {
-              stockItem.remaining_qty = 0;
-              stockItem.stock_status = 'out_of_stock';
-              invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
-              await connection.query(
-                `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-                [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-              );
-              break;
             }
+
+            invoiceItemStockDetails.push({ 
+              order_item_id: stockItem.id, 
+              used_qty: usedQty 
+            });
+
+            await connection.query(
+              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
+              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+            );
+
+            if (itemQtyCopy === 0) break;
           }
 
           const [result] = await connection.query(
@@ -871,7 +838,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
               item.description,
               item.quantity,
               item.unit_price,
-              item.actual_unit_price,
+              item.actual_unit_price || 0,
               item.tax_rate,
               item.tax_amount,
               item.total_price,
@@ -903,7 +870,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
               item.description,
               item.quantity,
               item.unit_price,
-              item.actual_unit_price,
+              item.actual_unit_price || 0,
               item.tax_rate,
               item.tax_amount,
               item.total_price,
@@ -917,14 +884,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
     }
 
     for (const oldId in oldItems) {
-      if (!usedIds.has(parseInt(oldId))) {  // This old item has been removed in the update, so revert stock changes
-
+      if (!usedIds.has(parseInt(oldId))) {
         if ((status === 'opened' || status === 'overdue') && invoice_type === 'invoice') {
           const { product_id, qty, stock_detail } = oldItems[oldId];
 
           const stockDetails = typeof stock_detail === 'string'
-          ? JSON.parse(stock_detail || '[]')
-          : (stock_detail || []);
+            ? JSON.parse(stock_detail || '[]')
+            : (stock_detail || []);
 
           for (const invoiceStockItem of stockDetails) {
             const [orderItemRows] = await connection.query(
@@ -953,22 +919,34 @@ const updateInvoice = asyncHandler(async (req, res) => {
           );
         }
 
-        await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [
-          oldId,
-        ]);
+        await connection.query(`DELETE FROM invoice_items WHERE id = ?`, [oldId]);
       }
     }
 
     // --- Calculate SSCL values ---
-    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
-    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
-    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025)).toFixed(2);
+    const SSCLper50 = Number((totalPrice * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((totalPrice * 1.00 * 0.025)).toFixed(2);
 
     // --- Update invoice with SSCL values ---
     await connection.query(
-      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
-      [SSCLper50, SSCLper100, invoiceId]
+      `UPDATE invoices SET 
+        company_id = ?, customer_id = ?, employee_id = ?, estimate_id = ?,
+        invoice_number = ?, head_note = ?, invoice_date = ?, due_date = ?,
+        discount_type = ?, discount_value = ?, notes = ?, terms = ?,
+        shipping_address = ?, billing_address = ?, ship_via = ?, 
+        shipping_date = ?, tracking_number = ?, subtotal = ?, tax_amount = ?,
+        discount_amount = ?, shipping_cost = ?, total_amount = ?, balance_due = ?,
+        status = ?, SSCLper50 = ?, SSCLper100 = ?
+      WHERE id = ?`,
+      [
+        company_id, customer_id, employee_id, estimate_id,
+        invoice_number, head_note, invoice_date, due_date,
+        discount_type, discount_value, notes, terms,
+        shipping_address, billing_address, ship_via,
+        shipping_date, tracking_number, subtotal, totalTaxAmount,
+        discount_amount, shipping_cost, total_amount, balance_due,
+        status, SSCLper50, SSCLper100, invoiceId
+      ]
     );
 
     // Handle file attachment if provided
@@ -980,11 +958,7 @@ const updateInvoice = asyncHandler(async (req, res) => {
       await connection.query(
         `INSERT INTO invoice_attachments (invoice_id, file_path, file_name)
         VALUES (?, ?, ?)`,
-        [
-          invoiceId,
-          req.file.path,
-          req.file.originalname
-        ]
+        [invoiceId, req.file.path, req.file.originalname]
       );
     }
 
@@ -1021,12 +995,10 @@ const updateInvoice = asyncHandler(async (req, res) => {
       items,
     };
 
-    res
-      .status(200)
-      .json({
-        message: "Invoice updated successfully",
-        invoice: updatedInvoice,
-      });
+    res.status(200).json({
+      message: "Invoice updated successfully",
+      invoice: updatedInvoice,
+    });
   } catch (error) {
     await connection.rollback();
     console.error('Error updating invoice:', error);

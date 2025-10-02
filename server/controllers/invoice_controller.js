@@ -79,8 +79,12 @@ const createInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: `Invoice number '${invoice_number}' already exists` });
     }
 
-    // --- Calculate total actual price for SSCL calculations ---
-    let totalActualPrice = 0;
+    // --- Calculate SSCL values based on total_amount ---
+    // SSCLper50 = (total_amount * 50%) * 2.5%
+    // SSCLper100 = (total_amount * 100%) * 2.5%
+    const totalAmountNum = Number(total_amount) || 0;
+    const SSCLper50 = Number((totalAmountNum * 0.50 * 0.025).toFixed(2));
+    const SSCLper100 = Number((totalAmountNum * 1.00 * 0.025).toFixed(2));
 
     // --- Prepare invoice data ---
     const invoiceData = {
@@ -107,6 +111,8 @@ const createInvoice = asyncHandler(async (req, res) => {
       shipping_cost: shipping_cost || 0,
       total_amount,
       balance_due: status === 'proforma' ? 0 : (total_amount || 0),
+      SSCLper50,
+      SSCLper100,
       status,
       created_at: new Date(),
       updated_at: new Date()
@@ -145,9 +151,6 @@ const createInvoice = asyncHandler(async (req, res) => {
       const actualUnitPrice = Number((item.unit_price / (1 + item.tax_rate / 100)).toFixed(2));
       const taxAmount = Number((actualUnitPrice * item.tax_rate / 100 * item.quantity).toFixed(2));
       const totalPrice = Number((subtotal).toFixed(2));
-
-      // Add to total actual price for SSCL calculation
-      totalActualPrice += actualUnitPrice * item.quantity;
 
       const itemData = [
         invoiceId,
@@ -196,18 +199,6 @@ const createInvoice = asyncHandler(async (req, res) => {
         );
       }
     }
-
-    // --- Calculate SSCL values ---
-    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
-    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
-    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025).toFixed(2));
-
-    // --- Update invoice with SSCL values ---
-    await connection.query(
-      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
-      [SSCLper50, SSCLper100, invoiceId]
-    );
 
     // --- Handle file attachment ---
     if (req.file) {
@@ -383,6 +374,13 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return sum + Number(item.tax_amount);
     }, 0);
 
+    // --- Calculate SSCL values based on total_amount ---
+    // SSCLper50 = (total_amount * 50%) * 2.5%
+    // SSCLper100 = (total_amount * 100%) * 2.5%
+    const totalAmountNum = Number(total_amount) || 0;
+    const SSCLper50 = Number((totalAmountNum * 0.50 * 0.025).toFixed(2));
+    const SSCLper100 = Number((totalAmountNum * 1.00 * 0.025).toFixed(2));
+
     const invoiceData = {
       company_id,
       customer_id,
@@ -407,6 +405,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
       shipping_cost: shipping_cost || 0,
       total_amount: total_amount || 0,
       balance_due: balance_due || 0,
+      SSCLper50,
+      SSCLper100,
       status,
     };
 
@@ -481,9 +481,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
       return res.status(400).json({ error: "Failed to update invoice" });
     }
 
-    // --- Calculate total actual price for SSCL calculations ---
-    let totalActualPrice = 0;
-
     // --- Update invoice items with inventory control ---
     const [oldRows] = await connection.query(
       "SELECT id, product_id, quantity FROM invoice_items WHERE invoice_id = ?",
@@ -498,9 +495,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
     const usedIds = new Set();
 
     for (const item of items) {
-      // Add to total actual price
-      totalActualPrice += Number(item.actual_unit_price) * Number(item.quantity);
-
       if (item.id && oldItems[item.id]) {
         const oldQty = oldItems[item.id].qty;
         const diff = item.quantity - oldQty;
@@ -603,18 +597,6 @@ const updateInvoice = asyncHandler(async (req, res) => {
         ]);
       }
     }
-
-    // --- Calculate SSCL values ---
-    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
-    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
-    const SSCLper50 = Number((totalActualPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalActualPrice * 1.00 * 0.025)).toFixed(2);
-
-    // --- Update invoice with SSCL values ---
-    await connection.query(
-      `UPDATE invoices SET SSCLper50 = ?, SSCLper100 = ? WHERE id = ?`,
-      [SSCLper50, SSCLper100, invoiceId]
-    );
 
     // Handle file attachment if provided
     if (req.file) {

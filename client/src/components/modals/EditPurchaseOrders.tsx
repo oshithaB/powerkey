@@ -45,6 +45,7 @@ interface Vendor {
   vendor_id: number;
   name: string;
   address: string;
+  email?: string;
 }
 
 interface Employee {
@@ -81,6 +82,7 @@ export default function EditOrdersPage() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [vendorSuggestions, setVendorSuggestions] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<any[]>([]); // New state for filtered products
   const [productSuggestions, setProductSuggestions] = useState<any[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
 
@@ -125,21 +127,33 @@ export default function EditOrdersPage() {
     }
   }, [vendorFilter, vendors]);
 
+  // New useEffect to filter products based on selected vendor
+  useEffect(() => {
+    if (order.vendor_id && products.length > 0) {
+      const vendorProducts = products.filter(product => 
+        product.preferred_vendor_id === order.vendor_id
+      );
+      setFilteredProducts(vendorProducts);
+    } else {
+      setFilteredProducts(products);
+    }
+  }, [order.vendor_id, products]);
+
   useEffect(() => {
     if (activeSuggestionIndex !== null) {
       const activeItem = orderItems[activeSuggestionIndex];
       if (activeItem?.name) {
-        const filteredSuggestions = products.filter(product =>
+        const filteredSuggestions = filteredProducts.filter(product =>
           product.name.toLowerCase().includes(activeItem.name.toLowerCase())
         );
         setProductSuggestions(filteredSuggestions);
       } else {
-        setProductSuggestions(products);
+        setProductSuggestions(filteredProducts);
       }
     } else {
       setProductSuggestions([]);
     }
-  }, [orderItems, products, activeSuggestionIndex]);
+  }, [orderItems, filteredProducts, activeSuggestionIndex]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -159,24 +173,24 @@ export default function EditOrdersPage() {
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
-      throw error; // Let the parent catch handle the error
+      throw error;
     }
   };
 
   const fetchOrderItems = async () => {
-  try {
-    if (!selectedCompany) {
-      throw new Error('Selected company is not available');
+    try {
+      if (!selectedCompany) {
+        throw new Error('Selected company is not available');
+      }
+      const response = await axiosInstance.get(`/api/order-items/${selectedCompany.company_id}`);
+      const allOrderItems = response.data;
+      const currentOrderItems = allOrderItems.filter((item: OrderItem) => item.order_id === parseInt(orderId ?? '0'));
+      setOrderItems(currentOrderItems);
+    } catch (error) {
+      console.error('Error fetching order items:', error);
+      throw error;
     }
-    const response = await axiosInstance.get(`/api/order-items/${selectedCompany.company_id}`);
-    const allOrderItems = response.data;
-    const currentOrderItems = allOrderItems.filter((item: OrderItem) => item.order_id === parseInt(orderId ?? '0'));
-    setOrderItems(currentOrderItems);
-  } catch (error) {
-    console.error('Error fetching order items:', error);
-    throw error;
-  }
-};
+  };
 
   const fetchProducts = async () => {
     try {
@@ -212,7 +226,8 @@ export default function EditOrdersPage() {
       setOrder((prev) => ({
         ...prev,
         vendor_id: value === '' ? null : Number(value),
-        mailling_address: selectedVendor ? selectedVendor.address : '',
+        mailling_address: selectedVendor ? selectedVendor.address || '' : '',
+        email: selectedVendor ? selectedVendor.email || '' : '', // Auto-populate email
       }));
     } else {
       setOrder((prev) => ({
@@ -239,7 +254,8 @@ export default function EditOrdersPage() {
       isEditing: true,
     };
     setOrderItems([...orderItems, newItem]);
-    setProductSuggestions(products);
+    // Use filtered products instead of all products
+    setProductSuggestions(filteredProducts);
   };
 
   const updateItem = (id: number | string, field: keyof OrderItem, value: any) => {
@@ -248,7 +264,8 @@ export default function EditOrdersPage() {
     updatedItems[index] = { ...updatedItems[index], [field]: value };
 
     if (field === 'product_id' && value) {
-      const product = products.find(p => p.id === parseInt(value));
+      // Use filteredProducts instead of products
+      const product = filteredProducts.find(p => p.id === parseInt(value));
       if (product) {
         updatedItems[index].name = product.name;
         updatedItems[index].sku = product.sku || '';
@@ -284,18 +301,7 @@ export default function EditOrdersPage() {
         items: orderItems,
       };
 
-      // Update the order
       await axiosInstance.put(`/api/orders/${selectedCompany?.company_id}/${orderId}`, orderData);
-
-      // Delete existing order items and create new ones
-      // await axiosInstance.delete(`/api/order-items/${selectedCompany?.company_id}/${orderId}`);
-      
-      // for (const item of orderItems) {
-      //   await axiosInstance.post(`/api/order-items/${selectedCompany?.company_id}`, {
-      //     ...item,
-      //     order_id: parseInt(orderId!),
-      //   });
-      // }
 
       navigate('/dashboard/purchases');
     } catch (error: any) {
@@ -370,6 +376,7 @@ export default function EditOrdersPage() {
                         ...order,
                         vendor_id: e.target.value === '' ? null : Number(e.target.value),
                         mailling_address: selectedVendor ? selectedVendor.address || '' : '',
+                        email: selectedVendor ? selectedVendor.email || '' : '', // Auto-populate email
                       });
                       setVendorFilter(selectedVendor ? selectedVendor.name : '');
                     }}
@@ -470,6 +477,22 @@ export default function EditOrdersPage() {
               </div>
             </div>
 
+            {/* Display message if editing and vendor changed warning */}
+            {order.prev_status !== 'closed' && !order.vendor_id && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Vendor Selection Required
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <p>Please select a vendor to see available products for this purchase order.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-md font-medium text-gray-900">Order Items</h4>
@@ -477,7 +500,7 @@ export default function EditOrdersPage() {
                   type="button"
                   onClick={addItem}
                   className="btn btn-primary btn-sm"
-                  disabled={order.prev_status === 'closed'}
+                  disabled={order.prev_status === 'closed' || !order.vendor_id}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
@@ -528,10 +551,10 @@ export default function EditOrdersPage() {
                                   }}
                                   onFocus={() => {
                                     setActiveSuggestionIndex(index);
-                                    const filtered = products.filter(product =>
+                                    const filtered = filteredProducts.filter(product =>
                                       product.name.toLowerCase().includes(item.name?.toLowerCase() || '')
                                     );
-                                    setProductSuggestions(filtered.length > 0 ? filtered : products);
+                                    setProductSuggestions(filtered.length > 0 ? filtered : filteredProducts);
                                   }}
                                   onBlur={() => {
                                     setTimeout(() => {
@@ -569,11 +592,16 @@ export default function EditOrdersPage() {
                                     ))}
                                   </ul>
                                 )}
+                                {activeSuggestionIndex === index && productSuggestions.length === 0 && order.vendor_id && (
+                                  <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 p-4 text-center text-gray-500">
+                                    No products found for this vendor
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <div
-                                onClick={() => updateItem(item.id, 'isEditing', true)}
-                                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                                onClick={() => order.prev_status !== 'closed' && updateItem(item.id, 'isEditing', true)}
+                                className={`p-2 rounded ${order.prev_status !== 'closed' ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                               >
                                 {item.name}
                               </div>
@@ -592,8 +620,8 @@ export default function EditOrdersPage() {
                               />
                             ) : (
                               <div
-                                onClick={() => updateItem(item.id, 'isEditing', true)}
-                                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                                onClick={() => order.prev_status !== 'closed' && updateItem(item.id, 'isEditing', true)}
+                                className={`p-2 rounded ${order.prev_status !== 'closed' ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                               >
                                 {item.sku || '-'}
                               </div>
@@ -612,8 +640,8 @@ export default function EditOrdersPage() {
                               />
                             ) : (
                               <div
-                                onClick={() => updateItem(item.id, 'isEditing', true)}
-                                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                                onClick={() => order.prev_status !== 'closed' && updateItem(item.id, 'isEditing', true)}
+                                className={`p-2 rounded ${order.prev_status !== 'closed' ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                               >
                                 {item.description || '-'}
                               </div>
@@ -633,8 +661,8 @@ export default function EditOrdersPage() {
                               />
                             ) : (
                               <div
-                                onClick={() => updateItem(item.id, 'isEditing', true)}
-                                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                                onClick={() => order.prev_status !== 'closed' && updateItem(item.id, 'isEditing', true)}
+                                className={`p-2 rounded ${order.prev_status !== 'closed' ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                               >
                                 {item.qty}
                               </div>
@@ -654,8 +682,8 @@ export default function EditOrdersPage() {
                               />
                             ) : (
                               <div
-                                onClick={() => updateItem(item.id, 'isEditing', true)}
-                                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                                onClick={() => order.prev_status !== 'closed' && updateItem(item.id, 'isEditing', true)}
+                                className={`p-2 rounded ${order.prev_status !== 'closed' ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                               >
                                 Rs. {Number(item.rate).toFixed(2)}
                               </div>

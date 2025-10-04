@@ -6,8 +6,24 @@ const getSalesReport = async (req, res) => {
         let whereClause = '';
         let params = [];
         if (start_date && end_date) {
-            whereClause = 'WHERE i.invoice_date >= ? AND i.invoice_date <= ? AND i.status != "proforma"';
-            params = [start_date, end_date];
+            // Validate date format
+            const startDate = new Date(start_date);
+            const endDate = new Date(end_date);
+            if (isNaN(startDate) || isNaN(endDate)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid date format'
+                });
+            }
+            // Ensure start_date is not after end_date
+            if (startDate > endDate) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Start date cannot be after end date'
+                });
+            }
+            whereClause = 'WHERE i.invoice_date >= ? AND i.invoice_date <= ? AND i.status != ?';
+            params = [start_date, end_date, 'proforma'];
         }
 
         const query = `
@@ -22,7 +38,7 @@ const getSalesReport = async (req, res) => {
                 invoices i ON e.id = i.employee_id
             ${whereClause}
             GROUP BY
-                e.name
+                e.id, e.name, e.email
         `;
 
         // Execute the query

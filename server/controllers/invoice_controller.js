@@ -120,7 +120,6 @@ const createInvoice = asyncHandler(async (req, res) => {
 
     // --- Update customer balance (if not proforma) ---
     if (status !== 'proforma') {
-
       console.log('Updating customer balance for invoice (Not Proforma):', invoiceData.invoice_number);
 
       const [customerRows] = await connection.query(
@@ -139,7 +138,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       );
     }
 
-    console.log('Customer balance updated'); 
+    console.log('Customer balance updated');
 
     // --- Insert invoice ---
     const [result] = await connection.query(`INSERT INTO invoices SET ?`, invoiceData);
@@ -173,6 +172,8 @@ const createInvoice = asyncHandler(async (req, res) => {
         totalPrice
       ];
 
+      let invoiceItemStockDetails = null; // Default for proforma or no stock
+
       // Check stock (if not proforma)
       if (status !== 'proforma') {
         const [productRows] = await connection.query(
@@ -198,47 +199,38 @@ const createInvoice = asyncHandler(async (req, res) => {
 
         console.log('Stock items for product', item.product_id, '[', item.product_name, '] :', stockItems);
 
-        if (stockItems.length === 0 && status !== 'proforma') {
+        if (stockItems.length === 0) {
           await connection.rollback();
           return res.status(404).json({
             error: `No stock available for ${item.product_name}.`
           });
         }
 
-        let itemQtyCopy = item.quantity; //10
-        let invoiceItemStockDetails = [];
+        let itemQtyCopy = item.quantity;
+        invoiceItemStockDetails = [];
 
         for (const stockItem of stockItems) {
           if (itemQtyCopy > stockItem.remaining_qty) {
             itemQtyCopy -= stockItem.remaining_qty;
-            stockItem.remaining_qty = 0;
-            stockItem.stock_status = 'out_of_stock';
             invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: stockItem.remaining_qty });
             await connection.query(
-              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              `UPDATE order_items SET remaining_qty = 0, stock_status = 'out_of_stock' WHERE id = ?`,
+              [stockItem.id]
             );
-          } else if (itemQtyCopy < stockItem.remaining_qty) {
+          } else {
             stockItem.remaining_qty -= itemQtyCopy;
             invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
             await connection.query(
               `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
-            );
-            break;
-          } else {
-            stockItem.remaining_qty = 0;
-            stockItem.stock_status = 'out_of_stock';
-            invoiceItemStockDetails.push({ order_item_id: stockItem.id, used_qty: itemQtyCopy });
-            await connection.query(
-              `UPDATE order_items SET remaining_qty = ?, stock_status = ? WHERE id = ?`,
-              [stockItem.remaining_qty, stockItem.stock_status, stockItem.id]
+              [stockItem.remaining_qty, stockItem.remaining_qty > 0 ? 'in_stock' : 'out_of_stock', stockItem.id]
             );
             break;
           }
         }
-        itemData.push(JSON.stringify(invoiceItemStockDetails));
       }
+
+      // Add stock_detail to itemData (JSON string or null)
+      itemData.push(invoiceItemStockDetails ? JSON.stringify(invoiceItemStockDetails) : null);
 
       // Insert item
       const [itemResult] = await connection.query(itemQuery, itemData);
@@ -257,10 +249,8 @@ const createInvoice = asyncHandler(async (req, res) => {
     }
 
     // --- Calculate SSCL values ---
-    // SSCLper50 = (totalActualPrice * 50%) * 2.5% + totalActualPrice
-    // SSCLper100 = (totalActualPrice * 100%) * 2.5% + totalActualPrice
-    const SSCLper50 = Number((totalPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalPrice * 1.00 * 0.025).toFixed(2));
+    const SSCLper50 = Number((total_amount * 0.50 * 0.025).toFixed(2));
+    const SSCLper100 = Number((total_amount * 1.00 * 0.025).toFixed(2));
 
     // --- Update invoice with SSCL values ---
     await connection.query(
@@ -924,8 +914,8 @@ const updateInvoice = asyncHandler(async (req, res) => {
     }
 
     // --- Calculate SSCL values ---
-    const SSCLper50 = Number((totalPrice * 0.50 * 0.025)).toFixed(2);
-    const SSCLper100 = Number((totalPrice * 1.00 * 0.025)).toFixed(2);
+    const SSCLper50 = Number((total_amount * 0.50 * 0.025)).toFixed(2);
+    const SSCLper100 = Number((total_amount * 1.00 * 0.025)).toFixed(2);
 
     // --- Update invoice with SSCL values ---
     await connection.query(

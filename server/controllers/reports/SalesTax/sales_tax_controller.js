@@ -98,64 +98,63 @@ const SSCL50percentTaxDetail = async (req, res) => {
 };
 
 // SSCL (100%) - Tax Detail Report
+// SSCL (100%) - Tax Detail Report
 const SSCL100percentTaxDetail = async (req, res) => {
     try {
         const { company_id } = req.params;
         const { start_date, end_date } = req.query;
 
-        console.log('=== SSCL 100% Tax Detail Debug ===');
-        console.log('Params:', { company_id, start_date, end_date });
+        console.log('Received params:', { company_id, start_date, end_date });
 
-        // First, let's see what columns exist
-        const [columns] = await db.execute(`
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'invoices' 
-            AND TABLE_SCHEMA = DATABASE()
-        `);
-        
-        console.log('Available columns in invoices table:', columns.map(c => c.COLUMN_NAME));
-
-        // Try a simple query first
         let query = `
             SELECT
                 i.invoice_number,
                 i.invoice_date,
                 c.name AS customer_name,
                 2.5 AS tax_rate,
-                0 AS total_tax_amount,
+                i.SSCLper100 AS total_tax_amount,
                 i.total_amount,
-                'SSCL 100%' AS tax_rate_name
+                'SSCL' AS tax_rate_name
             FROM invoices i
-            LEFT JOIN customer c ON i.customer_id = c.id
+            JOIN customer c ON i.customer_id = c.id
             WHERE i.company_id = ?
-            LIMIT 5
+                AND i.status != 'cancelled' 
+                AND i.status != 'proforma'
         `;
 
-        const [results] = await db.execute(query, [company_id]);
+        const queryParams = [company_id];
+
+        // Add date filtering if provided
+        if (start_date && end_date) {
+            query += ` AND DATE(i.invoice_date) BETWEEN DATE(?) AND DATE(?)`;
+            queryParams.push(start_date, end_date);
+            console.log('Date filter applied:', { start_date, end_date });
+        }
+
+        query += ` ORDER BY i.invoice_date DESC, i.invoice_number`;
+
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+
+        const [results] = await db.execute(query, queryParams);
         
-        console.log('Query successful, found:', results.length, 'records');
+        console.log(`Found ${results.length} records`);
+        if (results.length > 0) {
+            console.log('Date range in results:', {
+                earliest: results[results.length - 1].invoice_date,
+                latest: results[0].invoice_date
+            });
+        }
         
         res.json({
             success: true,
             data: results,
             total_records: results.length,
-            debug_columns: columns.map(c => c.COLUMN_NAME)
+            filter_applied: { start_date, end_date }
         });
     } catch (error) {
-        console.error('=== ERROR ===');
-        console.error('Message:', error.message);
-        console.error('SQL Message:', error.sqlMessage);
-        console.error('SQL State:', error.sqlState);
-        console.error('Error Number:', error.errno);
-        console.error('Full Error:', error);
-        
-        res.status(500).json({ 
-            success: false, 
-            message: error.message,
-            sqlMessage: error.sqlMessage,
-            sqlState: error.sqlState
-        });
+        console.error('Error fetching SSCL 100% tax detail report:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 };
 

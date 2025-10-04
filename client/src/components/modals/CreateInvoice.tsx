@@ -73,6 +73,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     discount_type: 'fixed' as 'percentage' | 'fixed',
     discount_value: 0,
     shipping_cost: 0,
+    shipping_tax_rate: 0,
     notes: '',
     terms: '',
     shipping_address: '',
@@ -347,6 +348,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
 
   const calculateTotals = () => {
     const shippingCost = Number(formData.shipping_cost || 0);
+    const shippingTaxRate = Number(formData.shipping_tax_rate || 0);
+    const shippingTaxAmount = Number((shippingCost * shippingTaxRate / 100).toFixed(2));
+    const totalShippingWithTax = Number((shippingCost + shippingTaxAmount).toFixed(2));
+    
     const subtotal = Number(items.reduce((sum, item) => sum + (item.quantity * item.actual_unit_price), 0).toFixed(2));
     const totalTax = Number(items.reduce((sum, item) => sum + (item.quantity * item.tax_amount), 0).toFixed(2));
     
@@ -356,10 +361,10 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     } else {
       discountAmount = Number(formData.discount_value.toFixed(2));
     }
-
-    const total = Number((subtotal + shippingCost + totalTax - discountAmount).toFixed(2));
-
-    return { subtotal, totalTax, discountAmount, shippingCost, total };
+  
+    const total = Number((subtotal + totalShippingWithTax + totalTax - discountAmount).toFixed(2));
+  
+    return { subtotal, totalTax, discountAmount, shippingCost: totalShippingWithTax, shippingTaxAmount, total };
   };
 
   const handleSubmit = async (e: React.FormEvent, invoiceType?: 'invoice' | 'proforma') => {
@@ -384,7 +389,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         throw new Error('At least one valid item is required');
       }
   
-      const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
+      const { subtotal, totalTax, discountAmount, shippingCost, shippingTaxAmount, total } = calculateTotals();
   
       // const selectedCustomer = customers.find(customer => customer.id === parseInt(formData.customer_id));
       // if (selectedCustomer && selectedCustomer.credit_limit < total) {
@@ -402,6 +407,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
         tax_amount: Number(totalTax),
         discount_amount: Number(discountAmount),
         shipping_cost: Number(shippingCost),
+        shipping_tax_rate: Number(formData.shipping_tax_rate),
         total_amount: Number(total),
         status: currentInvoiceType === 'proforma' ? 'proforma' : 'opened',
         items: items.map(item => ({
@@ -487,7 +493,7 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
     }
   };
 
-  const { subtotal, totalTax, discountAmount, shippingCost, total } = calculateTotals();
+  const { subtotal, totalTax, discountAmount, shippingCost, shippingTaxAmount, total } = calculateTotals();
 
   const handleNewCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1111,15 +1117,41 @@ export default function InvoiceModal({ invoice, onSave }: InvoiceModalProps) {
                     </div>
                     <div className="flex justify-between items-center">
                       <span>Shipping Cost:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="input w-24 text-right"
-                        value={formData.shipping_cost}
-                        onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
-                      />
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="input w-24 text-right"
+                          value={formData.shipping_cost}
+                          onChange={(e) => setFormData({ ...formData, shipping_cost: parseFloat(e.target.value) || 0 })}
+                        />
+                        <select
+                          className="input w-20"
+                          value={formData.shipping_tax_rate}
+                          onChange={(e) => setFormData({ ...formData, shipping_tax_rate: parseFloat(e.target.value) || 0 })}
+                        >
+                          {taxRates.length > 0 ? (
+                            <>
+                              {taxRates.map((tax) => (
+                                <option key={tax.tax_rate_id} value={parseFloat(tax.rate)}>
+                                  {tax.name} ({tax.rate}%)
+                                </option>
+                              ))}
+                              <option value={0}>0% No Tax</option>
+                            </>
+                          ) : (
+                            <option value={0} disabled>No tax rates available</option>
+                          )}
+                        </select>
+                      </div>
                     </div>
+                    {formData.shipping_cost > 0 && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span className="ml-4">Shipping Tax ({formData.shipping_tax_rate}%):</span>
+                        <span>Rs. {shippingTaxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>Tax:</span>
                       <span>Rs. {totalTax.toFixed(2)}</span>

@@ -438,60 +438,74 @@ const getOpenPurchaseOrdersList = async (req, res) => {
 };
 
 const getExpenseBySupplierSummary = async (req, res) => {
-  try {
-      const { company_id } = req.params;
-      const { start_date, end_date } = req.query;
+    try {
+        const { company_id } = req.params;
+        const { start_date, end_date } = req.query;
 
-      console.log('Received params:', { company_id, start_date, end_date });
+        // Validate inputs
+        if (!company_id) {
+        return res.status(400).json({ success: false, message: 'Company ID is required' });
+        }
 
-      let query = `
-          SELECT 
-              p.id as payee_id,
-              p.name as payee_name,
-              COUNT(DISTINCT e.id) as total_expenses,
-              SUM(CASE WHEN e.status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_expenses,
-              SUM(CASE WHEN e.status = 'paid' THEN 1 ELSE 0 END) as paid_expenses,
-              SUM(e.amount) as total_expense_amount,
-              MIN(e.payment_date) as first_expense_date,
-              MAX(e.payment_date) as last_expense_date,
-              status,
-              GROUP_CONCAT(DISTINCT ec.category_name) as expense_categories
-          FROM expenses e
-          JOIN payees p ON e.payee_id = p.id
-          LEFT JOIN expense_items ei ON e.id = ei.expense_id
-          LEFT JOIN expense_categories ec ON ei.category_id = ec.id
-          WHERE e.company_id = ?
-      `;
+        // Validate date format
+        if (start_date && end_date) {
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date);
+        if (isNaN(startDate) || isNaN(endDate)) {
+            return res.status(400).json({ success: false, message: 'Invalid date format' });
+        }
+        if (startDate > endDate) {
+            return res.status(400).json({ success: false, message: 'Start date cannot be after end date' });
+        }
+        }
 
-      const queryParams = [company_id];
+        let query = `
+        SELECT 
+            p.id AS payee_id,
+            p.name AS payee_name,
+            COUNT(DISTINCT e.id) AS total_expenses,
+            SUM(CASE WHEN e.status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_expenses,
+            SUM(CASE WHEN e.status = 'paid' THEN 1 ELSE 0 END) AS paid_expenses,
+            COALESCE(SUM(e.amount), 0) AS total_expense_amount,
+            MIN(e.payment_date) AS first_expense_date,
+            MAX(e.payment_date) AS last_expense_date,
+            GROUP_CONCAT(DISTINCT e.status) AS status,
+            GROUP_CONCAT(DISTINCT ec.category_name) AS expense_categories
+        FROM expenses e
+        JOIN payees p ON e.payee_id = p.id
+        LEFT JOIN expense_items ei ON e.id = ei.expense_id
+        LEFT JOIN expense_categories ec ON ei.category_id = ec.id
+        WHERE e.company_id = ?
+        `;
 
-      if (start_date && end_date) {
-          query += ` AND DATE(e.payment_date) BETWEEN DATE(?) AND DATE(?)`;
-          queryParams.push(start_date, end_date);
-          console.log('Date filter applied:', { start_date, end_date });
-      }
+        const queryParams = [company_id];
 
-      query += `
-          GROUP BY p.id, p.name
-          ORDER BY total_expense_amount DESC, p.name
-      `;
+        if (start_date && end_date) {
+        query += ` AND DATE(e.payment_date) BETWEEN ? AND ?`;
+        queryParams.push(start_date, end_date);
+        }
 
-      console.log('Query params:', queryParams);
+        query += `
+        GROUP BY p.id, p.name
+        ORDER BY total_expense_amount DESC, p.name
+        `;
 
-      const [results] = await db.execute(query, queryParams);
+        const [results] = await db.execute(query, queryParams);
 
-      console.log(`Found ${results.length} records`);
-
-      res.json({
-          success: true,
-          data: results,
-          total_records: results.length,
-          filter_applied: { start_date, end_date }
-      });
-  } catch (error) {
-      console.error('Error fetching expense by supplier summary:', error);
-      res.status(500).json({ success: false, message: 'Internal server error' });
-  }
+        res.json({
+        success: true,
+        data: results,
+        total_records: results.length,
+        filter_applied: { start_date, end_date }
+        });
+    } catch (error) {
+        console.error('Error fetching expense by supplier summary:', error);
+        res.status(500).json({ 
+        success: false, 
+        message: 'Failed to fetch expense by supplier summary',
+        error: error.message 
+        });
+    }
 };
 
 const getExpenseBySupplierDetail = async (req, res) => {

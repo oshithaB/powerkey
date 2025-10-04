@@ -32,7 +32,7 @@ const SalesReport: React.FC = () => {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   const fetchSalesData = async (startDate?: string, endDate?: string) => {
@@ -42,10 +42,9 @@ const SalesReport: React.FC = () => {
       const response = await axiosInstance.get('/api/sales-report', {
         params: { start_date: startDate, end_date: endDate }
       });
-      console.log(response.data);
       setData(response.data.data);
-    } catch (err) {
-      setError('Failed to fetch sales data. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to fetch sales data. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -53,32 +52,41 @@ const SalesReport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedCompany?.company_id) {
-      if (isCustomRange) {
-        return;
-      }
-      
-      const today = new Date();
-      let startDate: string | undefined;
-      let endDate: string = today.toISOString().split('T')[0];
-  
-      if (filter === 'week') {
-        startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
-      } else if (filter === 'month') {
-        startDate = new Date(today.setMonth(today.getMonth() - 1)).toISOString().split('T')[0];
-      } else if (filter === 'year') {
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
-      }
-  
-      setPeriodStart(startDate || '');
-      setPeriodEnd(endDate);
-      fetchSalesData(startDate, endDate);
-    } else {
-      setError('Missing company or customer information');
+    if (!selectedCompany?.company_id) {
+      setError('Missing company information');
       setLoading(false);
+      return;
     }
+
+    if (isCustomRange) {
+      return;
+    }
+
+    if (!filter) {
+      return;
+    }
+
+    const today = new Date();
+    let startDate: string | undefined;
+    let endDate: string = today.toISOString().split('T')[0];
+
+    if (filter === 'week') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(today.getDate() - 7);
+      startDate = weekAgo.toISOString().split('T')[0];
+    } else if (filter === 'month') {
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(today.getMonth() - 1);
+      startDate = monthAgo.toISOString().split('T')[0];
+    } else if (filter === 'year') {
+      startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+    }
+
+    setPeriodStart(startDate || '');
+    setPeriodEnd(endDate);
+    fetchSalesData(startDate, endDate);
   }, [selectedCompany?.company_id, filter, isCustomRange]);
-    
+
   const formatCurrency = (value: string) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'LKR' }).format(parseFloat(value));
   };
@@ -138,7 +146,7 @@ const SalesReport: React.FC = () => {
           }
         }
 
-        pdf.save(`sales-report.pdf`);
+        pdf.save(`sales-report-${new Date().toISOString().split('T')[0]}.pdf`);
         setShowPrintPreview(false);
       }
     } catch (error) {
@@ -152,13 +160,11 @@ const SalesReport: React.FC = () => {
       .section-header {
         background-color: #e2e8f0 !important;
         -webkit-print-color-adjust: exact !important;
-        color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
     }
     .section-header {
       -webkit-print-color-adjust: exact !important;
-      color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
   `;
@@ -203,7 +209,7 @@ const SalesReport: React.FC = () => {
                     <option value="custom">Custom Range</option>
                   </select>
                 </div>
-                
+
                 {isCustomRange && (
                   <>
                     <div className="flex flex-col">
@@ -213,6 +219,7 @@ const SalesReport: React.FC = () => {
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         className="border rounded-md p-2"
+                        max={endDate || new Date().toISOString().split('T')[0]}
                       />
                     </div>
                     <div className="flex flex-col">
@@ -222,6 +229,8 @@ const SalesReport: React.FC = () => {
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
                         className="border rounded-md p-2"
+                        min={startDate}
+                        max={new Date().toISOString().split('T')[0]}
                       />
                     </div>
                     <button
@@ -230,19 +239,19 @@ const SalesReport: React.FC = () => {
                           fetchSalesData(startDate, endDate);
                         }
                       }}
-                      disabled={!startDate || !endDate}
+                      disabled={!startDate || !endDate || new Date(startDate) > new Date(endDate)}
                       className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                       Apply
                     </button>
                   </>
                 )}
-                
+
                 <button
                   onClick={handlePrint}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                   title="Print Report"
-                  disabled={loading || !data}
+                  disabled={loading || data.length === 0}
                 >
                   <Printer className="h-6 w-6" />
                 </button>
@@ -273,13 +282,13 @@ const SalesReport: React.FC = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Employee Name</th>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Email</th>
-                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Sales</th>
+                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>Employee Name</th>
+                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>Email</th>
+                      <th className="bg-gray-100 p-2 font-semibold text-lg border-b section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>Total Sales</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((employee, index) => (
+                    {data.map((employee) => (
                       <tr 
                         key={employee.employeeId}
                         onClick={() => handleEmployeeClick(employee.employeeId)}
@@ -297,6 +306,9 @@ const SalesReport: React.FC = () => {
                   </tbody>
                 </table>
               )}
+              {data.length === 0 && !loading && !error && (
+                <div className="text-center text-gray-600">No sales data available for the selected period.</div>
+              )}
               <p className="text-sm mt-5">Report generated at {new Date().toLocaleString()}</p>
             </div>
           </div>
@@ -305,10 +317,7 @@ const SalesReport: React.FC = () => {
 
       {/* Print Preview Modal */}
       {showPrintPreview && data.length > 0 && (
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50"
-          style={{ marginTop: "-10px" }}
-        >
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto w-full z-50">
           <div className="relative top-4 mx-auto p-5 border w-full max-w-5xl shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900">
@@ -323,46 +332,30 @@ const SalesReport: React.FC = () => {
             </div>
 
             <div className="overflow-y-auto max-h-[70vh]">
-              <div
-                ref={printRef}
-                className="p-8 bg-white text-gray-900"
-              >
-                {/* Header */}
+              <div ref={printRef} className="p-8 bg-white text-gray-900">
                 <div className="flex justify-between items-start border-b pb-4 mb-6">
                   <div>
                     <h1 className="text-3xl font-bold mb-2">Sales Report</h1>
                     <h2 className="text-xl text-gray-600 mb-2">Employee Sales Summary for All Companies</h2>
-                    <h2 className="text-xl text-gray-600 mb-2">
-                      {/* {selectedCompany?.name || 'Company Name'} (Pvt) Ltd. */}
-                    </h2>
                     <p className="text-sm text-gray-600">
-                    {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
+                      {filter === 'week' && `Last 7 days: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {filter === 'month' && `Last 1 month: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {filter === 'year' && `Year to Date: ${formatDate(periodStart)} - ${formatDate(periodEnd)}`}
                       {isCustomRange && startDate && endDate && `Custom Range: ${formatDate(startDate)} - ${formatDate(endDate)}`}
                     </p>
                   </div>
-
-                  {/* {selectedCompany?.company_logo && (
-                    <img
-                      src={`http://localhost:3000${selectedCompany.company_logo}`}
-                      alt={`${selectedCompany.name} Logo`}
-                      className="h-20 w-auto max-w-[200px] object-contain"
-                    />
-                  )} */}
                 </div>
 
-                {/* Report Content */}
                 <table className="w-full border-collapse mb-6">
                   <thead>
                     <tr>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMPLOYEE NAME</th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>EMAIL</th>
-                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL SALES</th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>EMPLOYEE NAME</th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-left" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>EMAIL</th>
+                      <th className="bg-gray-100 p-2 font-bold text-base border section-header text-right" style={{backgroundColor: '#e2e8f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact'}}>TOTAL SALES</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((employee, index) => (
+                    {data.map((employee) => (
                       <tr key={employee.employeeId}>
                         <td className="p-2 border-b">{employee.employeeName}</td>
                         <td className="p-2 border-b">{employee.employeeEmail}</td>
@@ -376,7 +369,6 @@ const SalesReport: React.FC = () => {
                   </tbody>
                 </table>
 
-                {/* Footer */}
                 <div className="border-t pt-2">
                   <div className="flex justify-between items-center">
                     <div>

@@ -351,7 +351,7 @@ async function createTables(db) {
             payment_amount decimal(10,2) NOT NULL,
             payment_date date NOT NULL,
             payment_method varchar(50) NOT NULL,
-            deposit_to varchar(100) NOT NULL,
+            deposit_to varchar(100),
             notes text DEFAULT NULL,
             created_at timestamp NOT NULL DEFAULT current_timestamp(),
             PRIMARY KEY (id),
